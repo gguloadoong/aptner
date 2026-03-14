@@ -34,9 +34,9 @@ export default function SubscriptionPage() {
     <div className="min-h-screen bg-[#F5F6F8]">
       {/* 헤더 */}
       <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30">
-        <div className="px-5 py-4">
+        <div className="md:max-w-4xl md:mx-auto px-5 py-4">
           <div className="flex items-center gap-3 mb-4">
-            <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
+            <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 rounded-lg transition-colors">
               <svg className="w-5 h-5 text-[#191F28]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
@@ -68,68 +68,77 @@ export default function SubscriptionPage() {
       </header>
 
       {/* 필터 바 */}
-      <div className="bg-white border-b border-[#E5E8EB] px-5 py-3 flex items-center gap-3">
-        {/* 지역 필터 */}
-        <div className="flex gap-2 overflow-x-auto flex-1 pb-1 scrollbar-hide">
-          {REGIONS.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRegion(r)}
-              className={[
-                'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors',
-                region === r
-                  ? 'bg-[#1B64DA] text-white'
-                  : 'bg-[#F5F6F8] text-[#8B95A1]',
-              ].join(' ')}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+      <div className="bg-white border-b border-[#E5E8EB]">
+        <div className="md:max-w-4xl md:mx-auto px-5 py-3 flex items-center gap-3">
+          {/* 지역 필터 */}
+          <div className="flex gap-2 overflow-x-auto flex-1 pb-1 scrollbar-hide">
+            {REGIONS.map((r) => (
+              <button
+                key={r}
+                onClick={() => setRegion(r)}
+                className={[
+                  'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors',
+                  region === r
+                    ? 'bg-[#1B64DA] text-white'
+                    : 'bg-[#F5F6F8] text-[#8B95A1] hover:bg-gray-100',
+                ].join(' ')}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
 
-        {/* 정렬 선택 */}
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortOrder)}
-          className="flex-shrink-0 text-xs text-[#191F28] border border-[#E5E8EB] rounded-lg px-2 py-1.5 bg-white outline-none"
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          {/* 정렬 선택 */}
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortOrder)}
+            className="flex-shrink-0 text-xs text-[#191F28] border border-[#E5E8EB] rounded-lg px-2 py-1.5 bg-white outline-none cursor-pointer"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* 청약 목록 */}
-      <main className="px-5 py-4 pb-28">
-        {/* 건수 표시 */}
-        {!isLoading && (
-          <p className="text-xs text-[#8B95A1] mb-3">
-            총 {data?.total ?? 0}건
-          </p>
-        )}
+      <main className="py-4 pb-28 md:pb-8">
+        <div className="md:max-w-4xl md:mx-auto px-5 md:px-6">
+          {/* 건수 표시 */}
+          {!isLoading && (
+            <p className="text-xs text-[#8B95A1] mb-3">
+              총 {data?.total ?? 0}건
+            </p>
+          )}
 
-        {isLoading ? (
-          <div className="flex flex-col gap-3">
-            {[1, 2, 3, 4].map((i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </div>
-        ) : isError ? (
-          <ErrorState />
-        ) : subscriptions.length === 0 ? (
-          <EmptyState status={status} />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {subscriptions.map((sub) => (
-              <SubscriptionCard key={sub.id} subscription={sub} />
-            ))}
-          </div>
-        )}
+          {isLoading ? (
+            /* 모바일: 1열, 데스크탑: 2열 */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          ) : isError ? (
+            <ErrorState />
+          ) : subscriptions.length === 0 ? (
+            <EmptyState status={status} />
+          ) : (
+            /* 모바일: 1열, 데스크탑: 2열 그리드 */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {subscriptions.map((sub) => (
+                <SubscriptionCard key={sub.id} subscription={sub} />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
-      <BottomNav />
+      {/* 모바일 하단 내비게이션 */}
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
     </div>
   );
 }

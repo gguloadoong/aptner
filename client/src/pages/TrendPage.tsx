@@ -16,7 +16,7 @@ import { formatPriceShort, formatChange } from '../utils/formatNumber';
 
 const REGIONS = ['전국', '서울', '경기', '인천', '부산'];
 
-// 트렌드 페이지
+// 트렌드 페이지 - 데스크탑: 2컬럼 (랭킹 | 차트 + 급등)
 export default function TrendPage() {
   const navigate = useNavigate();
   const [selectedRegion, setSelectedRegion] = useState('전국');
@@ -37,120 +37,152 @@ export default function TrendPage() {
   return (
     <div className="min-h-screen bg-[#F5F6F8]">
       {/* 헤더 */}
-      <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4 md:px-6">
+        <div className="md:max-w-6xl md:mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-lg font-black text-[#191F28]">트렌드</h1>
-            <p className="text-xs text-[#8B95A1] mt-0.5">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} 기준</p>
+            <p className="text-xs text-[#8B95A1] mt-0.5">
+              {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} 기준
+            </p>
           </div>
+          {/* 데스크탑: 홈으로 돌아가기 */}
+          <button
+            onClick={() => navigate('/')}
+            className="hidden md:flex items-center gap-1.5 text-sm text-[#8B95A1] hover:text-[#191F28] transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            홈으로
+          </button>
         </div>
       </header>
 
-      <main className="pb-28">
-        {/* 지역별 가격 변동 차트 */}
-        <section className="bg-white px-5 py-5 mb-3">
-          <h2 className="text-base font-bold text-[#191F28] mb-4">지역별 가격 변동률</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E8EB" vertical={false} />
-              <XAxis
-                dataKey="region"
-                tick={{ fontSize: 12, fill: '#8B95A1' }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 10, fill: '#8B95A1' }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v) => `${v}%`}
-              />
-              <Tooltip
-                formatter={(value) => [`${value}%`, '변동률']}
-                contentStyle={{
-                  borderRadius: 12,
-                  border: 'none',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                  fontSize: 12,
-                }}
-              />
-              <Bar
-                dataKey="change"
-                fill="#1B64DA"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={40}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+      <main className="pb-28 md:pb-8">
+        <div className="md:max-w-6xl md:mx-auto md:px-6">
 
-          {/* 지역 요약 카드 */}
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            {MOCK_REGION_TRENDS.map((trend) => (
-              <RegionCard key={trend.region} trend={trend} />
-            ))}
-          </div>
-        </section>
+          {/* 데스크탑 2컬럼 레이아웃 */}
+          <div className="md:grid md:grid-cols-[1fr_420px] md:gap-6 md:pt-6">
 
-        {/* 거래량 급등 알림 */}
-        <section className="bg-white px-5 py-5 mb-3">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 bg-[#FF4B4B] rounded-full animate-pulse" />
-            <h2 className="text-base font-bold text-[#191F28]">거래량 급등 단지</h2>
-          </div>
-          <div className="space-y-3">
-            {MOCK_SURGE_ALERTS.map((alert) => (
-              <SurgeAlertCard key={alert.id} alert={alert} onPress={() => navigate(`/apartment/${alert.apartmentId}`)} />
-            ))}
-          </div>
-        </section>
-
-        {/* 주간 핫 아파트 TOP 20 */}
-        <section className="px-5 py-5">
-          <div className="flex items-center justify-between mb-4">
+            {/* 좌측 컬럼: 주간 HOT 랭킹 */}
             <div>
-              <h2 className="text-base font-bold text-[#191F28]">주간 HOT 아파트</h2>
-              <p className="text-xs text-[#8B95A1] mt-0.5">조회수 + 거래량 기준</p>
+              {/* 주간 핫 아파트 TOP 20 */}
+              <section className="px-5 py-5 md:px-0 md:py-0 md:bg-white md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-[#191F28]">주간 HOT 아파트</h2>
+                    <p className="text-xs text-[#8B95A1] mt-0.5">조회수 + 거래량 기준</p>
+                  </div>
+                </div>
+
+                {/* 지역 필터 */}
+                <div className="flex gap-2 overflow-x-auto pb-3 -mx-5 px-5 md:mx-0 md:px-0 md:overflow-visible md:flex-wrap">
+                  {REGIONS.map((region) => (
+                    <button
+                      key={region}
+                      onClick={() => setSelectedRegion(region)}
+                      className={[
+                        'flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-colors',
+                        selectedRegion === region
+                          ? 'bg-[#1B64DA] text-white'
+                          : 'bg-white text-[#8B95A1] border border-[#E5E8EB] hover:border-[#1B64DA] hover:text-[#1B64DA]',
+                      ].join(' ')}
+                    >
+                      {region}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 mt-3">
+                  {filteredRanking.length === 0 ? (
+                    <div className="py-8 text-center">
+                      <p className="text-sm text-[#8B95A1]">{selectedRegion} 지역 데이터가 없습니다</p>
+                    </div>
+                  ) : (
+                    filteredRanking.slice(0, 20).map((apt, index) => (
+                      <ApartmentCard
+                        key={apt.id}
+                        apartment={apt}
+                        rank={index + 1}
+                        showRankChange
+                      />
+                    ))
+                  )}
+                </div>
+              </section>
+            </div>
+
+            {/* 우측 컬럼: 차트 + 급등 알림 */}
+            <div className="space-y-4 md:space-y-4">
+              {/* 지역별 가격 변동 차트 */}
+              <section className="bg-white px-5 py-5 mb-3 md:mb-0 md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
+                <h2 className="text-base font-bold text-[#191F28] mb-4">지역별 가격 변동률</h2>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E8EB" vertical={false} />
+                    <XAxis
+                      dataKey="region"
+                      tick={{ fontSize: 12, fill: '#8B95A1' }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: '#8B95A1' }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `${v}%`}
+                    />
+                    <Tooltip
+                      formatter={(value) => [`${value}%`, '변동률']}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: 'none',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        fontSize: 12,
+                      }}
+                    />
+                    <Bar
+                      dataKey="change"
+                      fill="#1B64DA"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={40}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+
+                {/* 지역 요약 카드 */}
+                <div className="grid grid-cols-3 gap-3 mt-4">
+                  {MOCK_REGION_TRENDS.map((trend) => (
+                    <RegionCard key={trend.region} trend={trend} />
+                  ))}
+                </div>
+              </section>
+
+              {/* 거래량 급등 알림 */}
+              <section className="bg-white px-5 py-5 mb-3 md:mb-0 md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-2 h-2 bg-[#FF4B4B] rounded-full animate-pulse" />
+                  <h2 className="text-base font-bold text-[#191F28]">거래량 급등 단지</h2>
+                </div>
+                <div className="space-y-3">
+                  {MOCK_SURGE_ALERTS.map((alert) => (
+                    <SurgeAlertCard
+                      key={alert.id}
+                      alert={alert}
+                      onPress={() => navigate(`/apartment/${alert.apartmentId}`)}
+                    />
+                  ))}
+                </div>
+              </section>
             </div>
           </div>
-
-          {/* 지역 필터 */}
-          <div className="flex gap-2 overflow-x-auto pb-3 -mx-5 px-5">
-            {REGIONS.map((region) => (
-              <button
-                key={region}
-                onClick={() => setSelectedRegion(region)}
-                className={[
-                  'flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-colors',
-                  selectedRegion === region
-                    ? 'bg-[#1B64DA] text-white'
-                    : 'bg-white text-[#8B95A1] border border-[#E5E8EB]',
-                ].join(' ')}
-              >
-                {region}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-3">
-            {filteredRanking.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-sm text-[#8B95A1]">{selectedRegion} 지역 데이터가 없습니다</p>
-              </div>
-            ) : (
-              filteredRanking.slice(0, 20).map((apt, index) => (
-                <ApartmentCard
-                  key={apt.id}
-                  apartment={apt}
-                  rank={index + 1}
-                  showRankChange
-                />
-              ))
-            )}
-          </div>
-        </section>
+        </div>
       </main>
 
-      <BottomNav />
+      {/* 모바일 하단 내비게이션 */}
+      <div className="md:hidden">
+        <BottomNav />
+      </div>
     </div>
   );
 }
@@ -162,7 +194,7 @@ function RegionCard({ trend }: { trend: (typeof MOCK_REGION_TRENDS)[0] }) {
 
   return (
     <div className="bg-[#F5F6F8] rounded-xl p-3">
-      <p className="text-xs font-bold text-[#191F28]">{trend.region}</p>
+      <p className="text-xs font-bold text-[#191F28] truncate">{trend.region}</p>
       <p className="text-sm font-black text-[#191F28] mt-1">
         {formatPriceShort(trend.avgPrice)}
       </p>
