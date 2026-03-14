@@ -1,0 +1,585 @@
+/**
+ * Aptner Design Tokens
+ * Version: 1.0.0
+ * 기준 뷰포트: 375px (모바일 퍼스트)
+ * 참조: DESIGN_SYSTEM.md
+ *
+ * 사용법:
+ *   color: var(--color-primary);
+ *   font-size: var(--font-size-h2);
+ *   padding: var(--space-4);
+ */
+
+/* ============================================================
+   @layer base — 폰트 임포트
+   ============================================================ */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+:root {
+  /* ============================================================
+     COLOR — Brand
+     ============================================================ */
+  --color-primary:        #1B64DA;
+  --color-primary-light:  #EBF1FC;
+  --color-primary-dark:   #1451B5;
+
+  /* ============================================================
+     COLOR — Price Change (국내 부동산 컨벤션: 상승=빨강, 하락=초록)
+     ============================================================ */
+  --color-price-up:         #FF4B4B;
+  --color-price-up-bg:      #FFF3F3;
+  --color-price-down:       #00C896;
+  --color-price-down-bg:    #F0FBF7;
+  --color-price-neutral:    #8B95A1;
+
+  /* ============================================================
+     COLOR — Grey Scale
+     ============================================================ */
+  --color-gray-900:  #191F28;
+  --color-gray-800:  #333D4B;
+  --color-gray-600:  #4E5968;
+  --color-gray-400:  #8B95A1;
+  --color-gray-200:  #E5E8EB;
+  --color-gray-100:  #F2F4F6;
+  --color-gray-50:   #F5F6F8;
+  --color-white:     #FFFFFF;
+
+  /* ============================================================
+     COLOR — Semantic (State Colors)
+     ============================================================ */
+  --color-status-active:    #1B64DA;
+  --color-status-upcoming:  #F59E0B;
+  --color-status-closed:    #8B95A1;
+
+  /* D-day 배지 색상 */
+  --color-dday-urgent:  #FF4B4B;   /* D-3 이내 */
+  --color-dday-soon:    #F59E0B;   /* D-7 이내 */
+  --color-dday-normal:  #4E5968;   /* 그 외 */
+
+  /* ============================================================
+     COLOR — Ranking Medal
+     ============================================================ */
+  --color-rank-gold:    #FFD700;
+  --color-rank-silver:  #C0C0C0;
+  --color-rank-bronze:  #CD7F32;
+
+  /* ============================================================
+     COLOR — Background
+     ============================================================ */
+  --color-bg-page:     #F5F6F8;
+  --color-bg-card:     #FFFFFF;
+  --color-bg-overlay:  rgba(0, 0, 0, 0.5);
+
+  /* ============================================================
+     COLOR — Chart
+     ============================================================ */
+  --color-chart-line:    #1B64DA;
+  --color-chart-grid:    #E5E8EB;
+  --color-chart-axis:    #8B95A1;
+  --color-chart-tooltip: #191F28;
+
+  /* ============================================================
+     GRADIENT
+     ============================================================ */
+  --gradient-subscription-banner: linear-gradient(135deg, #1B64DA 0%, #2979FF 100%);
+  --gradient-skeleton:
+    linear-gradient(
+      90deg,
+      #F2F4F6 25%,
+      #E5E8EB 50%,
+      #F2F4F6 75%
+    );
+
+  /* ============================================================
+     TYPOGRAPHY — Font Family
+     ============================================================ */
+  --font-pretendard:    'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-jetbrains:     'JetBrains Mono', 'Courier New', monospace;
+
+  /* ============================================================
+     TYPOGRAPHY — Font Size (px 기준, rem 병기)
+     ============================================================ */
+  --font-size-display:  28px;   /* 1.75rem */
+  --font-size-h1:       24px;   /* 1.5rem  */
+  --font-size-h2:       20px;   /* 1.25rem */
+  --font-size-h3:       17px;   /* 1.0625rem */
+  --font-size-body1:    15px;   /* 0.9375rem */
+  --font-size-body2:    13px;   /* 0.8125rem */
+  --font-size-caption:  11px;   /* 0.6875rem */
+  --font-size-label:    13px;   /* 0.8125rem */
+
+  /* ============================================================
+     TYPOGRAPHY — Font Weight
+     ============================================================ */
+  --font-weight-regular:    400;
+  --font-weight-medium:     500;
+  --font-weight-semibold:   600;
+  --font-weight-bold:       700;
+  --font-weight-extrabold:  800;
+
+  /* ============================================================
+     TYPOGRAPHY — Line Height
+     ============================================================ */
+  --line-height-display:  1.2;
+  --line-height-heading:  1.3;
+  --line-height-body:     1.5;
+  --line-height-caption:  1.4;
+  --line-height-label:    1.2;
+
+  /* ============================================================
+     TYPOGRAPHY — Letter Spacing
+     ============================================================ */
+  --letter-spacing-display:  -0.02em;
+  --letter-spacing-heading:  -0.01em;
+  --letter-spacing-body:     0em;
+  --letter-spacing-caption:  0.01em;
+
+  /* ============================================================
+     SPACING — 4px 기반 그리드
+     ============================================================ */
+  --space-1:   4px;    /* 0.25rem */
+  --space-2:   8px;    /* 0.5rem  */
+  --space-3:   12px;   /* 0.75rem */
+  --space-4:   16px;   /* 1rem    */
+  --space-5:   20px;   /* 1.25rem */
+  --space-6:   24px;   /* 1.5rem  */
+  --space-8:   32px;   /* 2rem    */
+  --space-10:  40px;   /* 2.5rem  */
+  --space-12:  48px;   /* 3rem    */
+
+  /* ============================================================
+     LAYOUT — Page Structure
+     ============================================================ */
+  --layout-page-padding-x:    16px;
+  --layout-header-height:     56px;
+  --layout-status-bar-height: 44px;
+  --layout-bottom-nav-height: 83px;   /* 49px UI + 34px safe-area */
+  --layout-bottom-nav-ui:     49px;
+  --layout-tab-bar-height:    48px;
+  --layout-search-bar-height: 44px;
+
+  /* 콘텐츠 시작 위치 */
+  --layout-content-top:
+    calc(var(--layout-status-bar-height) + var(--layout-header-height));
+  /* 콘텐츠 하단 여백 (탭바 위) */
+  --layout-content-bottom: var(--layout-bottom-nav-height);
+
+  /* ============================================================
+     BORDER RADIUS
+     ============================================================ */
+  --radius-sm:    6px;
+  --radius-md:    8px;
+  --radius-lg:    12px;
+  --radius-xl:    16px;
+  --radius-2xl:   20px;
+  --radius-full:  9999px;
+
+  /* ============================================================
+     SHADOW
+     ============================================================ */
+  --shadow-card:          0 1px 4px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover:    0 4px 16px rgba(0, 0, 0, 0.12);
+  --shadow-header:        0 1px 3px rgba(0, 0, 0, 0.10);
+  --shadow-bottom-sheet:  0 -4px 20px rgba(0, 0, 0, 0.12);
+  --shadow-marker:        0 2px 8px rgba(0, 0, 0, 0.15);
+  --shadow-marker-active: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-icon-btn:      0 2px 8px rgba(0, 0, 0, 0.12);
+  --shadow-search-float:  0 2px 12px rgba(0, 0, 0, 0.15);
+  --shadow-dropdown:      0 4px 20px rgba(0, 0, 0, 0.12);
+  --shadow-toast:         0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-chip:          0 1px 4px rgba(0, 0, 0, 0.12);
+  --shadow-rank-gold:     0 2px 6px rgba(255, 215, 0, 0.50);
+  --shadow-rank-silver:   0 2px 6px rgba(192, 192, 192, 0.50);
+  --shadow-rank-bronze:   0 2px 6px rgba(205, 127, 50, 0.50);
+  --shadow-marker-blue:   0 2px 8px rgba(27, 100, 218, 0.40);
+
+  /* ============================================================
+     TRANSITION / ANIMATION
+     ============================================================ */
+  --transition-fast:    100ms ease;
+  --transition-normal:  200ms ease;
+  --transition-slow:    300ms cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-page:    250ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 바텀시트 */
+  --transition-bottom-sheet-in:  300ms cubic-bezier(0.32, 0.72, 0, 1);
+  --transition-bottom-sheet-out: 250ms ease-in;
+
+  /* 카드 hover */
+  --transition-card-hover: 200ms ease;
+
+  /* 마커 선택 */
+  --transition-marker: 150ms ease;
+
+  /* 스켈레톤 */
+  --skeleton-duration: 1.5s;
+  --skeleton-bg-size:  200% 100%;
+
+  /* ============================================================
+     Z-INDEX
+     ============================================================ */
+  --z-map:          0;
+  --z-map-marker:   1;
+  --z-map-overlay:  10;
+  --z-sticky:       20;
+  --z-map-controls: 20;
+  --z-bottom-nav:   50;
+  --z-bottom-sheet: 100;
+  --z-overlay:      100;
+  --z-modal:        150;
+  --z-toast:        200;
+
+  /* ============================================================
+     COMPONENT — Button Heights
+     ============================================================ */
+  --btn-height-lg:    52px;
+  --btn-height-md:    44px;
+  --btn-height-sm:    32px;
+  --btn-height-icon:  40px;
+
+  /* ============================================================
+     COMPONENT — Map Marker
+     ============================================================ */
+  --marker-padding:       6px 12px;
+  --marker-border-radius: 20px;
+  --marker-border-width:  1.5px;
+  --marker-font-size:     14px;
+  --marker-scale-active:  1.15;
+
+  --cluster-size:   40px;
+
+  /* ============================================================
+     COMPONENT — Bottom Sheet
+     ============================================================ */
+  --bottom-sheet-default-height:  60vh;
+  --bottom-sheet-max-height:      90vh;
+  --bottom-sheet-min-height:      200px;
+  --bottom-sheet-border-radius:   20px 20px 0 0;
+  --drag-handle-width:            36px;
+  --drag-handle-height:           4px;
+
+  /* ============================================================
+     COMPONENT — Chart
+     ============================================================ */
+  --chart-height:           240px;
+  --chart-line-width:       2px;
+  --chart-dot-radius:       3px;
+  --chart-active-dot-radius: 5px;
+
+  /* ============================================================
+     BREAKPOINTS (CSS Custom Properties — 참조용)
+     실제 미디어 쿼리에서는 아래 값을 직접 사용
+     xs:  max-width 374px
+     sm:  375px~ (기본)
+     md:  768px~
+     lg:  1024px~
+     xl:  1280px~
+     ============================================================ */
+  --breakpoint-md:  768px;
+  --breakpoint-lg:  1024px;
+  --breakpoint-xl:  1280px;
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-body1);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
+  color: var(--color-gray-800);
+  background-color: var(--color-bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* iOS 기본 탭 하이라이트 제거 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   UTILITY CLASSES — Typography
+   ============================================================ */
+
+/* Display */
+.text-display {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-display);
+  letter-spacing: var(--letter-spacing-display);
+  color: var(--color-gray-900);
+}
+
+/* Heading H1 */
+.text-h1 {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  color: var(--color-gray-900);
+}
+
+/* Heading H2 */
+.text-h2 {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  color: var(--color-gray-900);
+}
+
+/* Heading H3 */
+.text-h3 {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
+  color: var(--color-gray-900);
+}
+
+/* Body1 */
+.text-body1 {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-body1);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
+  color: var(--color-gray-800);
+}
+
+/* Body2 */
+.text-body2 {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-body2);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
+  color: var(--color-gray-800);
+}
+
+/* Caption */
+.text-caption {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-caption);
+  color: var(--color-gray-400);
+}
+
+/* Label (버튼, 배지용) */
+.text-label {
+  font-family: var(--font-pretendard);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-label);
+  letter-spacing: var(--letter-spacing-caption);
+}
+
+/* 가격 숫자 전용 (JetBrains Mono) */
+.text-price {
+  font-family: var(--font-jetbrains);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ============================================================
+   UTILITY CLASSES — Color
+   ============================================================ */
+.text-primary    { color: var(--color-primary); }
+.text-up         { color: var(--color-price-up); }
+.text-down       { color: var(--color-price-down); }
+.text-neutral    { color: var(--color-price-neutral); }
+.text-muted      { color: var(--color-gray-400); }
+.text-secondary  { color: var(--color-gray-600); }
+
+.bg-primary-light { background-color: var(--color-primary-light); }
+.bg-price-up      { background-color: var(--color-price-up-bg); }
+.bg-price-down    { background-color: var(--color-price-down-bg); }
+.bg-card          { background-color: var(--color-bg-card); }
+.bg-page          { background-color: var(--color-bg-page); }
+
+/* ============================================================
+   UTILITY CLASSES — Layout
+   ============================================================ */
+.page-padding-x {
+  padding-left: var(--layout-page-padding-x);
+  padding-right: var(--layout-page-padding-x);
+}
+
+.card {
+  background-color: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+}
+
+.card-hover {
+  transition: box-shadow var(--transition-card-hover),
+              transform var(--transition-card-hover);
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+/* ============================================================
+   UTILITY CLASSES — Scroll
+   ============================================================ */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-y {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ============================================================
+   ANIMATION — Skeleton Shimmer
+   ============================================================ */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton {
+  background: var(--gradient-skeleton);
+  background-size: var(--skeleton-bg-size);
+  animation: skeleton-shimmer var(--skeleton-duration) infinite linear;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+  height: 14px;
+  border-radius: 4px;
+}
+
+.skeleton-block {
+  border-radius: var(--radius-md);
+}
+
+/* ============================================================
+   ANIMATION — Loading Spinner
+   ============================================================ */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 800ms linear infinite;
+  color: var(--color-primary);
+}
+
+/* ============================================================
+   ANIMATION — Bottom Sheet
+   ============================================================ */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
+/* ============================================================
+   ANIMATION — Fade In (페이지/컴포넌트 진입)
+   ============================================================ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fade-in 200ms ease forwards;
+}
+
+/* ============================================================
+   MEDIA QUERIES — Responsive Breakpoints
+   ============================================================ */
+
+/* xs: 소형 스마트폰 (374px 이하) */
+@media (max-width: 374px) {
+  :root {
+    --font-size-h1:    22px;
+    --font-size-h2:    18px;
+    --layout-page-padding-x: 12px;
+  }
+}
+
+/* md: 태블릿 (768px 이상) */
+@media (min-width: 768px) {
+  :root {
+    --layout-page-padding-x: 24px;
+    --layout-header-height:  64px;
+    --layout-bottom-nav-height: 0px;  /* 사이드 네비로 전환 */
+  }
+
+  body {
+    background-color: var(--color-bg-page);
+  }
+}
+
+/* lg: 데스크톱 (1024px 이상) */
+@media (min-width: 1024px) {
+  :root {
+    --layout-page-padding-x: 32px;
+    --layout-header-height:  72px;
+    --chart-height: 320px;
+  }
+}
+
+/* xl: 와이드 데스크톱 (1280px 이상) — 최대 너비 제한 */
+@media (min-width: 1280px) {
+  .app-container {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+}
+
+/* ============================================================
+   iOS Safe Area 대응
+   ============================================================ */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  :root {
+    --safe-area-inset-bottom: env(safe-area-inset-bottom);
+    --safe-area-inset-top:    env(safe-area-inset-top);
+  }
+
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .bottom-sheet-inner {
+    padding-bottom: calc(env(safe-area-inset-bottom) + 16px);
+  }
+}

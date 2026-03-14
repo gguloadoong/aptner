@@ -1,0 +1,16 @@
+{
+  "name": "aptner",
+  "version": "1.0.0",
+  "description": "아파트 중심 부동산 서비스 - 청약정보 + 실거래가 + 핫한 부동산 시각화",
+  "scripts": {
+    "dev": "concurrently --names \"BE,FE\" --prefix-colors \"blue,green\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "dev:client": "npm run dev --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "start": "concurrently --names \"BE,FE\" --prefix-colors \"blue,green\" \"npm run start --prefix server\" \"npm run dev --prefix client\"",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}

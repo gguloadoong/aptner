@@ -1,0 +1,36 @@
+{
+  "name": "aptner-server",
+  "version": "1.0.0",
+  "description": "Aptner API 프록시 서버 - 국토부 실거래가 및 청약 정보 제공",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["aptner", "real-estate", "api-proxy"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "node-cache": "^5.1.2",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^25.5.0",
+    "@types/xml2js": "^0.4.14",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

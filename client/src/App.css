@@ -1,0 +1,29 @@
+/* Aptner App 전역 스타일 */
+
+/* iOS safe area 지원 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 스크롤바 숨김 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 카카오맵 마커 색상 */
+.marker-up {
+  background-color: #FF4B4B;
+  color: white;
+}
+.marker-down {
+  background-color: #00C896;
+  color: white;
+}
+.marker-flat {
+  background-color: #8B95A1;
+  color: white;
+}
