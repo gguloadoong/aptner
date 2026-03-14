@@ -12,21 +12,22 @@ import { SiDo, SiGunGu, TrendQueryParams } from '../types';
 const router = Router();
 
 // ---- 시도 코드 정적 데이터 ----
-// 행정안전부 법정동 코드 기준
+// 행정안전부 법정동 코드 기준 (2024년 최신 행정구역 명칭 반영)
+// 강원도 → 강원특별자치도 (2023.06), 전라북도 → 전북특별자치도 (2024.01)
 const SI_DO_LIST: SiDo[] = [
   { code: '11', name: '서울특별시' },
+  { code: '41', name: '경기도' },
+  { code: '28', name: '인천광역시' },
   { code: '26', name: '부산광역시' },
   { code: '27', name: '대구광역시' },
-  { code: '28', name: '인천광역시' },
   { code: '29', name: '광주광역시' },
   { code: '30', name: '대전광역시' },
   { code: '31', name: '울산광역시' },
   { code: '36', name: '세종특별자치시' },
-  { code: '41', name: '경기도' },
-  { code: '42', name: '강원도' },
+  { code: '42', name: '강원특별자치도' },
   { code: '43', name: '충청북도' },
   { code: '44', name: '충청남도' },
-  { code: '45', name: '전라북도' },
+  { code: '45', name: '전북특별자치도' },
   { code: '46', name: '전라남도' },
   { code: '47', name: '경상북도' },
   { code: '48', name: '경상남도' },

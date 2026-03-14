@@ -3,6 +3,8 @@ import { Suspense, lazy } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import Toast from './components/ui/Toast';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
 // 페이지 lazy loading — 초기 번들 크기 축소
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -33,19 +35,24 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <div className="w-full relative bg-[#F5F6F8] min-h-screen">
-          <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><LoadingSpinner message="페이지 로딩중..." /></div>}>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/map" element={<MapPage />} />
-              <Route path="/subscription" element={<SubscriptionPage />} />
-              <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
-              <Route path="/apartment/:id" element={<ApartmentDetailPage />} />
-              <Route path="/trend" element={<TrendPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              {/* 404 처리 */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+          {/* 전역 에러 바운더리 - Suspense 내부 렌더링 에러 포착 */}
+          <ErrorBoundary>
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><LoadingSpinner message="페이지 로딩중..." /></div>}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/map" element={<MapPage />} />
+                <Route path="/subscription" element={<SubscriptionPage />} />
+                <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
+                <Route path="/apartment/:id" element={<ApartmentDetailPage />} />
+                <Route path="/trend" element={<TrendPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                {/* 404 처리 */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+          {/* 전역 토스트 알림 */}
+          <Toast />
         </div>
       </BrowserRouter>
     </QueryClientProvider>

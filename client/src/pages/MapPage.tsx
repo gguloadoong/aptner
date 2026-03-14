@@ -9,12 +9,14 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { formatPriceShort, formatChange, formatUnits } from '../utils/formatNumber';
 import type { MapApartment, PriceFilter } from '../types';
 import { MOCK_MAP_APARTMENTS } from '../mocks/apartments.mock';
+import { useToastStore } from '../stores/toastStore';
 
 // 지도 페이지 - 모바일: 지도 전체 + 바텀시트, 데스크탑: 좌측 패널 + 우측 지도
 export default function MapPage() {
   const navigate = useNavigate();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { priceFilter, selectedApartment, isBottomSheetOpen, setPriceFilter, setSelectedApartment, closeBottomSheet } = useMapStore();
+  const addToast = useToastStore((s) => s.addToast);
   const [searchValue, setSearchValue] = useState('');
   const [mapApartments, setMapApartments] = useState<MapApartment[]>(MOCK_MAP_APARTMENTS);
 
@@ -96,12 +98,15 @@ export default function MapPage() {
 
   // 현재 위치로 이동
   const handleCurrentLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      addToast('이 브라우저는 위치 서비스를 지원하지 않습니다.', 'error');
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         moveToLocation(pos.coords.latitude, pos.coords.longitude, 5);
       },
-      () => alert('위치 정보를 가져올 수 없습니다.')
+      () => addToast('위치 정보를 가져올 수 없습니다.', 'error')
     );
   };
 

@@ -7,8 +7,8 @@ import NodeCache from 'node-cache';
 export const CACHE_TTL = {
   /** 실거래가: 6시간 */
   APARTMENT_TRADE: 60 * 60 * 6,
-  /** 청약 목록: 1시간 */
-  SUBSCRIPTION: 60 * 60,
+  /** 청약 목록: 10분 (날짜 키 포함으로 자정 자동 무효화 병행) */
+  SUBSCRIPTION: 60 * 10,
   /** 지역 코드: 24시간 */
   REGION: 60 * 60 * 24,
   /** 트렌드: 30분 */

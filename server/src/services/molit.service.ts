@@ -634,12 +634,18 @@ export async function fetchTradesForTrend(
  * TODO: 실 API 연동 시 이 함수 교체
  * - Mock: 사전 정의된 20개 아파트 데이터 반환 (lat/lng 포함)
  * - 실 API: 국토부 API 호출 후 거래량 기준 정렬
+ *
+ * @param regionCode - 법정동 코드 앞 2자리 (예: '11' = 서울). Mock 모드에서는 regionFilter 우선 사용.
+ * @param limit - 반환 개수 (기본 10, 최대 20)
+ * @param regionFilter - 한글 시도명 키워드 (예: '서울', '경기'). lawdNm 포함 여부로 필터링.
+ *                       undefined 또는 미지정 시 전체 반환.
  */
 export async function getHotApartments(
   regionCode: string,
   limit: number = 10,
+  regionFilter?: string,
 ): Promise<HotApartment[]> {
-  const cacheKey = `hot:${regionCode}:${limit}`;
+  const cacheKey = `hot:${regionCode}:${limit}:${regionFilter ?? 'all'}`;
 
   const cached = cacheService.get<HotApartment[]>(cacheKey);
   if (cached) {
@@ -647,12 +653,30 @@ export async function getHotApartments(
     return cached;
   }
 
-  console.log(`[Molit] 핫 아파트 조회: regionCode=${regionCode}`);
+  console.log(`[Molit] 핫 아파트 조회: regionCode=${regionCode}, regionFilter=${regionFilter ?? '없음'}`);
 
   // MOLIT_API_KEY가 없으면 즉시 Mock 반환
   if (!process.env.MOLIT_API_KEY) {
     console.warn('[Molit] API 키 없음 → Mock 데이터 반환');
-    return HOT_APARTMENTS_MOCK.slice(0, limit);
+
+    // mock 모드에서 한글 region 필터 적용
+    // '서울' → lawdNm에 '서울' 포함된 것만, undefined 또는 '전국'이면 전체 반환
+    let mockList = HOT_APARTMENTS_MOCK;
+    if (regionFilter && regionFilter !== '전국') {
+      mockList = HOT_APARTMENTS_MOCK.filter((apt) =>
+        apt.lawdNm.includes(regionFilter),
+      );
+      console.log(`[Molit] Mock 한글 필터 '${regionFilter}' 적용: ${mockList.length}건`);
+    }
+
+    // 필터 후 순위 재부여
+    const result = mockList.slice(0, limit).map((apt, idx) => ({
+      ...apt,
+      rank: idx + 1,
+    }));
+
+    cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
+    return result;
   }
 
   // 최근 1개월 데이터 조회

@@ -103,16 +103,30 @@ router.get('/trades', apiRateLimiter, async (req: Request, res: Response, next: 
  * 핫한 아파트 랭킹 (거래량 기준)
  *
  * Query params:
- *   - region: 시도 코드 2자리 (선택, 예: 11 = 서울)
+ *   - region: 시도 코드 2자리(예: 11 = 서울) 또는 한글 시도명(예: '서울', '경기')
+ *             '전국' 또는 미지정 시 전체 반환
  *   - limit: 랭킹 개수 (선택, 기본: 10, 최대: 20)
  */
 router.get('/hot', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { region = '11', limit } = req.query as Partial<Record<string, string>>;
+    const { region, limit } = req.query as Partial<Record<string, string>>;
 
     const limitNum = limit ? Math.min(20, Math.max(1, parseInt(limit, 10))) : 10;
 
-    const data = await getHotApartments(region, limitNum);
+    // region 파라미터 정규화:
+    // - 한글(서울, 경기 등): lawdNm 기준 필터용 한글 키워드로 전달
+    // - 숫자 코드(11, 41 등): 기존 법정동 코드 방식으로 전달
+    // - '전국' 또는 미지정: 전체 반환 (regionCode = undefined)
+    const isKorean = region && /[가-힣]/.test(region);
+    const isNationwide = !region || region === '전국';
+
+    // 서비스에 전달할 regionCode: 숫자 코드이거나 미지정이면 기존 방식
+    const regionCode = isNationwide ? undefined : isKorean ? undefined : region;
+
+    // 한글 region이면 lawdNm 필터 키워드로 사용
+    const regionFilter = isKorean ? region : undefined;
+
+    const data = await getHotApartments(regionCode ?? '11', limitNum, regionFilter);
 
     res.json({
       success: true,
@@ -122,6 +136,7 @@ router.get('/hot', async (req: Request, res: Response, next: NextFunction) => {
         page: 1,
         limit: limitNum,
         totalPages: 1,
+        regionFilter: regionFilter ?? regionCode ?? '전국',
       },
     });
   } catch (error) {

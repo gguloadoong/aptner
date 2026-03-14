@@ -46,6 +46,29 @@ export async function getApartmentsByBounds(
   return response.data;
 }
 
+// BE HotApartment 타입 → FE Apartment 타입 변환 어댑터
+function adaptHotApartment(raw: any, index: number): Apartment {
+  return {
+    id: raw.aptCode,
+    name: raw.apartmentName,
+    address: raw.lawdNm,
+    district: raw.lawdNm.split(' ').slice(0, 2).join(' '),
+    dong: raw.lawdNm.split(' ')[2] || '',
+    lat: raw.lat || 37.5665,
+    lng: raw.lng || 126.978,
+    totalUnits: 0,
+    builtYear: 0,
+    builder: '',
+    areas: [String(raw.area)],
+    recentPrice: raw.recentPrice,
+    recentPriceArea: String(raw.area),
+    priceChange: raw.priceChangeRate,
+    priceChangeType: raw.priceChange > 0 ? 'up' : raw.priceChange < 0 ? 'down' : 'flat',
+    weeklyRank: raw.rank ?? index + 1,
+    weeklyRankChange: 0,
+  };
+}
+
 // 핫한 아파트 목록 조회
 export async function getHotApartments(region?: string, limit = 10): Promise<Apartment[]> {
   if (USE_MOCK) {
@@ -59,10 +82,11 @@ export async function getHotApartments(region?: string, limit = 10): Promise<Apa
     return data.slice(0, limit);
   }
 
-  const response = await api.get<Apartment[]>('/apartments/hot', {
+  const response = await api.get<any[]>('/apartments/hot', {
     params: { region, limit },
   });
-  return response.data;
+  // BE 응답이 HotApartment 배열인 경우 FE Apartment 타입으로 변환
+  return response.data.map((raw, index) => adaptHotApartment(raw, index));
 }
 
 // 아파트 상세 정보 조회
