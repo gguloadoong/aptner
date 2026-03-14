@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 기능 제안 또는 버그 제보
+    url: https://github.com/gguloadoong/aptner/issues/new/choose
+    about: 아래 템플릿을 사용해 이슈를 등록해 주세요.
