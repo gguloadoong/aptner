@@ -22,6 +22,14 @@ const MOLIT_API_BASE_URL =
 // API 타임아웃: 10초
 const API_TIMEOUT = 10_000;
 
+/**
+ * 실제 API 키인지 여부를 판별합니다.
+ * 미설정이거나 demo 플레이스홀더 값이면 false를 반환합니다.
+ */
+function isRealApiKey(key: string | undefined): boolean {
+  return !!key && key !== 'demo_key_replace_with_real_key';
+}
+
 // ============================================================
 // 서울/경기 실제 아파트 Mock 데이터 정의
 // ============================================================
@@ -375,7 +383,7 @@ const MAP_MARKERS_MOCK: ApartmentMapMarker[] = APT_BASE_DATA.map((apt) => ({
   lng: apt.lng,
   price: apt.basePrice,
   area: String(apt.area),
-  priceChangeType: apt.priceChange > 0 ? 'up' : apt.priceChange < 0 ? 'down' : 'same',
+  priceChangeType: apt.priceChange > 0 ? 'up' : apt.priceChange < 0 ? 'down' : 'flat',
 }));
 
 // ============================================================
@@ -426,7 +434,7 @@ async function fetchMolitApi(
   numOfRows: number = 100,
 ): Promise<{ items: ApartmentTrade[]; totalCount: number }> {
   const apiKey = process.env.MOLIT_API_KEY;
-  if (!apiKey) {
+  if (!isRealApiKey(apiKey)) {
     throw new Error('MOLIT_API_KEY 환경변수가 설정되지 않았습니다.');
   }
 
@@ -655,8 +663,8 @@ export async function getHotApartments(
 
   console.log(`[Molit] 핫 아파트 조회: regionCode=${regionCode}, regionFilter=${regionFilter ?? '없음'}`);
 
-  // MOLIT_API_KEY가 없으면 즉시 Mock 반환
-  if (!process.env.MOLIT_API_KEY) {
+  // MOLIT_API_KEY가 없거나 demo 키이면 즉시 Mock 반환
+  if (!isRealApiKey(process.env.MOLIT_API_KEY)) {
     console.warn('[Molit] API 키 없음 → Mock 데이터 반환');
 
     // mock 모드에서 한글 region 필터 적용
@@ -781,4 +789,91 @@ export async function getApartmentMapMarkers(
   cacheService.set(cacheKey, markers, 30);
 
   return markers;
+}
+
+/**
+ * aptCode로 특정 아파트 정보를 조회합니다.
+ * TODO: 실 API 연동 시 실제 조회 로직 구현
+ * - Mock: APT_BASE_DATA에서 aptCode로 검색
+ * - 실 API: 일단 Mock 반환
+ *
+ * @param aptCode - 아파트 코드 (예: APT001)
+ */
+export async function getApartmentById(aptCode: string): Promise<HotApartment | null> {
+  const cacheKey = `apt:${aptCode}`;
+
+  const cached = cacheService.get<HotApartment>(cacheKey);
+  if (cached) {
+    console.log(`[Molit] 아파트 상세 캐시 히트: ${aptCode}`);
+    return cached;
+  }
+
+  // Mock 데이터에서 aptCode로 검색
+  const found = APT_BASE_DATA.find((apt) => apt.aptCode === aptCode);
+  if (!found) {
+    console.log(`[Molit] 아파트 없음: aptCode=${aptCode}`);
+    return null;
+  }
+
+  const result: HotApartment = {
+    rank: 0,
+    aptCode: found.aptCode,
+    apartmentName: found.apartmentName,
+    lawdNm: found.lawdNm,
+    recentPrice: found.basePrice,
+    area: found.area,
+    tradeCount: found.tradeCount,
+    priceChange: found.priceChange,
+    priceChangeRate: found.priceChangeRate,
+    lat: found.lat,
+    lng: found.lng,
+  };
+
+  cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
+  return result;
+}
+
+/**
+ * 키워드로 아파트를 검색합니다.
+ * APT_BASE_DATA에서 apartmentName 또는 lawdNm에 keyword가 포함된 항목을 반환합니다.
+ *
+ * @param keyword - 검색 키워드 (아파트명 또는 행정구역명)
+ */
+export async function searchApartments(keyword: string): Promise<HotApartment[]> {
+  const cacheKey = `search:${keyword}`;
+
+  const cached = cacheService.get<HotApartment[]>(cacheKey);
+  if (cached) {
+    console.log(`[Molit] 아파트 검색 캐시 히트: ${keyword}`);
+    return cached;
+  }
+
+  const lowerKeyword = keyword.toLowerCase();
+
+  const matched = APT_BASE_DATA.filter(
+    (apt) =>
+      apt.apartmentName.toLowerCase().includes(lowerKeyword) ||
+      apt.lawdNm.toLowerCase().includes(lowerKeyword),
+  );
+
+  const result: HotApartment[] = matched.map((apt, idx) => ({
+    rank: idx + 1,
+    aptCode: apt.aptCode,
+    apartmentName: apt.apartmentName,
+    lawdNm: apt.lawdNm,
+    recentPrice: apt.basePrice,
+    area: apt.area,
+    tradeCount: apt.tradeCount,
+    priceChange: apt.priceChange,
+    priceChangeRate: apt.priceChangeRate,
+    lat: apt.lat,
+    lng: apt.lng,
+  }));
+
+  console.log(`[Molit] 아파트 검색 '${keyword}': ${result.length}건`);
+
+  // 캐시 저장 (30초)
+  cacheService.set(cacheKey, result, 30);
+
+  return result;
 }

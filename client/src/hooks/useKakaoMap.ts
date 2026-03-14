@@ -98,10 +98,16 @@ export function useKakaoMap(
       window.kakao.maps.load(initMap);
     } else {
       // SDK 로드 재시도 (script 태그 로드 완료 대기)
+      // MINOR-06: 최대 10초(100번 × 100ms) 초과 시 에러 상태로 전환
+      let attempts = 0;
       timer = setInterval(() => {
+        attempts += 1;
         if (isKakaoAvailable()) {
           clearInterval(timer);
           window.kakao.maps.load(initMap);
+        } else if (attempts >= 100) {
+          clearInterval(timer);
+          setState((prev) => ({ ...prev, isError: true }));
         }
       }, 100);
     }

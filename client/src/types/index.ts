@@ -29,6 +29,13 @@ export interface TradeHistory {
   price: number; // 만원
 }
 
+// 청약 일정 상세 (BE schedule 필드)
+export interface SubscriptionSchedule {
+  announceDate?: string;      // 당첨자 발표일 (YYYY-MM-DD)
+  contractStartDate?: string; // 계약 시작일 (YYYY-MM-DD)
+  contractEndDate?: string;   // 계약 종료일 (YYYY-MM-DD)
+}
+
 // 청약 정보
 export interface Subscription {
   id: string;
@@ -43,6 +50,7 @@ export interface Subscription {
   supplyUnits: number; // 공급 세대수
   type: 'general' | 'special'; // 일반/특별
   areas: SubscriptionArea[];
+  schedule?: SubscriptionSchedule; // BE 제공 일정 정보
   lat?: number;
   lng?: number;
 }

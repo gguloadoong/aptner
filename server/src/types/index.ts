@@ -90,7 +90,7 @@ export interface ApartmentMapMarker {
   lng: number;
   price: number;
   area: string;
-  priceChangeType: 'up' | 'down' | 'same';
+  priceChangeType: 'up' | 'down' | 'flat';
 }
 
 // ---- 청약 정보 ----

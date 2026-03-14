@@ -47,6 +47,14 @@ function adaptSubscription(raw: any): Subscription {
       generalRatio: 70,
       lotteryRatio: 30,
     })),
+    // MAJOR-03: BE schedule 필드 직접 매핑
+    schedule: raw.schedule
+      ? {
+          announceDate: raw.schedule.announceDate,
+          contractStartDate: raw.schedule.contractStartDate,
+          contractEndDate: raw.schedule.contractEndDate,
+        }
+      : undefined,
     lat: raw.lat,
     lng: raw.lng,
   };

@@ -40,10 +40,23 @@ export async function getApartmentsByBounds(
     return data;
   }
 
+  // MAJOR-05: FE 문자열 필터 → BE 숫자(만원 상한값)로 변환
+  const priceMax = convertPriceFilter(priceFilter);
+
   const response = await api.get<MapApartment[]>('/apartments/map', {
-    params: { swLat, swLng, neLat, neLng, priceFilter },
+    params: { swLat, swLng, neLat, neLng, ...(priceMax !== undefined && { priceMax }) },
   });
   return response.data;
+}
+
+// FE priceFilter 문자열을 BE 숫자(만원 상한값)로 변환
+// 'all' → undefined, 'under5' → 50000, '5to10' → 100000, 'over10' → undefined
+function convertPriceFilter(priceFilter?: string): number | undefined {
+  if (!priceFilter || priceFilter === 'all') return undefined;
+  if (priceFilter === 'under5') return 50000;   // 5억 = 50000만원
+  if (priceFilter === '5to10') return 100000;   // 10억 = 100000만원
+  if (priceFilter === 'over10') return undefined; // 상한 없음
+  return undefined;
 }
 
 // BE HotApartment 타입 → FE Apartment 타입 변환 어댑터

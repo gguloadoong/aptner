@@ -13,6 +13,7 @@ import ApartmentCard from '../components/apartment/ApartmentCard';
 import { BottomNav } from './HomePage';
 import { MOCK_WEEKLY_RANKING, MOCK_REGION_TRENDS, MOCK_SURGE_ALERTS } from '../mocks/trends.mock';
 import { formatPriceShort, formatChange } from '../utils/formatNumber';
+import { useHotApartments } from '../hooks/useApartment';
 
 const REGIONS = ['전국', '서울', '경기', '인천', '부산'];
 
@@ -21,13 +22,19 @@ export default function TrendPage() {
   const navigate = useNavigate();
   const [selectedRegion, setSelectedRegion] = useState('전국');
 
-  // 지역 필터 적용
-  const filteredRanking =
-    selectedRegion === '전국'
-      ? MOCK_WEEKLY_RANKING
-      : MOCK_WEEKLY_RANKING.filter((apt) => apt.address.includes(selectedRegion));
+  // MAJOR-04: useHotApartments로 실 데이터 페칭 (selectedRegion 파라미터 전달)
+  const hotRegionParam = selectedRegion === '전국' ? undefined : selectedRegion;
+  const { data: hotApartments, isLoading: isHotLoading } = useHotApartments(hotRegionParam, 20);
 
-  // 지역별 가격 변동 차트 데이터
+  // 로딩 중에는 MOCK 데이터를 폴백으로 사용하여 빈 화면 방지
+  const rankingSource = hotApartments ?? MOCK_WEEKLY_RANKING;
+  const filteredRanking = isHotLoading
+    ? selectedRegion === '전국'
+      ? MOCK_WEEKLY_RANKING
+      : MOCK_WEEKLY_RANKING.filter((apt) => apt.address.includes(selectedRegion))
+    : rankingSource;
+
+  // 지역별 가격 변동 차트 데이터 (MOCK_REGION_TRENDS는 BE API 미제공으로 유지)
   const chartData = MOCK_REGION_TRENDS.map((t) => ({
     region: t.region,
     change: t.priceChange,

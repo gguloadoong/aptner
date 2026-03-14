@@ -10,6 +10,8 @@ import {
   getApartmentHistory,
   getHotApartments,
   getApartmentMapMarkers,
+  getApartmentById,
+  searchApartments,
 } from '../services/molit.service';
 import { apiRateLimiter } from '../middleware/security';
 import { TradeQueryParams } from '../types';
@@ -92,6 +94,40 @@ router.get('/trades', apiRateLimiter, async (req: Request, res: Response, next: 
         totalPages,
       },
       cached,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/apartments/search?q=keyword
+ * 키워드로 아파트 검색 (아파트명 또는 행정구역명 포함 여부)
+ *
+ * Query params:
+ *   - q: 검색 키워드 (필수, 빈 문자열 불가)
+ */
+router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { q } = req.query as Partial<Record<string, string>>;
+
+    // q 파라미터 없거나 빈 문자열이면 400 반환
+    if (!q || q.trim() === '') {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_PARAMS',
+          message: 'q(검색 키워드)는 필수 파라미터이며 빈 문자열일 수 없습니다.',
+        },
+      });
+      return;
+    }
+
+    const data = await searchApartments(q.trim());
+
+    res.json({
+      success: true,
+      data,
     });
   } catch (error) {
     next(error);
@@ -191,14 +227,19 @@ router.get('/map', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
 
-    const priceFilterNum = priceFilter ? parseInt(priceFilter, 10) : undefined;
+    // 문자열 enum을 숫자 상한값으로 변환 (under5, 5to10, over10 처리)
+    let maxPrice: number | undefined;
+    if (priceFilter === 'under5') maxPrice = 50000;
+    else if (priceFilter === '5to10') maxPrice = 100000;
+    else if (priceFilter === 'over10') maxPrice = undefined; // 하한만 있음 (필터 없이 전체 반환)
+    else if (priceFilter && !isNaN(Number(priceFilter))) maxPrice = Number(priceFilter);
 
     const data = await getApartmentMapMarkers(
       swLatNum,
       swLngNum,
       neLarNum,
       neLngNum,
-      priceFilterNum,
+      maxPrice,
     );
 
     res.json({
@@ -272,5 +313,39 @@ router.get(
     }
   },
 );
+
+/**
+ * GET /api/apartments/:aptCode
+ * 특정 아파트 상세 정보 조회
+ * 주의: /search, /hot, /map, /trades, /:aptCode/history 라우트보다 반드시 뒤에 선언
+ *
+ * Path params:
+ *   - aptCode: 아파트 코드 (예: APT001)
+ */
+router.get('/:aptCode', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const aptCode = String(req.params.aptCode);
+
+    const data = await getApartmentById(aptCode);
+
+    if (!data) {
+      res.status(404).json({
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: `aptCode '${aptCode}'에 해당하는 아파트를 찾을 수 없습니다.`,
+        },
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

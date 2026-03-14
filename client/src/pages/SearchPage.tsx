@@ -10,7 +10,7 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') ?? '';
 
-  const { data: results = [], isLoading } = useApartmentSearch(query);
+  const { data: results = [], isLoading, isError, refetch } = useApartmentSearch(query);
 
   return (
     <div className="min-h-screen bg-[#F5F6F8]">
@@ -39,6 +39,23 @@ export default function SearchPage() {
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <LoadingSpinner message="검색중..." />
+          </div>
+        ) : isError ? (
+          /* MINOR-02: 에러 상태 표시 + 재시도 버튼 */
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <svg className="w-16 h-16 text-[#FF4B4B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <div className="text-center">
+              <p className="text-base font-bold text-[#191F28]">검색 중 오류가 발생했습니다</p>
+              <p className="text-sm text-[#8B95A1] mt-1">잠시 후 다시 시도해주세요</p>
+            </div>
+            <button
+              onClick={() => refetch()}
+              className="px-6 py-2.5 bg-[#1B64DA] text-white text-sm font-semibold rounded-xl hover:bg-[#1550B2] transition-colors"
+            >
+              다시 시도
+            </button>
           </div>
         ) : results.length === 0 ? (
           <EmptySearch keyword={query} />

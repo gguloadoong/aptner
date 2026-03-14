@@ -3,6 +3,7 @@ import { useSubscriptionDetail } from '../hooks/useSubscription';
 import SubscriptionBadge from '../components/subscription/SubscriptionBadge';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { formatPrice, calcDday } from '../utils/formatNumber';
+import type { SubscriptionSchedule } from '../types';
 
 // 청약 상세 페이지
 export default function SubscriptionDetailPage() {
@@ -39,7 +40,11 @@ export default function SubscriptionDetailPage() {
       {/* 헤더 */}
       <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center">
+          <button
+            onClick={() => navigate(-1)}
+            aria-label="뒤로가기"
+            className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 rounded-lg transition-colors"
+          >
             <svg className="w-5 h-5 text-[#191F28]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -102,6 +107,7 @@ export default function SubscriptionDetailPage() {
           <SubscriptionTimeline
             startDate={subscription.startDate}
             deadline={subscription.deadline}
+            schedule={subscription.schedule}
           />
         </div>
 
@@ -181,18 +187,46 @@ export default function SubscriptionDetailPage() {
 }
 
 // 청약 일정 타임라인
+// MAJOR-03: BE schedule 필드를 직접 사용하도록 수정 (추정 계산 제거)
 function SubscriptionTimeline({
   startDate,
   deadline,
+  schedule,
 }: {
   startDate: string;
   deadline: string;
+  schedule?: SubscriptionSchedule;
 }) {
-  const steps = [
-    { label: '청약 시작', date: startDate, done: new Date(startDate) <= new Date() },
-    { label: '청약 마감', date: deadline, done: new Date(deadline) < new Date() },
-    { label: '당첨자 발표', date: getAnnouncementDate(deadline), done: false },
-    { label: '계약 기간', date: getContractDate(deadline), done: false },
+  const now = new Date();
+
+  // 계약 기간 표시: 시작~종료가 모두 있으면 범위로, 시작만 있으면 단일 날짜로 표시
+  const contractDateLabel = schedule?.contractStartDate
+    ? schedule.contractEndDate
+      ? `${schedule.contractStartDate} ~ ${schedule.contractEndDate}`
+      : schedule.contractStartDate
+    : undefined;
+
+  const steps: Array<{ label: string; date: string | undefined; done: boolean }> = [
+    {
+      label: '청약 시작',
+      date: startDate,
+      done: !!startDate && new Date(startDate) <= now,
+    },
+    {
+      label: '청약 마감',
+      date: deadline,
+      done: !!deadline && new Date(deadline) < now,
+    },
+    {
+      label: '당첨자 발표',
+      date: schedule?.announceDate,
+      done: !!schedule?.announceDate && new Date(schedule.announceDate) < now,
+    },
+    {
+      label: '계약 기간',
+      date: contractDateLabel,
+      done: !!schedule?.contractEndDate && new Date(schedule.contractEndDate) < now,
+    },
   ];
 
   return (
@@ -219,24 +253,12 @@ function SubscriptionTimeline({
             <p className={`text-sm font-semibold ${step.done ? 'text-[#1B64DA]' : 'text-[#191F28]'}`}>
               {step.label}
             </p>
-            <p className="text-xs text-[#8B95A1] mt-0.5">{step.date}</p>
+            <p className="text-xs text-[#8B95A1] mt-0.5">
+              {step.date ?? '일정 미정'}
+            </p>
           </div>
         </div>
       ))}
     </div>
   );
-}
-
-// 당첨자 발표일 계산 (마감 후 약 1주일)
-function getAnnouncementDate(deadline: string): string {
-  const d = new Date(deadline);
-  d.setDate(d.getDate() + 7);
-  return d.toISOString().slice(0, 10);
-}
-
-// 계약 기간 계산 (당첨자 발표 후 약 2주)
-function getContractDate(deadline: string): string {
-  const d = new Date(deadline);
-  d.setDate(d.getDate() + 21);
-  return d.toISOString().slice(0, 10) + ' ~';
 }
