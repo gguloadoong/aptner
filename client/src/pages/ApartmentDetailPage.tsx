@@ -15,11 +15,10 @@ export default function ApartmentDetailPage() {
 
   const { data: apartment, isLoading, isError } = useApartmentDetail(id);
 
-  // apartment.id가 바뀔 때마다 첫 번째 면적으로 초기화
-  // selectedArea를 의존성에서 제외하여 불필요한 재실행 방지
+  // apartment가 바뀔 때마다 첫 번째 면적으로 초기화
   React.useEffect(() => {
     if (apartment) setSelectedArea(apartment.areas[0]);
-  }, [apartment?.id]);
+  }, [apartment]);
 
   const { data: tradeHistory = [], isLoading: isHistoryLoading } = useApartmentHistory(
     id,

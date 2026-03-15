@@ -2,7 +2,7 @@ name: Label PR
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, edited]
 
 permissions:
   pull-requests: write
@@ -51,6 +51,9 @@ jobs:
               });
               core.info('Applied ai-generated and claude-code labels.');
             }
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Label by changed paths
         uses: actions/labeler@v5

@@ -40,7 +40,7 @@ function adaptSubscription(raw: any): Subscription {
     status: raw.status as SubscriptionStatus,
     supplyUnits: raw.totalSupply ?? 0,
     type: raw.type?.includes('특별') ? 'special' : 'general',  // CRIT-03 수정
-    areas: (raw.areas ?? []).map((a: any) => ({
+    areas: (raw.areas ?? []).map((a: { area?: number; price?: number; supply?: number }) => ({
       area: String(Math.round(a.area ?? 0)),
       price: a.price ?? 0,
       units: a.supply ?? 0,

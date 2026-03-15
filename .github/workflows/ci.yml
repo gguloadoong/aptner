@@ -50,7 +50,7 @@ jobs:
         run: npm ci --prefix client
 
       - name: Typecheck client
-        run: npx tsc --noEmit --prefix client
+        run: npx tsc --noEmit
         working-directory: client
 
   build:
