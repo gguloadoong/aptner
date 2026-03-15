@@ -31,3 +31,32 @@
     min-height: 100svh;
   }
 }
+
+/* 지도 마커 — 청약 진행중 pulse 애니메이션 (섹션 1-D) */
+@keyframes markerPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(27, 100, 218, 0.50); }
+  60%  { box-shadow: 0 0 0 10px rgba(27, 100, 218, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(27, 100, 218, 0); }
+}
+
+/* 마커 외곽 ring 엘리먼트 */
+.marker-pulse-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 14px;
+  border: 2px solid rgba(27, 100, 218, 0.60);
+  animation: markerPulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
+/* 스켈레톤 shimmer 애니메이션 (섹션 4-1) */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #E5E8EB 25%, #F5F6F8 50%, #E5E8EB 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite linear;
+}

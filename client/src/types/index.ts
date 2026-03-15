@@ -17,6 +17,8 @@ export interface Apartment {
   priceChangeType: 'up' | 'down' | 'flat';
   weeklyRank?: number;
   weeklyRankChange?: number | 'new';
+  isRecordHigh?: boolean;  // BE HotApartment: 역대 최고가 여부
+  hotRank?: number;        // BE HotApartment: HOT 단지 순위
 }
 
 // 실거래 내역
@@ -72,6 +74,19 @@ export interface RegionTrend {
   hotApartments: Apartment[];
 }
 
+// 마커 렌더링 타입 (5종)
+export type MarkerType = 'price' | 'hot' | 'allTimeHigh' | 'subOngoing' | 'subUpcoming';
+
+// 평형 필터 타입
+export type AreaFilter = '59' | '74' | '84' | '109plus' | 'all';
+
+// 레이어 필터 타입
+export interface LayerFilters {
+  hot: boolean;
+  allTimeHigh: boolean;
+  subscription: boolean;
+}
+
 // 지도 마커용 데이터
 export interface MapApartment {
   id: string;
@@ -80,7 +95,12 @@ export interface MapApartment {
   lng: number;
   price: number; // 만원
   area: string;
+  areas?: string[];          // 평형 필터용 전체 평형 목록
   priceChangeType: 'up' | 'down' | 'flat';
+  markerType?: MarkerType;   // 마커 렌더링 타입 결정
+  subDeadline?: string;      // 청약 마감일 YYYY-MM-DD (청약 마커 전용)
+  subStartDate?: string;     // 청약 시작일 YYYY-MM-DD (청약 마커 전용)
+  subId?: string;            // 청약 ID (Subscription 테이블 FK)
 }
 
 // 카카오맵 타입 선언

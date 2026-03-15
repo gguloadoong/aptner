@@ -157,8 +157,9 @@ function adaptHotApartment(raw: RawHotApartment, index: number): Apartment {
     address: raw.lawdNm,
     district: raw.lawdNm.split(' ').slice(0, 2).join(' '),
     dong: raw.lawdNm.split(' ')[2] || '',
-    lat: raw.lat || 37.5665,
-    lng: raw.lng || 126.978,
+    // M-3: || 연산자는 0이 falsy라 lat/lng=0인 경우 fallback으로 대체됨 → ?? 로 수정
+    lat: raw.lat ?? 37.5665,
+    lng: raw.lng ?? 126.978,
     totalUnits: 0,
     builtYear: 0,
     builder: '',

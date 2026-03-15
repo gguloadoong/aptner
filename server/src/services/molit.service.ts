@@ -46,6 +46,10 @@ interface AptBaseData {
   tradeCount: number;
   priceChange: number;
   priceChangeRate: number;
+  /** 역대 최고가 여부 */
+  isRecordHigh?: boolean;
+  /** HOT 랭킹 TOP 10 순위 (TOP 10이면 1~10, 나머지 undefined) */
+  hotRank?: number;
 }
 
 const APT_BASE_DATA: AptBaseData[] = [
@@ -60,6 +64,8 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 42,
     priceChange: 15000,
     priceChangeRate: 5.7,
+    isRecordHigh: true,  // 반포 역대 최고가 경신
+    hotRank: 1,
   },
   {
     aptCode: 'APT002',
@@ -72,6 +78,8 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 38,
     priceChange: 8000,
     priceChangeRate: 2.6,
+    isRecordHigh: true,  // 국내 최고가 단지 신고가
+    hotRank: 2,
   },
   {
     aptCode: 'APT003',
@@ -84,6 +92,7 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 35,
     priceChange: 5000,
     priceChangeRate: 3.6,
+    hotRank: 3,
   },
   {
     aptCode: 'APT004',
@@ -96,6 +105,7 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 31,
     priceChange: -2000,
     priceChangeRate: -1.1,
+    hotRank: 4,
   },
   {
     aptCode: 'APT005',
@@ -108,6 +118,8 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 28,
     priceChange: 7000,
     priceChangeRate: 5.5,
+    isRecordHigh: true,  // 둔촌주공 재건축 신고가
+    hotRank: 5,
   },
   {
     aptCode: 'APT006',
@@ -120,6 +132,7 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 25,
     priceChange: 9000,
     priceChangeRate: 4.3,
+    hotRank: 6,
   },
   {
     aptCode: 'APT007',
@@ -132,6 +145,7 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 22,
     priceChange: 5500,
     priceChangeRate: 2.9,
+    hotRank: 7,
   },
   {
     aptCode: 'APT008',
@@ -144,6 +158,8 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 20,
     priceChange: 12000,
     priceChangeRate: 5.5,
+    isRecordHigh: true,  // 재건축 기대감 신고가
+    hotRank: 8,
   },
   {
     aptCode: 'APT009',
@@ -156,6 +172,7 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 25,
     priceChange: 3000,
     priceChangeRate: 2.7,
+    hotRank: 9,
   },
   {
     aptCode: 'APT010',
@@ -168,6 +185,7 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 22,
     priceChange: -1000,
     priceChangeRate: -1.0,
+    hotRank: 10,
   },
   {
     aptCode: 'APT011',
@@ -362,6 +380,8 @@ const HOT_APARTMENTS_MOCK: HotApartment[] = APT_BASE_DATA.map((apt, idx) => ({
   priceChangeRate: apt.priceChangeRate,
   lat: apt.lat,
   lng: apt.lng,
+  isRecordHigh: apt.isRecordHigh,
+  hotRank: apt.hotRank,
 }));
 
 // ============================================================
@@ -827,6 +847,8 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
     priceChangeRate: found.priceChangeRate,
     lat: found.lat,
     lng: found.lng,
+    isRecordHigh: found.isRecordHigh,
+    hotRank: found.hotRank,
   };
 
   cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
@@ -868,6 +890,8 @@ export async function searchApartments(keyword: string): Promise<HotApartment[]>
     priceChangeRate: apt.priceChangeRate,
     lat: apt.lat,
     lng: apt.lng,
+    isRecordHigh: apt.isRecordHigh,
+    hotRank: apt.hotRank,
   }));
 
   console.log(`[Molit] 아파트 검색 '${keyword}': ${result.length}건`);

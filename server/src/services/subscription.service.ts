@@ -54,7 +54,7 @@ function calcStatus(startDate: string, endDate: string): SubscriptionStatus {
 // closed:   endDate 과거
 
 const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
-  // ---- 진행중(ongoing) 2개 이상 ----
+  // ---- 진행중(ongoing) 4개 이상 ----
   {
     id: 'sub-2024-001',
     name: '래미안 원베일리 2차',
@@ -62,28 +62,32 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     sido: '서울특별시',
     sigungu: '서초구',
     address: '서울특별시 서초구 반포동 1-1',
-    minPrice: 150000,
-    maxPrice: 280000,
+    // 서울 서초구 59㎡ 10억, 84㎡ 16억, 109㎡ 24억 수준
+    minPrice: 100000,
+    maxPrice: 240000,
     totalSupply: 641,
     startDate: daysFromNow(-3),   // 3일 전 시작
     endDate: daysFromNow(4),      // 4일 후 마감
     announceDate: daysFromNow(18),
     type: '일반공급',
     areas: [
-      { typeName: '59A', area: 59.98, supply: 120, price: 150000 },
-      { typeName: '84A', area: 84.99, supply: 320, price: 200000 },
-      { typeName: '109A', area: 109.97, supply: 201, price: 280000 },
+      { typeName: '59A', area: 59.98, supply: 120, price: 100000 },
+      { typeName: '84A', area: 84.99, supply: 320, price: 160000 },
+      { typeName: '109A', area: 109.97, supply: 201, price: 240000 },
     ],
+    lat: 37.5068,
+    lng: 126.9997,
   },
   {
     id: 'sub-2024-002',
     name: '힐스테이트 e편한세상 문정',
-    constructor: '현대건설/대림산업',
+    constructor: '현대건설/DL이앤씨',
     sido: '서울특별시',
     sigungu: '송파구',
     address: '서울특별시 송파구 문정동 150',
+    // 서울 송파구 59㎡ 8억, 84㎡ 11억 수준
     minPrice: 80000,
-    maxPrice: 120000,
+    maxPrice: 110000,
     totalSupply: 1052,
     startDate: daysFromNow(-5),   // 5일 전 시작
     endDate: daysFromNow(2),      // 2일 후 마감
@@ -91,9 +95,11 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     type: '일반공급',
     areas: [
       { typeName: '59A', area: 59.6, supply: 400, price: 80000 },
-      { typeName: '74A', area: 74.99, supply: 352, price: 100000 },
-      { typeName: '84B', area: 84.5, supply: 300, price: 120000 },
+      { typeName: '74A', area: 74.99, supply: 352, price: 96000 },
+      { typeName: '84B', area: 84.5, supply: 300, price: 110000 },
     ],
+    lat: 37.4875,
+    lng: 127.1227,
   },
   {
     id: 'sub-2024-006',
@@ -102,20 +108,45 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     sido: '서울특별시',
     sigungu: '마포구',
     address: '서울특별시 마포구 아현동 300',
-    minPrice: 95000,
-    maxPrice: 135000,
+    // 서울 마포구 59㎡ 9억, 84㎡ 12억 수준
+    minPrice: 90000,
+    maxPrice: 120000,
     totalSupply: 720,
     startDate: daysFromNow(-1),   // 어제 시작
     endDate: daysFromNow(6),      // 6일 후 마감
     announceDate: daysFromNow(20),
     type: '일반공급',
     areas: [
-      { typeName: '59A', area: 59.9, supply: 280, price: 95000 },
-      { typeName: '84A', area: 84.7, supply: 440, price: 135000 },
+      { typeName: '59A', area: 59.9, supply: 280, price: 90000 },
+      { typeName: '84A', area: 84.7, supply: 440, price: 120000 },
     ],
+    lat: 37.5494,
+    lng: 126.9541,
+  },
+  {
+    id: 'sub-2024-009',
+    name: '자이 강동 에코파크',
+    constructor: 'GS건설',
+    sido: '서울특별시',
+    sigungu: '강동구',
+    address: '서울특별시 강동구 명일동 250',
+    // 서울 강동구 59㎡ 8.5억, 84㎡ 11.5억 수준
+    minPrice: 85000,
+    maxPrice: 115000,
+    totalSupply: 560,
+    startDate: daysFromNow(-2),   // 2일 전 시작
+    endDate: daysFromNow(5),      // 5일 후 마감
+    announceDate: daysFromNow(19),
+    type: '일반공급',
+    areas: [
+      { typeName: '59A', area: 59.7, supply: 200, price: 85000 },
+      { typeName: '84A', area: 84.8, supply: 360, price: 115000 },
+    ],
+    lat: 37.5498,
+    lng: 127.1491,
   },
 
-  // ---- 예정(upcoming) 3개 이상 ----
+  // ---- 예정(upcoming) 3개 이상 (1~14일 후 시작) ----
   {
     id: 'sub-2024-003',
     name: '수원 광교 아이파크',
@@ -123,38 +154,44 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     sido: '경기도',
     sigungu: '수원시 영통구',
     address: '경기도 수원시 영통구 광교동 100',
+    // 경기 수원 광교 59㎡ 5.5억, 84㎡ 7.5억 수준
     minPrice: 55000,
     maxPrice: 90000,
     totalSupply: 824,
-    startDate: daysFromNow(10),   // 10일 후 시작
-    endDate: daysFromNow(14),     // 14일 후 마감
-    announceDate: daysFromNow(28),
+    startDate: daysFromNow(5),    // 5일 후 시작
+    endDate: daysFromNow(9),      // 9일 후 마감
+    announceDate: daysFromNow(23),
     type: '일반공급',
     areas: [
       { typeName: '59A', area: 59.7, supply: 300, price: 55000 },
       { typeName: '84A', area: 84.98, supply: 400, price: 75000 },
       { typeName: '101A', area: 101.0, supply: 124, price: 90000 },
     ],
+    lat: 37.2902,
+    lng: 127.0457,
   },
   {
     id: 'sub-2024-005',
     name: '고양 창릉 e편한세상',
-    constructor: '대림산업',
+    constructor: 'DL이앤씨',
     sido: '경기도',
     sigungu: '고양시 덕양구',
     address: '경기도 고양시 덕양구 창릉동 50',
+    // 경기 고양 창릉 59㎡ 4.5억, 84㎡ 6.5억 수준
     minPrice: 45000,
-    maxPrice: 68000,
+    maxPrice: 65000,
     totalSupply: 980,
-    startDate: daysFromNow(20),   // 20일 후 시작
-    endDate: daysFromNow(24),     // 24일 후 마감
-    announceDate: daysFromNow(38),
+    startDate: daysFromNow(10),   // 10일 후 시작
+    endDate: daysFromNow(14),     // 14일 후 마감
+    announceDate: daysFromNow(28),
     type: '특별공급',
     areas: [
       { typeName: '59A', area: 59.5, supply: 400, price: 45000 },
-      { typeName: '74A', area: 74.5, supply: 380, price: 58000 },
-      { typeName: '84A', area: 84.6, supply: 200, price: 68000 },
+      { typeName: '74A', area: 74.5, supply: 380, price: 55000 },
+      { typeName: '84A', area: 84.6, supply: 200, price: 65000 },
     ],
+    lat: 37.6341,
+    lng: 126.8614,
   },
   {
     id: 'sub-2024-007',
@@ -163,21 +200,24 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     sido: '인천광역시',
     sigungu: '연수구',
     address: '인천광역시 연수구 송도동 400',
-    minPrice: 62000,
-    maxPrice: 95000,
+    // 인천 송도 59㎡ 5억, 84㎡ 7억 수준
+    minPrice: 50000,
+    maxPrice: 70000,
     totalSupply: 1200,
-    startDate: daysFromNow(30),   // 30일 후 시작
-    endDate: daysFromNow(34),     // 34일 후 마감
-    announceDate: daysFromNow(48),
+    startDate: daysFromNow(7),    // 7일 후 시작
+    endDate: daysFromNow(11),     // 11일 후 마감
+    announceDate: daysFromNow(25),
     type: '일반공급',
     areas: [
-      { typeName: '59A', area: 59.8, supply: 500, price: 62000 },
-      { typeName: '74A', area: 74.6, supply: 400, price: 78000 },
-      { typeName: '84A', area: 84.9, supply: 300, price: 95000 },
+      { typeName: '59A', area: 59.8, supply: 500, price: 50000 },
+      { typeName: '74A', area: 74.6, supply: 400, price: 60000 },
+      { typeName: '84A', area: 84.9, supply: 300, price: 70000 },
     ],
+    lat: 37.3831,
+    lng: 126.6563,
   },
 
-  // ---- 마감(closed) 2개 이상 ----
+  // ---- 마감(closed) 2개 ----
   {
     id: 'sub-2024-004',
     name: '인천 검단 푸르지오 더퍼스트',
@@ -185,38 +225,44 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     sido: '인천광역시',
     sigungu: '서구',
     address: '인천광역시 서구 검단동 200',
-    minPrice: 32000,
-    maxPrice: 48000,
+    // 인천 검단 59㎡ 3.5억, 84㎡ 4.7억 수준
+    minPrice: 35000,
+    maxPrice: 47000,
     totalSupply: 1560,
     startDate: daysFromNow(-20),  // 20일 전 시작
     endDate: daysFromNow(-16),    // 16일 전 마감
     announceDate: daysFromNow(-2),
     type: '일반공급',
     areas: [
-      { typeName: '59A', area: 59.99, supply: 600, price: 32000 },
+      { typeName: '59A', area: 59.99, supply: 600, price: 35000 },
       { typeName: '84A', area: 84.9, supply: 760, price: 42000 },
-      { typeName: '102A', area: 102.5, supply: 200, price: 48000 },
+      { typeName: '102A', area: 102.5, supply: 200, price: 47000 },
     ],
+    lat: 37.5932,
+    lng: 126.7241,
   },
   {
     id: 'sub-2024-008',
-    name: '부산 해운대 아이파크',
-    constructor: 'HDC현대산업개발',
-    sido: '부산광역시',
-    sigungu: '해운대구',
-    address: '부산광역시 해운대구 우동 500',
-    minPrice: 58000,
-    maxPrice: 88000,
-    totalSupply: 890,
+    name: '성남 판교 힐스테이트',
+    constructor: '현대건설',
+    sido: '경기도',
+    sigungu: '성남시 분당구',
+    address: '경기도 성남시 분당구 판교동 130',
+    // 경기 판교 59㎡ 8억, 84㎡ 12억 수준 (입지 프리미엄)
+    minPrice: 80000,
+    maxPrice: 120000,
+    totalSupply: 540,
     startDate: daysFromNow(-35),  // 35일 전 시작
     endDate: daysFromNow(-31),    // 31일 전 마감
     announceDate: daysFromNow(-17),
     type: '일반공급',
     areas: [
-      { typeName: '59A', area: 59.5, supply: 350, price: 58000 },
-      { typeName: '84A', area: 84.8, supply: 400, price: 74000 },
-      { typeName: '101A', area: 101.2, supply: 140, price: 88000 },
+      { typeName: '59A', area: 59.5, supply: 200, price: 80000 },
+      { typeName: '84A', area: 84.8, supply: 240, price: 110000 },
+      { typeName: '101A', area: 101.2, supply: 100, price: 120000 },
     ],
+    lat: 37.3947,
+    lng: 127.1116,
   },
 ];
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Apartment, PriceFilter } from '../types';
+import type { Apartment, PriceFilter, LayerFilters, AreaFilter } from '../types';
 
 interface MapState {
   // 지도 중심 좌표 (기본: 서울 시청)
@@ -13,6 +13,10 @@ interface MapState {
   isBottomSheetOpen: boolean;
   // 가격 필터
   priceFilter: PriceFilter;
+  // 레이어 필터 (HOT / 신고가 / 청약) — 다중 ON/OFF
+  layerFilters: LayerFilters;
+  // 평형 필터 — 단일 선택
+  areaFilter: AreaFilter;
 
   // 액션
   setCenter: (lat: number, lng: number) => void;
@@ -21,6 +25,8 @@ interface MapState {
   openBottomSheet: () => void;
   closeBottomSheet: () => void;
   setPriceFilter: (filter: PriceFilter) => void;
+  setLayerFilter: (key: keyof LayerFilters, value: boolean) => void;
+  setAreaFilter: (filter: AreaFilter) => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
@@ -31,6 +37,8 @@ export const useMapStore = create<MapState>((set) => ({
   selectedApartment: null,
   isBottomSheetOpen: false,
   priceFilter: 'all',
+  layerFilters: { hot: false, allTimeHigh: false, subscription: false },
+  areaFilter: 'all',
 
   setCenter: (lat, lng) => set({ centerLat: lat, centerLng: lng }),
   setZoomLevel: (level) => set({ zoomLevel: level }),
@@ -39,4 +47,11 @@ export const useMapStore = create<MapState>((set) => ({
   openBottomSheet: () => set({ isBottomSheetOpen: true }),
   closeBottomSheet: () => set({ isBottomSheetOpen: false, selectedApartment: null }),
   setPriceFilter: (filter) => set({ priceFilter: filter }),
+  // 레이어 필터 개별 토글
+  setLayerFilter: (key, value) =>
+    set((state) => ({
+      layerFilters: { ...state.layerFilters, [key]: value },
+    })),
+  // 평형 필터 단일 선택
+  setAreaFilter: (filter) => set({ areaFilter: filter }),
 }));

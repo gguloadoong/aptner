@@ -168,12 +168,18 @@ export default function HomePage() {
             </div>
 
             {isAptLoading ? (
-              /* 모바일: 1열, 데스크탑: 2열 스켈레톤 */
+              /* 로딩 스켈레톤 — 모바일 3개, 데스크탑 6개 */
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <CardSkeleton key={i} />
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <HotApartmentSkeleton key={i} className="md:hidden" />
+                ))}
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <HotApartmentSkeleton key={`dt-${i}`} className="hidden md:block" />
                 ))}
               </div>
+            ) : hotApartments.length === 0 ? (
+              /* 빈 상태 UI */
+              <HotApartmentEmpty />
             ) : (
               /* 모바일: 1열, 데스크탑: 2열 그리드 */
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -240,11 +246,104 @@ function RegionTrendCard({ trend }: { trend: (typeof MOCK_REGION_TRENDS)[0] }) {
   );
 }
 
-// 빈 상태
+// 빈 상태 (일반)
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="py-8 text-center bg-white rounded-xl border border-[#E5E8EB]">
       <p className="text-sm text-[#8B95A1]">{message}</p>
+    </div>
+  );
+}
+
+// 핫 아파트 전용 스켈레톤 — shimmer 애니메이션 (섹션 4-1)
+function HotApartmentSkeleton({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`bg-white rounded-xl border border-[#E5E8EB] px-4 py-3.5 ${className}`}
+      style={{ height: '76px' }}
+    >
+      <div className="flex items-center gap-3">
+        {/* rank 원형 */}
+        <div
+          className="skeleton-shimmer flex-shrink-0 rounded-full"
+          style={{ width: '24px', height: '24px' }}
+        />
+        {/* 단지명 + 가격 */}
+        <div className="flex-1 flex items-center justify-between gap-3">
+          <div
+            className="skeleton-shimmer rounded"
+            style={{ width: '62%', height: '14px' }}
+          />
+          <div
+            className="skeleton-shimmer rounded flex-shrink-0"
+            style={{ width: '25%', height: '14px' }}
+          />
+        </div>
+      </div>
+      {/* 주소 행 */}
+      <div className="flex items-center gap-3 mt-2 pl-9">
+        <div
+          className="skeleton-shimmer rounded"
+          style={{ width: '40%', height: '11px', background: 'linear-gradient(90deg, #F0F2F4 25%, #F8F9FA 50%, #F0F2F4 75%)', backgroundSize: '800px 100%' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// 핫 아파트 전용 빈 상태 UI (섹션 4-2)
+function HotApartmentEmpty() {
+  const navigate = useNavigate();
+
+  return (
+    <div
+      className="bg-white rounded-xl border border-[#E5E8EB] flex flex-col items-center justify-center text-center"
+      style={{ padding: '32px 16px' }}
+    >
+      {/* 아파트 아이콘 SVG */}
+      <svg
+        width="40"
+        height="40"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#E5E8EB"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+
+      <p
+        className="mt-3"
+        style={{ fontSize: '14px', fontWeight: 700, color: '#8B95A1' }}
+      >
+        이번 주 핫한 아파트를 불러오는 중
+      </p>
+      <p
+        className="mt-1"
+        style={{ fontSize: '12px', color: '#8B95A1' }}
+      >
+        잠시 후 다시 확인해 주세요
+      </p>
+
+      <button
+        onClick={() => navigate('/map')}
+        style={{
+          marginTop: '16px',
+          height: '36px',
+          padding: '0 20px',
+          borderRadius: '18px',
+          border: '1px solid #1B64DA',
+          color: '#1B64DA',
+          fontSize: '13px',
+          fontWeight: 600,
+          background: 'transparent',
+          cursor: 'pointer',
+        }}
+      >
+        지도에서 직접 찾기 →
+      </button>
     </div>
   );
 }

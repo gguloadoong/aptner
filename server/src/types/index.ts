@@ -80,6 +80,10 @@ export interface HotApartment {
   lat?: number;
   /** 경도 (지도 마커용) */
   lng?: number;
+  /** 최근 거래가 역대 최고가 여부 */
+  isRecordHigh?: boolean;
+  /** HOT 랭킹 순위 (TOP 10이면 1~10, 나머지 undefined) */
+  hotRank?: number;
 }
 
 /** 지도 뷰포트용 아파트 마커 데이터 */
@@ -129,6 +133,10 @@ export interface Subscription {
   dDay: number;
   /** 평형 목록 */
   areas: SubscriptionArea[];
+  /** 위도 (지도 마커용) */
+  lat?: number;
+  /** 경도 (지도 마커용) */
+  lng?: number;
 }
 
 export interface SubscriptionArea {
