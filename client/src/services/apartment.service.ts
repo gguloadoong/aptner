@@ -54,12 +54,37 @@ export async function getApartmentsByBounds(
   // MAJOR-05: FE 문자열 필터 → BE 숫자(만원 상한값)로 변환
   const priceMax = convertPriceFilter(priceFilter);
 
-  const [mapResponse, subApts] = await Promise.all([
-    api.get<MapApartment[]>('/apartments/map', {
+  // 버그 2 수정: BE map API 응답에 markerType 필드가 없으므로
+  // hot 목록을 병렬 조회하여 FE에서 markerType을 직접 결정
+  const [mapResponse, hotResponse, subApts] = await Promise.all([
+    api.get<{ success: true; data: ApartmentMapMarker[] }>('/apartments/map', {
       params: { swLat, swLng, neLat, neLng, ...(priceMax !== undefined && { priceMax }) },
+    }),
+    api.get<{ success: true; data: RawHotApartment[] }>('/apartments/hot', {
+      params: { limit: 20 },
     }),
     getSubscriptionMapApartments(),
   ]);
+
+  // aptCode 기준으로 hot 여부 및 신고가 여부를 빠르게 조회
+  const hotMap = new Map(hotResponse.data.data.map((h) => [h.aptCode, h]));
+
+  const markers: MapApartment[] = mapResponse.data.data.map((raw) => {
+    const hotData = hotMap.get(raw.id);
+    let markerType: MarkerType = 'price';
+    if (hotData?.isRecordHigh) markerType = 'allTimeHigh';
+    else if (hotData?.hotRank != null) markerType = 'hot';
+    return {
+      id: raw.id,
+      name: raw.name,
+      lat: raw.lat,
+      lng: raw.lng,
+      price: raw.price,
+      area: raw.area,
+      priceChangeType: raw.priceChangeType,
+      markerType,
+    };
+  });
 
   // 뷰포트 내 청약 단지만 필터링하여 병합
   const subInBounds = subApts.filter(
@@ -70,7 +95,7 @@ export async function getApartmentsByBounds(
       apt.lng <= neLng
   );
 
-  return [...mapResponse.data, ...subInBounds];
+  return [...markers, ...subInBounds];
 }
 
 // 청약 데이터를 MapApartment 배열로 변환 (TASK 7)
@@ -133,6 +158,17 @@ function convertPriceFilter(priceFilter?: string): number | undefined {
   return undefined;
 }
 
+// BE /apartments/map 응답 단건 타입 (markerType 없음)
+interface ApartmentMapMarker {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  price: number;
+  area: string;
+  priceChangeType: 'up' | 'down' | 'flat';
+}
+
 // BE HotApartment 타입 → FE Apartment 타입 변환 어댑터 (TASK 8)
 // isRecordHigh, hotRank 필드 반영
 interface RawHotApartment {
@@ -189,11 +225,12 @@ export async function getHotApartments(region?: string, limit = 10): Promise<Apa
     return data.slice(0, limit);
   }
 
-  const response = await api.get<RawHotApartment[]>('/apartments/hot', {
+  // 버그 1 수정: BE 응답은 { success: true, data: RawHotApartment[] } 구조
+  // response.data 자체가 래퍼 객체이므로 .data.data 로 배열에 접근해야 함
+  const response = await api.get<{ success: true; data: RawHotApartment[] }>('/apartments/hot', {
     params: { region, limit },
   });
-  // BE 응답이 HotApartment 배열인 경우 FE Apartment 타입으로 변환
-  return response.data.map((raw, index) => adaptHotApartment(raw, index));
+  return response.data.data.map((raw, index) => adaptHotApartment(raw, index));
 }
 
 // 아파트 상세 정보 조회
