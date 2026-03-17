@@ -253,21 +253,29 @@ export async function fetchRealCompetitionRate(page = 1, perPage = 20): Promise<
   const keyPrefix = `${apiKey.substring(0, 8)}...`;
   console.log(`[Subscription] 경쟁률 실 API 호출: page=${page}, perPage=${perPage}, key=${keyPrefix}`);
 
-  const response = await axios.get(
-    'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail',
-    {
-      params: {
-        serviceKey: apiKey,
-        page,
-        perPage,
-      },
-      timeout: LH_API_TIMEOUT,
-    }
-  );
+  try {
+    // 경쟁률 조회는 분양공고 상세(getAPTLttotPblancDetail)가 아닌
+    // 청약결과/경쟁률 전용 엔드포인트(getAPTLttotPblancMdlSttus)를 사용
+    const response = await axios.get(
+      'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdlSttus',
+      {
+        params: {
+          serviceKey: apiKey,
+          page,
+          perPage,
+        },
+        timeout: LH_API_TIMEOUT,
+      }
+    );
 
-  const data = response.data?.data ?? [];
-  console.log(`[Subscription] 경쟁률 실 API 응답: ${data.length}건`);
-  return data;
+    const data = response.data?.data ?? [];
+    console.log(`[Subscription] 경쟁률 실 API 응답: ${data.length}건`);
+    return data;
+  } catch (err) {
+    // 실 API 키 없거나 네트워크 오류 시 Mock fallback 처리
+    console.warn('[Subscription] 경쟁률 실 API 호출 실패 → 빈 배열 반환 (Mock fallback)', err instanceof Error ? err.message : err);
+    return [];
+  }
 }
 
 

@@ -1289,7 +1289,7 @@ export async function getApartmentHistory(
   }));
 
   // 캐시 저장 (6시간)
-  cacheService.set(cacheKey, history, CACHE_TTL.APARTMENT_TRADE);
+  cacheService.set(cacheLookupId, history, CACHE_TTL.APARTMENT_TRADE);
 
   return history;
 }

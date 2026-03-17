@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import {
   AreaChart,
   Area,
@@ -31,6 +31,10 @@ interface ChartPoint {
 // 실거래가 에어리어 차트 컴포넌트
 const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => {
   const [dateRange, setDateRange] = useState<DateRange>(24);
+
+  // 동일 페이지에 PriceChart가 여러 개 마운트될 때 linearGradient id 충돌 방지
+  const rawId = useId();
+  const gradientId = `priceGradient-${rawId.replace(/:/g, '')}`;
 
   // 날짜 범위에 따라 데이터 필터링 후 월별 평균 집계
   const chartData = useMemo<ChartPoint[]>(() => {
@@ -146,7 +150,7 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
           <defs>
-            <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#0066FF" stopOpacity={0.18} />
               <stop offset="95%" stopColor="#0066FF" stopOpacity={0.01} />
             </linearGradient>
@@ -201,7 +205,7 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
             dataKey="price"
             stroke="#0066FF"
             strokeWidth={2.5}
-            fill="url(#priceGradient)"
+            fill={`url(#${gradientId})`}
             dot={false}
             activeDot={{
               r: 5,

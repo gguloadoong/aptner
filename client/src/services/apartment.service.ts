@@ -55,7 +55,8 @@ export async function getApartmentsByBounds(
   }
 
   // BE는 priceFilter 문자열('under5'|'5to10'|'over10') 그대로 수신
-  const [mapResponse, hotResponse, subApts] = await Promise.all([
+  // Promise.allSettled 사용: 핫 아파트 API 실패 시에도 지도 마커는 정상 표시
+  const [mapResult, hotResult, subResult] = await Promise.allSettled([
     api.get<{ success: true; data: ApartmentMapMarker[] }>('/apartments/map', {
       params: { swLat, swLng, neLat, neLng, ...(priceFilter && priceFilter !== 'all' && { priceFilter }) },
     }),
@@ -65,10 +66,25 @@ export async function getApartmentsByBounds(
     getSubscriptionMapApartments(),
   ]);
 
-  // aptCode 기준으로 hot 여부 및 최고가 경신 여부를 빠르게 조회
-  const hotMap = new Map(hotResponse.data.data.map((h) => [h.aptCode, h]));
+  // 각 결과를 null/빈 배열로 처리 — 개별 API 실패가 전체 마커 렌더링을 막지 않음
+  const mapResponse = mapResult.status === 'fulfilled' ? mapResult.value : null;
+  const hotResponse = hotResult.status === 'fulfilled' ? hotResult.value : null;
+  const subApts = subResult.status === 'fulfilled' ? subResult.value : [];
 
-  const markers: MapApartment[] = mapResponse.data.data.map((raw) => {
+  if (mapResult.status === 'rejected') {
+    console.warn('[getApartmentsByBounds] 지도 마커 API 실패:', mapResult.reason);
+    return subApts;
+  }
+  if (hotResult.status === 'rejected') {
+    console.warn('[getApartmentsByBounds] 핫 아파트 API 실패 (지도 마커는 정상 표시):', hotResult.reason);
+  }
+
+  // aptCode 기준으로 hot 여부 및 최고가 경신 여부를 빠르게 조회
+  const hotMap = new Map(
+    hotResponse?.data.data.map((h) => [h.aptCode, h]) ?? []
+  );
+
+  const markers: MapApartment[] = mapResponse!.data.data.map((raw) => {
     const hotData = hotMap.get(raw.id);
     let markerType: MarkerType = 'price';
     if (hotData?.isRecordHigh) markerType = 'allTimeHigh';
