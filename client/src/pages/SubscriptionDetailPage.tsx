@@ -178,6 +178,21 @@ export default function SubscriptionDetailPage() {
           <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '16px' }}>
             면적별 공급 현황
           </Typography>
+          {/* areas 빈 배열 graceful empty state */}
+          {subscription.areas.length === 0 ? (
+            <Box
+              sx={{
+                padding: '28px 16px',
+                textAlign: 'center',
+                backgroundColor: 'var(--semantic-background-normal-alternative)',
+                borderRadius: '12px',
+              }}
+            >
+              <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                분양가 정보 준비 중입니다
+              </Typography>
+            </Box>
+          ) : (
           <FlexBox flexDirection="column" gap="12px">
             {subscription.areas.map((area) => (
               <Box
@@ -223,6 +238,7 @@ export default function SubscriptionDetailPage() {
               </Box>
             ))}
           </FlexBox>
+          )}
         </Box>
 
         {/* 총 공급 현황 */}

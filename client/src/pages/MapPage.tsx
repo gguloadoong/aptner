@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useKakaoMap, isVisible } from '../hooks/useKakaoMap';
 import { useMapStore } from '../stores/mapStore';
 import { useApartmentDetail } from '../hooks/useApartment';
@@ -10,12 +10,13 @@ import { Button, IconButton, useToast } from '@wanteddev/wds';
 import { IconChevronLeft, IconArrowRight } from '@wanteddev/wds-icon';
 import { formatPriceShort, formatChange, formatUnits } from '../utils/formatNumber';
 import type { MapApartment, PriceFilter, AreaFilter, UnitCountFilter, ComplexFeature, ApartmentComplex } from '../types';
-import { MOCK_MAP_APARTMENTS } from '../mocks/apartments.mock';
 import { getApartmentsByBounds, getComplexesByBounds } from '../services/apartment.service';
 
 // 지도 페이지 - 모바일: 지도 전체 + 바텀시트, 데스크탑: 좌측 패널 + 우측 지도
 export default function MapPage() {
   const navigate = useNavigate();
+  // SubscriptionDetailPage 등에서 /map?search=단지명+위치 형태로 진입 시 자동 검색
+  const [searchParams] = useSearchParams();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const {
     priceFilter,
@@ -34,16 +35,17 @@ export default function MapPage() {
     closeBottomSheet,
   } = useMapStore();
   const addToast = useToast();
-  const [searchValue, setSearchValue] = useState('');
+  // queryString의 search 파라미터로 초기값 세팅
+  const [searchValue, setSearchValue] = useState(() => searchParams.get('search') ?? '');
   // 평형대 필터 (20/30/40/50평대 구분): 지도 상단 오버레이 칩용
   const [pyeongFilter, setPyeongFilter] = useState<'all' | '20s' | '30s' | '40s' | '50plus'>('all');
-  const [mapApartments, setMapApartments] = useState<MapApartment[]>(MOCK_MAP_APARTMENTS);
+  const [mapApartments, setMapApartments] = useState<MapApartment[]>([]);
   // 호갱노노 스타일 실 단지 데이터 (Geocoder 변환 후 좌표 포함)
   const [complexes, setComplexes] = useState<ApartmentComplex[]>([]);
   // 단지 데이터 로딩 중 여부 (로딩 중 기존 마커 유지, 향후 스켈레톤 UI용)
   const [, setIsComplexLoading] = useState(false);
 
-  const { batchGeocode } = useGeocoder();
+  const { geocodeAddress, batchGeocode } = useGeocoder();
 
   // 바텀시트용 선택 아파트 상세 정보
   const { data: selectedDetail } = useApartmentDetail(selectedApartment?.id);
@@ -133,6 +135,22 @@ export default function MapPage() {
       onBoundsChange: handleBoundsChange,
     }
   );
+
+  // queryString ?search= 파라미터가 있을 때 지도 로드 후 Geocoder 자동 실행
+  useEffect(() => {
+    if (!isLoaded) return;
+    const query = searchParams.get('search');
+    if (!query) return;
+    geocodeAddress(query).then((coords) => {
+      if (coords) {
+        // level 5: 단지 수준에서 표시
+        moveToLocation(coords.lat, coords.lng, 5);
+      } else {
+        addToast({ content: `'${query}' 위치를 찾을 수 없습니다.`, variant: 'cautionary', duration: 'short' });
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
 
   // 마커 뷰 / 히트맵 뷰 토글 상태
   const [viewMode, setViewMode] = useState<'marker' | 'heatmap'>('marker');

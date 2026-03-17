@@ -459,6 +459,11 @@ router.get(
 
       const data = await getApartmentHistory(String(aptCode), String(lawdCd), monthsNum, areaNum);
 
+      // 데이터 없을 경우 경고 로그 (빈 배열 조용히 반환 방지)
+      if (data.length === 0) {
+        console.warn(`[Apartment] 히스토리 데이터 없음: aptCode=${aptCode}, lawdCd=${lawdCd}, months=${monthsNum}`);
+      }
+
       res.json({
         success: true,
         data,
@@ -477,29 +482,31 @@ router.get(
 
 /**
  * GET /api/apartments/:aptCode/sale-price
- * 특정 아파트 분양가 조회
- * 현재 승인 대기 중 — 데이터 구조만 확정하고 빈 데이터 반환
+ * 특정 아파트 최신 분양가 조회 (국토부 실거래 기반)
  *
  * Path params:
  *   - aptCode: 아파트 코드 (예: APT001)
  *
  * 응답 예시:
- *   { "success": true, "data": { "salePrice": null, "unit": "만원", "note": "승인 대기중" } }
+ *   { "success": true, "data": { "salePrice": 160000, "date": "2023-05-01" } }
+ *   데이터 없을 시:
+ *   { "success": true, "data": { "salePrice": null, "date": null } }
  */
 router.get(
   '/:aptCode/sale-price',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { aptCode } = req.params;
+      const aptCode = String(req.params.aptCode);
       console.log(`[Apartment] 분양가 조회: aptCode=${aptCode}`);
+
+      // TODO: 국토부 분양가 공개 API 연동 예정
+      // 현재는 Mock 데이터에서 basePrice를 분양가로 근사 반환
+      const { getSalePriceByAptCode } = await import('../services/molit.service');
+      const result = await getSalePriceByAptCode(aptCode);
 
       res.json({
         success: true,
-        data: {
-          salePrice: null,
-          unit: '만원',
-          note: '승인 대기중',
-        },
+        data: result,
       });
     } catch (error) {
       next(error);
