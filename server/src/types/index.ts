@@ -77,13 +77,34 @@ export interface HotApartment {
   priceChange: number;
   priceChangeRate: number;
   /** 위도 (지도 마커용) */
-  lat?: number;
+  lat?: number | null;
   /** 경도 (지도 마커용) */
-  lng?: number;
+  lng?: number | null;
   /** 최근 거래가 역대 최고가 여부 */
   isRecordHigh?: boolean;
   /** HOT 랭킹 순위 (TOP 10이면 1~10, 나머지 undefined) */
   hotRank?: number;
+  // ---- 아파트 상세 조회 시 추가 반환 필드 ----
+  /** 총 세대수 */
+  totalUnits?: number;
+  /** 건축 연도 */
+  buildYear?: number;
+  /** 도로명 주소 */
+  address?: string;
+  /** 법정동 코드 (5자리) */
+  lawdCd?: string;
+  /** 건설사 */
+  builder?: string;
+  /** 면적별 대표 거래 히스토리 */
+  areas?: ApartmentAreaSummary[];
+}
+
+/** 단지 내 면적 유형별 요약 */
+export interface ApartmentAreaSummary {
+  /** 전용 면적 (m²) */
+  area: number;
+  /** 해당 면적 최근 거래가 (만원) */
+  recentPrice: number;
 }
 
 /** 지도 뷰포트용 아파트 마커 데이터 */
