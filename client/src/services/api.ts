@@ -3,7 +3,7 @@ import axios, { type AxiosError } from 'axios';
 // Axios 인스턴스 생성
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL
-    ? `${import.meta.env.VITE_API_BASE_URL}/api`
+    ? `${import.meta.env.VITE_API_BASE_URL.trim()}/api`
     : '/api',
   timeout: 10000,
   headers: {
