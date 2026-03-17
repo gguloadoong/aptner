@@ -19,6 +19,11 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Configure GitHub Packages auth
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" >> ~/.npmrc
+          echo "@wanteddev:registry=https://npm.pkg.github.com/" >> ~/.npmrc
+
       - name: Install root dependencies
         run: npm ci
 
@@ -46,6 +51,11 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Configure GitHub Packages auth
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" >> ~/.npmrc
+          echo "@wanteddev:registry=https://npm.pkg.github.com/" >> ~/.npmrc
+
       - name: Install client dependencies
         run: npm ci --prefix client
 
@@ -64,6 +74,11 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - name: Configure GitHub Packages auth
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" >> ~/.npmrc
+          echo "@wanteddev:registry=https://npm.pkg.github.com/" >> ~/.npmrc
 
       - name: Install root dependencies
         run: npm ci
