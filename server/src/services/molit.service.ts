@@ -9,15 +9,17 @@ import {
   ApartmentTrade,
   ApartmentTradeHistory,
   ApartmentMapMarker,
+  ComplexFilter,
   HotApartment,
   MolitApiResponse,
   MolitTradeItem,
 } from '../types';
 import { cacheService, CACHE_TTL } from './cache.service';
 
-// 국토부 실거래가 API 기본 URL
-const MOLIT_API_BASE_URL =
-  'http://openapi.molit.go.kr/OpenAPI_ToolInstallPackage/service/rest/RTMSOBJSvc/getRTMSDataSvcAptTradeDev';
+// 국토부 실거래가 API — Cloudflare Workers 프록시를 통해 호출
+// Railway 서버가 해외 IP라 직접 호출 시 WAF 차단됨
+// Cloudflare 서울 엣지에서 한국 IP로 중계
+const MOLIT_API_BASE_URL = 'https://molit-proxy.bomzip.workers.dev/trade';
 
 // API 타임아웃: 10초
 const API_TIMEOUT = 10_000;
@@ -50,9 +52,36 @@ interface AptBaseData {
   isRecordHigh?: boolean;
   /** HOT 랭킹 TOP 10 순위 (TOP 10이면 1~10, 나머지 undefined) */
   hotRank?: number;
+  // ---- 단지 특성 필드 (MAP_MARKERS_MOCK 에서 사용) ----
+  /** 건설사 */
+  builder?: string;
+  /** 준공 연도 */
+  builtYear?: number;
+  /** 총 세대수 */
+  totalUnits?: number;
+  /** 역세권 여부 (500m 이내) */
+  isWalkSubway?: boolean;
+  /** 평지 여부 */
+  isFlat?: boolean;
+  /** 초품아 여부 */
+  hasElementarySchool?: boolean;
+}
+
+// ---- 브랜드 건설사 목록 및 판별 헬퍼 ----
+const BRAND_BUILDERS = [
+  '삼성물산', 'GS건설', '현대건설', '대우건설', '롯데건설',
+  '포스코이앤씨', 'DL이앤씨', 'HDC현대산업개발', '한화건설',
+];
+
+/**
+ * 건설사명 기반 브랜드 단지 여부를 반환합니다.
+ */
+function isBrandBuilder(builder: string): boolean {
+  return BRAND_BUILDERS.some((b) => builder.includes(b));
 }
 
 const APT_BASE_DATA: AptBaseData[] = [
+  // ---- 기존 20개 단지 ----
   {
     aptCode: 'APT001',
     apartmentName: '래미안 원베일리',
@@ -66,6 +95,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChangeRate: 5.7,
     isRecordHigh: true,  // 반포 역대 최고가 경신
     hotRank: 1,
+    builder: '삼성물산',
+    builtYear: 2023,
+    totalUnits: 2990,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
   },
   {
     aptCode: 'APT002',
@@ -80,6 +115,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChangeRate: 2.6,
     isRecordHigh: true,  // 국내 최고가 단지 신고가
     hotRank: 2,
+    builder: 'DL이앤씨',
+    builtYear: 2016,
+    totalUnits: 1612,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
   },
   {
     aptCode: 'APT003',
@@ -93,6 +134,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChange: 5000,
     priceChangeRate: 3.6,
     hotRank: 3,
+    builder: '삼성물산/현대건설/GS건설',
+    builtYear: 2018,
+    totalUnits: 9510,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT004',
@@ -106,6 +153,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChange: -2000,
     priceChangeRate: -1.1,
     hotRank: 4,
+    builder: '한양',
+    builtYear: 1979,
+    totalUnits: 4424,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT005',
@@ -120,6 +173,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChangeRate: 5.5,
     isRecordHigh: true,  // 둔촌주공 재건축 신고가
     hotRank: 5,
+    builder: '현대건설/HDC현대산업개발/대우건설/롯데건설',
+    builtYear: 2023,
+    totalUnits: 12032,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT006',
@@ -133,6 +192,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChange: 9000,
     priceChangeRate: 4.3,
     hotRank: 6,
+    builder: '삼성물산',
+    builtYear: 2015,
+    totalUnits: 1278,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT007',
@@ -146,6 +211,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChange: 5500,
     priceChangeRate: 2.9,
     hotRank: 7,
+    builder: '현대건설',
+    builtYear: 2002,
+    totalUnits: 1717,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
   },
   {
     aptCode: 'APT008',
@@ -160,6 +231,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChangeRate: 5.5,
     isRecordHigh: true,  // 재건축 기대감 신고가
     hotRank: 8,
+    builder: '주공',
+    builtYear: 1978,
+    totalUnits: 3930,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT009',
@@ -173,6 +250,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChange: 3000,
     priceChangeRate: 2.7,
     hotRank: 9,
+    builder: '삼성물산/대우건설',
+    builtYear: 2014,
+    totalUnits: 3885,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT010',
@@ -186,6 +269,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     priceChange: -1000,
     priceChangeRate: -1.0,
     hotRank: 10,
+    builder: '주공',
+    builtYear: 1986,
+    totalUnits: 2512,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT011',
@@ -198,6 +287,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 18,
     priceChange: 2000,
     priceChangeRate: 2.9,
+    builder: '현대건설',
+    builtYear: 2017,
+    totalUnits: 1248,
+    isWalkSubway: false,
+    isFlat: false,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT012',
@@ -210,6 +305,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 15,
     priceChange: 4000,
     priceChangeRate: 6.3,
+    builder: '롯데건설',
+    builtYear: 2016,
+    totalUnits: 2102,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
   },
   {
     aptCode: 'APT013',
@@ -222,6 +323,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 17,
     priceChange: 6000,
     priceChangeRate: 4.8,
+    builder: '포스코이앤씨',
+    builtYear: 2014,
+    totalUnits: 1652,
+    isWalkSubway: false,
+    isFlat: false,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT014',
@@ -234,6 +341,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 19,
     priceChange: 3500,
     priceChangeRate: 3.4,
+    builder: 'GS건설',
+    builtYear: 2016,
+    totalUnits: 1872,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT015',
@@ -246,6 +359,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 24,
     priceChange: 10000,
     priceChangeRate: 3.9,
+    builder: 'GS건설',
+    builtYear: 2008,
+    totalUnits: 3410,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
   },
   {
     aptCode: 'APT016',
@@ -258,6 +377,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 21,
     priceChange: 7500,
     priceChangeRate: 3.8,
+    builder: '롯데건설/현대건설',
+    builtYear: 2008,
+    totalUnits: 5563,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT017',
@@ -270,6 +395,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 16,
     priceChange: 11000,
     priceChangeRate: 4.8,
+    builder: '삼성물산',
+    builtYear: 2019,
+    totalUnits: 2296,
+    isWalkSubway: false,
+    isFlat: false,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT018',
@@ -282,6 +413,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 20,
     priceChange: 4500,
     priceChangeRate: 4.0,
+    builder: '현대건설',
+    builtYear: 2019,
+    totalUnits: 4066,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
   },
   {
     aptCode: 'APT019',
@@ -294,6 +431,12 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 14,
     priceChange: 2500,
     priceChangeRate: 4.0,
+    builder: 'GS건설',
+    builtYear: 2021,
+    totalUnits: 1320,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: false,
   },
   {
     aptCode: 'APT020',
@@ -306,6 +449,386 @@ const APT_BASE_DATA: AptBaseData[] = [
     tradeCount: 12,
     priceChange: 1800,
     priceChangeRate: 3.4,
+    builder: '대우건설',
+    builtYear: 2021,
+    totalUnits: 2084,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: false,
+  },
+
+  // ---- 추가 20개 단지 ----
+
+  // 서울 북부
+  {
+    aptCode: 'APT021',
+    apartmentName: '중계 주공그린4단지',
+    lawdNm: '서울 노원구 중계동',
+    lat: 37.6512,
+    lng: 127.0762,
+    basePrice: 80000,
+    area: 84,
+    tradeCount: 10,
+    priceChange: 1000,
+    priceChangeRate: 1.3,
+    builder: '현대건설',
+    builtYear: 1994,
+    totalUnits: 1900,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT022',
+    apartmentName: '창동 e편한세상',
+    lawdNm: '서울 도봉구 창동',
+    lat: 37.6523,
+    lng: 127.0478,
+    basePrice: 72000,
+    area: 84,
+    tradeCount: 9,
+    priceChange: 800,
+    priceChangeRate: 1.1,
+    builder: 'DL이앤씨',
+    builtYear: 2002,
+    totalUnits: 1046,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: false,
+  },
+  {
+    aptCode: 'APT023',
+    apartmentName: '서울숲 리버뷰 자이',
+    lawdNm: '서울 성동구 성수동',
+    lat: 37.5481,
+    lng: 127.0392,
+    basePrice: 185000,
+    area: 84,
+    tradeCount: 11,
+    priceChange: 9000,
+    priceChangeRate: 5.1,
+    builder: 'GS건설',
+    builtYear: 2022,
+    totalUnits: 1052,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+
+  // 서울 기타
+  {
+    aptCode: 'APT024',
+    apartmentName: '이수 브라운스톤',
+    lawdNm: '서울 동작구 사당동',
+    lat: 37.4892,
+    lng: 126.9812,
+    basePrice: 95000,
+    area: 84,
+    tradeCount: 8,
+    priceChange: 1500,
+    priceChangeRate: 1.6,
+    builder: '코오롱글로벌',
+    builtYear: 2003,
+    totalUnits: 584,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT025',
+    apartmentName: '용산 센트럴파크 해링턴스퀘어',
+    lawdNm: '서울 용산구 한강로동',
+    lat: 37.5253,
+    lng: 126.9646,
+    basePrice: 290000,
+    area: 84,
+    tradeCount: 13,
+    priceChange: 12000,
+    priceChangeRate: 4.3,
+    builder: '한화건설',
+    builtYear: 2019,
+    totalUnits: 1140,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
+  },
+
+  // 경기 1기 신도시
+  {
+    aptCode: 'APT026',
+    apartmentName: '분당 파크뷰',
+    lawdNm: '경기 성남시 분당구',
+    lat: 37.3729,
+    lng: 127.1219,
+    basePrice: 145000,
+    area: 84,
+    tradeCount: 14,
+    priceChange: 5000,
+    priceChangeRate: 3.6,
+    builder: '삼성물산',
+    builtYear: 2003,
+    totalUnits: 1694,
+    isWalkSubway: false,
+    isFlat: false,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT027',
+    apartmentName: '일산 위시티 블루밍',
+    lawdNm: '경기 고양시 일산동구',
+    lat: 37.6738,
+    lng: 126.7712,
+    basePrice: 58000,
+    area: 84,
+    tradeCount: 9,
+    priceChange: 500,
+    priceChangeRate: 0.9,
+    builder: '대우건설',
+    builtYear: 2011,
+    totalUnits: 2102,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT028',
+    apartmentName: '평촌 어바인퍼스트',
+    lawdNm: '경기 안양시 동안구',
+    lat: 37.3924,
+    lng: 126.9619,
+    basePrice: 89000,
+    area: 84,
+    tradeCount: 11,
+    priceChange: 2000,
+    priceChangeRate: 2.3,
+    builder: '대우건설',
+    builtYear: 2010,
+    totalUnits: 1680,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+
+  // 경기 2기/3기 신도시
+  {
+    aptCode: 'APT029',
+    apartmentName: '광교 자이더클래스',
+    lawdNm: '경기 수원시 영통구',
+    lat: 37.2891,
+    lng: 127.0532,
+    basePrice: 128000,
+    area: 84,
+    tradeCount: 12,
+    priceChange: 4000,
+    priceChangeRate: 3.2,
+    builder: 'GS건설',
+    builtYear: 2021,
+    totalUnits: 1956,
+    isWalkSubway: false,
+    isFlat: false,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT030',
+    apartmentName: '동탄역 롯데캐슬 트리니엔',
+    lawdNm: '경기 화성시 동탄',
+    lat: 37.2095,
+    lng: 127.0727,
+    basePrice: 92000,
+    area: 84,
+    tradeCount: 10,
+    priceChange: 3000,
+    priceChangeRate: 3.4,
+    builder: '롯데건설',
+    builtYear: 2016,
+    totalUnits: 2102,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: false,
+  },
+  {
+    aptCode: 'APT031',
+    apartmentName: '판교 더샵 퍼스트파크',
+    lawdNm: '경기 성남시 분당구',
+    lat: 37.3847,
+    lng: 127.1119,
+    basePrice: 162000,
+    area: 84,
+    tradeCount: 13,
+    priceChange: 6000,
+    priceChangeRate: 3.8,
+    builder: '포스코이앤씨',
+    builtYear: 2018,
+    totalUnits: 1160,
+    isWalkSubway: false,
+    isFlat: false,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT032',
+    apartmentName: '위례 자이 2단지',
+    lawdNm: '경기 성남시 수정구',
+    lat: 37.4712,
+    lng: 127.1391,
+    basePrice: 115000,
+    area: 84,
+    tradeCount: 11,
+    priceChange: 3500,
+    priceChangeRate: 3.1,
+    builder: 'GS건설',
+    builtYear: 2016,
+    totalUnits: 1872,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT033',
+    apartmentName: '하남 미사 강변힐스테이트',
+    lawdNm: '경기 하남시 미사동',
+    lat: 37.5512,
+    lng: 127.2163,
+    basePrice: 78000,
+    area: 84,
+    tradeCount: 10,
+    priceChange: 2000,
+    priceChangeRate: 2.6,
+    builder: '현대건설',
+    builtYear: 2017,
+    totalUnits: 1480,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+
+  // 인천/경기 기타
+  {
+    aptCode: 'APT034',
+    apartmentName: '검단 AB3블록 푸르지오',
+    lawdNm: '인천 서구 검단동',
+    lat: 37.6012,
+    lng: 126.7219,
+    basePrice: 52000,
+    area: 84,
+    tradeCount: 8,
+    priceChange: 1000,
+    priceChangeRate: 2.0,
+    builder: '대우건설',
+    builtYear: 2023,
+    totalUnits: 2084,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: false,
+  },
+  {
+    aptCode: 'APT035',
+    apartmentName: '고양 삼송 원흥 아이파크',
+    lawdNm: '경기 고양시 덕양구',
+    lat: 37.6502,
+    lng: 126.8892,
+    basePrice: 65000,
+    area: 84,
+    tradeCount: 9,
+    priceChange: 1500,
+    priceChangeRate: 2.4,
+    builder: 'HDC현대산업개발',
+    builtYear: 2015,
+    totalUnits: 1536,
+    isWalkSubway: true,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT036',
+    apartmentName: '과천 푸르지오 써밋',
+    lawdNm: '경기 과천시',
+    lat: 37.4295,
+    lng: 126.9878,
+    basePrice: 175000,
+    area: 84,
+    tradeCount: 11,
+    priceChange: 7000,
+    priceChangeRate: 4.2,
+    builder: '대우건설',
+    builtYear: 2022,
+    totalUnits: 1571,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: true,
+  },
+
+  // 지방 광역시
+  {
+    aptCode: 'APT037',
+    apartmentName: '부산 해운대 아이파크',
+    lawdNm: '부산 해운대구',
+    lat: 35.1631,
+    lng: 129.1624,
+    basePrice: 135000,
+    area: 84,
+    tradeCount: 12,
+    priceChange: 4500,
+    priceChangeRate: 3.4,
+    builder: 'HDC현대산업개발',
+    builtYear: 2011,
+    totalUnits: 1631,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: false,
+  },
+  {
+    aptCode: 'APT038',
+    apartmentName: '대구 수성 범어 아이파크',
+    lawdNm: '대구 수성구 범어동',
+    lat: 35.8582,
+    lng: 128.6321,
+    basePrice: 98000,
+    area: 84,
+    tradeCount: 10,
+    priceChange: 2500,
+    priceChangeRate: 2.6,
+    builder: 'HDC현대산업개발',
+    builtYear: 2013,
+    totalUnits: 1248,
+    isWalkSubway: true,
+    isFlat: false,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT039',
+    apartmentName: '대전 도안 트리풀시티',
+    lawdNm: '대전 서구 도안동',
+    lat: 36.3502,
+    lng: 127.3612,
+    basePrice: 56000,
+    area: 84,
+    tradeCount: 9,
+    priceChange: 1200,
+    priceChangeRate: 2.2,
+    builder: '현대건설',
+    builtYear: 2014,
+    totalUnits: 3032,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
+  },
+  {
+    aptCode: 'APT040',
+    apartmentName: '세종 리더스포레',
+    lawdNm: '세종특별자치시',
+    lat: 36.5012,
+    lng: 127.2719,
+    basePrice: 48000,
+    area: 84,
+    tradeCount: 8,
+    priceChange: 800,
+    priceChangeRate: 1.7,
+    builder: '한화건설',
+    builtYear: 2015,
+    totalUnits: 1030,
+    isWalkSubway: false,
+    isFlat: true,
+    hasElementarySchool: true,
   },
 ];
 
@@ -393,7 +916,10 @@ const APT_HISTORY_MOCK: Record<string, ApartmentTradeHistory[]> = Object.fromEnt
 );
 
 // ============================================================
-// 지도 마커용 Mock 데이터
+// 지도 마커용 Mock 데이터 (40개)
+// isBrand: builder 기준 자동 계산
+// isLargeComplex: totalUnits >= 1000 자동 계산
+// isNewBuild: builtYear >= 2020 자동 계산
 // TODO: 실 API 연동 시 이 함수 교체
 // ============================================================
 const MAP_MARKERS_MOCK: ApartmentMapMarker[] = APT_BASE_DATA.map((apt) => ({
@@ -404,6 +930,13 @@ const MAP_MARKERS_MOCK: ApartmentMapMarker[] = APT_BASE_DATA.map((apt) => ({
   price: apt.basePrice,
   area: String(apt.area),
   priceChangeType: apt.priceChange > 0 ? 'up' : apt.priceChange < 0 ? 'down' : 'flat',
+  unitCount: apt.totalUnits,
+  isBrand: apt.builder ? isBrandBuilder(apt.builder) : false,
+  isWalkSubway: apt.isWalkSubway ?? false,
+  isLargeComplex: apt.totalUnits !== undefined ? apt.totalUnits >= 1000 : false,
+  isNewBuild: apt.builtYear !== undefined ? apt.builtYear >= 2020 : false,
+  isFlat: apt.isFlat ?? false,
+  hasElementarySchool: apt.hasElementarySchool ?? false,
 }));
 
 // ============================================================
@@ -412,31 +945,33 @@ const MAP_MARKERS_MOCK: ApartmentMapMarker[] = APT_BASE_DATA.map((apt) => ({
 
 /**
  * 국토부 XML 응답에서 거래 아이템 하나를 파싱합니다.
+ * 공공데이터포털 신 API (apis.data.go.kr) 기준 필드명 사용
  */
 function parseMolitItem(item: MolitTradeItem, lawdCd: string): ApartmentTrade {
-  // 거래 금액에서 쉼표 제거 후 숫자 변환
-  const rawPrice = item.거래금액?.[0]?.replace(/,/g, '').trim() ?? '0';
+  // 거래 금액에서 쉼표 및 공백 제거 후 숫자 변환
+  const rawPrice = item.dealAmount?.[0]?.replace(/,/g, '').trim() ?? '0';
   const price = parseInt(rawPrice, 10) || 0;
 
-  const year = parseInt(item.년?.[0] ?? '0', 10);
-  const month = parseInt(item.월?.[0] ?? '0', 10);
-  const day = parseInt(item.일?.[0]?.trim() ?? '0', 10);
+  const year = parseInt(item.dealYear?.[0]?.trim() ?? '0', 10);
+  const month = parseInt(item.dealMonth?.[0]?.trim() ?? '0', 10);
+  const day = parseInt(item.dealDay?.[0]?.trim() ?? '0', 10);
   const dealDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
   return {
-    apartmentName: item.아파트?.[0]?.trim() ?? '',
-    area: parseFloat(item.전용면적?.[0] ?? '0'),
-    floor: parseInt(item.층?.[0] ?? '0', 10),
+    apartmentName: item.aptNm?.[0]?.trim() ?? '',
+    area: parseFloat(item.excluUseAr?.[0]?.trim() ?? '0'),
+    floor: parseInt(item.floor?.[0]?.trim() ?? '0', 10),
     price,
     dealDate,
     dealYear: year,
     dealMonth: month,
     dealDay: day,
-    lawdCd: item.지역코드?.[0] ?? lawdCd,
-    lawdNm: item.법정동?.[0]?.trim() ?? '',
-    roadNm: item.도로명?.[0]?.trim(),
-    buildYear: item.건축년도?.[0] ? parseInt(item.건축년도[0], 10) : undefined,
-    aptCode: item.단지코드?.[0]?.trim(),
+    // 신 API: sggCd (시군구 코드), umdNm (읍면동명)
+    lawdCd: item.sggCd?.[0]?.trim() ?? lawdCd,
+    lawdNm: item.umdNm?.[0]?.trim() ?? '',
+    roadNm: item.roadNm?.[0]?.trim(),
+    buildYear: item.buildYear?.[0] ? parseInt(item.buildYear[0].trim(), 10) : undefined,
+    aptCode: item.aptSeq?.[0]?.trim(),
   };
 }
 
@@ -466,22 +1001,59 @@ async function fetchMolitApi(
     numOfRows: String(numOfRows),
   };
 
-  const response = await axios.get<string>(MOLIT_API_BASE_URL, {
-    params,
-    timeout: API_TIMEOUT,
-    responseType: 'text',
-    headers: {
-      Accept: 'application/xml',
-    },
-  });
+  let response;
+  try {
+    response = await axios.get<string>(MOLIT_API_BASE_URL, {
+      params,
+      timeout: API_TIMEOUT,
+      responseType: 'text',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BomzipServer/1.0)',
+      },
+    });
+  } catch (err) {
+    // axios 네트워크/타임아웃 에러 시 응답 body도 함께 출력
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status ?? 'N/A';
+      const body = err.response?.data ?? '(응답 없음)';
+      console.error(
+        `[Molit] API HTTP 에러 — status=${status}, lawdCd=${lawdCd}, dealYmd=${dealYmd}`,
+        typeof body === 'string' ? body.substring(0, 500) : body,
+      );
+    } else {
+      console.error(`[Molit] API 호출 실패 — lawdCd=${lawdCd}, dealYmd=${dealYmd}`, err);
+    }
+    throw err;
+  }
 
   // XML을 JSON으로 변환
-  const parsed = (await parseStringPromise(response.data)) as MolitApiResponse;
+  let parsed: MolitApiResponse;
+  try {
+    parsed = (await parseStringPromise(response.data)) as MolitApiResponse;
+  } catch (parseErr) {
+    // XML 파싱 실패 시 응답 원문 앞 500자 출력
+    console.error(
+      `[Molit] XML 파싱 실패 — lawdCd=${lawdCd}, dealYmd=${dealYmd}, 응답 앞 500자:`,
+      response.data?.substring(0, 500),
+    );
+    throw parseErr;
+  }
+
   const body = parsed.response?.body?.[0];
+  // API 레벨 에러 메시지 확인 (예: "SERVICE_KEY_IS_NOT_REGISTERED_ERROR")
+  const resultCode = parsed.response?.header?.[0]?.resultCode?.[0];
+  const resultMsg = parsed.response?.header?.[0]?.resultMsg?.[0];
+  if (resultCode && resultCode !== '00' && resultCode !== '0000') {
+    console.error(
+      `[Molit] API 에러 응답 — lawdCd=${lawdCd}, dealYmd=${dealYmd}, code=${resultCode}, msg=${resultMsg}`,
+    );
+  }
+
   const totalCount = parseInt(body?.totalCount?.[0] ?? '0', 10);
   const rawItems = body?.items?.[0]?.item ?? [];
 
   const items = rawItems.map((item: MolitTradeItem) => parseMolitItem(item, lawdCd));
+  console.log(`[Molit] API 응답 — lawdCd=${lawdCd}, dealYmd=${dealYmd}, totalCount=${totalCount}, parsed=${items.length}건`);
 
   return { items, totalCount };
 }
@@ -707,12 +1279,24 @@ export async function getHotApartments(
     return result;
   }
 
-  // 최근 1개월 데이터 조회
+  // 국토부 API는 5자리 시군구 코드(LAWD_CD) 필수
+  // regionCode가 2자리(시도)이면 해당 시도 주요 구 코드 목록으로 확장
+  const REGION_LAWD_MAP: Record<string, string[]> = {
+    '11': ['11110','11140','11170','11200','11215','11230','11260','11290','11305','11320','11350','11380','11410','11440','11470','11500','11530','11545','11560','11590','11620','11650','11680','11710','11740'], // 서울 25구
+    '41': ['41110','41130','41150','41170','41190','41210','41220','41250','41270','41280','41290','41310','41360','41370','41390','41410','41430','41450','41460','41480','41500','41550','41570','41590','41610','41630','41650','41670','41800','41820','41830'], // 경기 주요
+    '26': ['26110','26140','26170','26200','26230','26260','26290','26320','26350','26380','26410','26440','26470','26500','26530','26710'], // 부산
+  };
+  const lawdCodes = REGION_LAWD_MAP[regionCode] ?? [regionCode];
+
+  // 최근 1개월 데이터 조회 (주요 구 병렬)
   const now = new Date();
   const dealYmd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   try {
-    const { items } = await fetchMolitApi(regionCode, dealYmd, 1, 1000);
+    const results = await Promise.allSettled(
+      lawdCodes.map((cd) => fetchMolitApi(cd, dealYmd, 1, 1000)),
+    );
+    const items = results.flatMap((r) => (r.status === 'fulfilled' ? r.value.items : []));
 
     // 아파트별 거래 집계
     const aptMap = new Map<string, { trades: ApartmentTrade[]; key: string }>();
@@ -745,15 +1329,64 @@ export async function getHotApartments(
         tradeCount: apt.trades.length,
         priceChange,
         priceChangeRate: Math.round(priceChangeRate * 10) / 10,
-        // 실 API 응답에는 좌표가 없으므로 undefined
         lat: undefined,
         lng: undefined,
       };
     });
 
-    // 캐시 저장 (6시간)
-    cacheService.set(cacheKey, hotList, CACHE_TTL.APARTMENT_TRADE);
+    // 데이터 없으면 최대 6개월 전까지 순차 탐색 (신고 기간 지연 대응)
+    if (hotList.length === 0) {
+      let prevItems: ApartmentTrade[] = [];
+      let prevDealYmd = '';
+      for (let offset = 1; offset <= 6; offset++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+        prevDealYmd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+        console.warn(`[Molit] 데이터 없음 → ${prevDealYmd} 재시도 (offset=${offset})`);
+        const prevResults = await Promise.allSettled(
+          lawdCodes.map((cd) => fetchMolitApi(cd, prevDealYmd, 1, 1000)),
+        );
+        const errs = prevResults.filter((r) => r.status === 'rejected');
+        if (errs.length > 0) console.error(`[Molit] ${prevDealYmd} API 오류 샘플:`, (errs[0] as PromiseRejectedResult).reason?.message ?? errs[0]);
+        prevItems = prevResults.flatMap((r) => (r.status === 'fulfilled' ? r.value.items : []));
+        if (prevItems.length > 0) break;
+      }
+      if (prevItems.length > 0) {
+        const prevMap = new Map<string, { trades: ApartmentTrade[]; key: string }>();
+        prevItems.forEach((item) => {
+          const key = item.aptCode ?? item.apartmentName;
+          if (!prevMap.has(key)) prevMap.set(key, { trades: [], key });
+          prevMap.get(key)!.trades.push(item);
+        });
+        const prevSorted = Array.from(prevMap.values())
+          .sort((a, b) => b.trades.length - a.trades.length)
+          .slice(0, limit);
+        const prevHotList = prevSorted.map((apt, idx) => {
+          const latest = apt.trades[apt.trades.length - 1];
+          const first = apt.trades[0];
+          const pc = latest.price - first.price;
+          return {
+            rank: idx + 1,
+            aptCode: apt.key,
+            apartmentName: latest.apartmentName,
+            lawdNm: latest.lawdNm,
+            recentPrice: latest.price,
+            area: latest.area,
+            tradeCount: apt.trades.length,
+            priceChange: pc,
+            priceChangeRate: Math.round((first.price > 0 ? (pc / first.price) * 100 : 0) * 10) / 10,
+            lat: undefined,
+            lng: undefined,
+          };
+        });
+        cacheService.set(cacheKey, prevHotList, CACHE_TTL.APARTMENT_TRADE);
+        return prevHotList;
+      }
+      // 이전 달도 없으면 Mock
+      console.warn('[Molit] 이전 달도 데이터 없음 → Mock 반환');
+      return HOT_APARTMENTS_MOCK.slice(0, limit);
+    }
 
+    cacheService.set(cacheKey, hotList, CACHE_TTL.APARTMENT_TRADE);
     return hotList;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -765,7 +1398,7 @@ export async function getHotApartments(
 /**
  * 지도 뷰포트 내 아파트 마커를 조회합니다.
  * TODO: 실 API 연동 시 이 함수 교체
- * - Mock: 사전 정의된 20개 아파트에서 뷰포트 필터링
+ * - Mock: 사전 정의된 40개 아파트에서 뷰포트 및 단지 특성 필터링
  * - 실 API: DB 또는 API에서 좌표 기반 조회
  *
  * @param swLat - 남서쪽 위도
@@ -773,6 +1406,7 @@ export async function getHotApartments(
  * @param neLat - 북동쪽 위도
  * @param neLng - 북동쪽 경도
  * @param priceFilter - 가격 필터 (만원, 이하)
+ * @param complexFilter - 단지 특성 필터 (세대수, 브랜드, 역세권 등)
  */
 export async function getApartmentMapMarkers(
   swLat: number,
@@ -780,8 +1414,10 @@ export async function getApartmentMapMarkers(
   neLat: number,
   neLng: number,
   priceFilter?: number,
+  complexFilter?: ComplexFilter,
 ): Promise<ApartmentMapMarker[]> {
-  const cacheKey = `map:${swLat}:${swLng}:${neLat}:${neLng}:${priceFilter ?? 'all'}`;
+  const filterKey = complexFilter ? JSON.stringify(complexFilter) : 'none';
+  const cacheKey = `map:${swLat}:${swLng}:${neLat}:${neLng}:${priceFilter ?? 'all'}:${filterKey}`;
 
   const cached = cacheService.get<ApartmentMapMarker[]>(cacheKey);
   if (cached) {
@@ -801,6 +1437,42 @@ export async function getApartmentMapMarkers(
   // 가격 필터 적용
   if (priceFilter !== undefined && priceFilter > 0) {
     markers = markers.filter((apt) => apt.price <= priceFilter);
+  }
+
+  // 단지 특성 필터 적용
+  if (complexFilter) {
+    // 최소 세대수 필터
+    if (complexFilter.minUnit !== undefined) {
+      markers = markers.filter(
+        (apt) => apt.unitCount !== undefined && apt.unitCount >= complexFilter.minUnit!,
+      );
+    }
+    // 브랜드 필터
+    if (complexFilter.isBrand !== undefined) {
+      markers = markers.filter((apt) => apt.isBrand === complexFilter.isBrand);
+    }
+    // 역세권 필터
+    if (complexFilter.isWalkSubway !== undefined) {
+      markers = markers.filter((apt) => apt.isWalkSubway === complexFilter.isWalkSubway);
+    }
+    // 대단지 필터
+    if (complexFilter.isLargeComplex !== undefined) {
+      markers = markers.filter((apt) => apt.isLargeComplex === complexFilter.isLargeComplex);
+    }
+    // 신축 필터
+    if (complexFilter.isNewBuild !== undefined) {
+      markers = markers.filter((apt) => apt.isNewBuild === complexFilter.isNewBuild);
+    }
+    // 평지 필터
+    if (complexFilter.isFlat !== undefined) {
+      markers = markers.filter((apt) => apt.isFlat === complexFilter.isFlat);
+    }
+    // 초품아 필터
+    if (complexFilter.hasElementarySchool !== undefined) {
+      markers = markers.filter(
+        (apt) => apt.hasElementarySchool === complexFilter.hasElementarySchool,
+      );
+    }
   }
 
   console.log(`[Molit] 지도 마커 조회: 뷰포트 내 ${markers.length}개 반환`);
@@ -852,6 +1524,238 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
   };
 
   cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
+  return result;
+}
+
+// ============================================================
+// 전세가율 계산 관련 상수 및 함수
+// ============================================================
+
+/** 국토부 전세 실거래가 API 직접 호출 URL
+ *  - Railway 서버가 해외 IP이므로 WAF 차단 가능성 있음
+ *  - 차단 시 null 반환 + 경고 로그로 처리
+ */
+// 전세 API도 Cloudflare Worker 프록시 경유 (Railway 해외 IP WAF 차단 우회)
+const JEONSE_API_URL = 'https://molit-proxy.bomzip.workers.dev/rent';
+
+/**
+ * 전세 API 응답 XML 아이템 타입 (xml2js 파싱 결과)
+ */
+interface JeonseItem {
+  aptNm?: string[];
+  deposit?: string[];      // 보증금 (만원, 쉼표 포함 가능)
+  excluUseAr?: string[];   // 전용면적
+  dealYear?: string[];
+  dealMonth?: string[];
+  dealDay?: string[];
+  umdNm?: string[];
+  sggCd?: string[];
+  aptSeq?: string[];
+}
+
+/**
+ * 두 단지명의 유사도를 계산합니다 (0~1).
+ * 공백 제거 후 포함 여부로 판단하는 간단한 방식.
+ */
+function calcNameSimilarity(a: string, b: string): number {
+  const normalize = (s: string) => s.replace(/\s/g, '').toLowerCase();
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (na === nb) return 1;
+  if (na.includes(nb) || nb.includes(na)) return 0.8;
+  // 공통 글자 수 / 전체 글자 수로 자카드 유사도 근사
+  const setA = new Set(na);
+  const setB = new Set(nb);
+  const intersection = [...setA].filter((c) => setB.has(c)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+/**
+ * 숫자 배열에서 중위값(median)을 반환합니다.
+ */
+function calcMedian(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+/**
+ * 특정 아파트 단지의 전세가율을 계산합니다.
+ *
+ * 알고리즘:
+ * 1. 국토부 전세 API를 최근 6개월 순차 시도하여 해당 지역 전세 거래 수집
+ * 2. aptCode(단지 시퀀스) 또는 단지명 유사도로 해당 단지 거래 필터링
+ * 3. 같은 기간 매매 실거래 수집 (fetchMolitApi 사용)
+ * 4. 전세가율 = 전세 중위가 / 매매 중위가 × 100 (소수점 1자리 반올림)
+ *
+ * @param aptCode - 단지 시퀀스 코드 또는 단지명
+ * @param lawdCd - 법정동 코드 앞 5자리 (시군구 코드)
+ * @returns 전세가율(%), 전세 중위가, 매매 중위가 — 계산 불가 시 null
+ */
+export async function getJeonseRate(
+  aptCode: string,
+  lawdCd: string,
+): Promise<{
+  jeonseRate: number | null;
+  jeonsePrice: number | null;
+  tradePrice: number | null;
+}> {
+  const cacheKey = `jeonse-rate:${aptCode}:${lawdCd}`;
+
+  // 캐시 확인 (5분 TTL)
+  const cached = cacheService.get<{
+    jeonseRate: number | null;
+    jeonsePrice: number | null;
+    tradePrice: number | null;
+  }>(cacheKey);
+  if (cached) {
+    console.log(`[Molit] 전세가율 캐시 히트: ${cacheKey}`);
+    return cached;
+  }
+
+  const apiKey = process.env.MOLIT_API_KEY;
+  if (!isRealApiKey(apiKey)) {
+    console.warn('[Molit] getJeonseRate: MOLIT_API_KEY 없음 → null 반환');
+    return { jeonseRate: null, jeonsePrice: null, tradePrice: null };
+  }
+
+  // 최근 6개월 YYYYMM 목록 생성
+  const now = new Date();
+  const recentMonths: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    recentMonths.push(
+      `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`,
+    );
+  }
+
+  // ---- 전세 데이터 수집 ----
+  const allJeonseDeposits: number[] = [];
+  let aptNameFromApi: string | null = null; // API에서 확인한 단지명
+
+  for (const ym of recentMonths) {
+    try {
+      const response = await axios.get<string>(JEONSE_API_URL, {
+        params: {
+          serviceKey: apiKey,
+          LAWD_CD: lawdCd,
+          DEAL_YMD: ym,
+          pageNo: '1',
+          numOfRows: '100',
+        },
+        timeout: API_TIMEOUT,
+        responseType: 'text',
+      });
+
+      const parsed = (await parseStringPromise(response.data)) as MolitApiResponse;
+      const body = parsed.response?.body?.[0];
+      const rawItems: JeonseItem[] = body?.items?.[0]?.item ?? [];
+
+      // aptCode(aptSeq) 또는 단지명 유사도로 해당 단지 필터링
+      const matched = rawItems.filter((item) => {
+        const seq = item.aptSeq?.[0]?.trim() ?? '';
+        const nm = item.aptNm?.[0]?.trim() ?? '';
+        if (seq && seq === aptCode) return true;
+        return calcNameSimilarity(aptCode, nm) >= 0.7;
+      });
+
+      matched.forEach((item) => {
+        const raw = item.deposit?.[0]?.replace(/,/g, '').trim() ?? '0';
+        const deposit = parseInt(raw, 10);
+        if (deposit > 0) {
+          allJeonseDeposits.push(deposit);
+          // 단지명 기록 (첫 번째 매칭)
+          if (!aptNameFromApi) {
+            aptNameFromApi = item.aptNm?.[0]?.trim() ?? null;
+          }
+        }
+      });
+
+      console.log(
+        `[Molit] 전세 조회 ${ym}: ${rawItems.length}건 중 매칭 ${matched.length}건`,
+      );
+
+      // 충분한 데이터 수집 시 중단 (10건 이상)
+      if (allJeonseDeposits.length >= 10) break;
+    } catch (err) {
+      console.warn(`[Molit] 전세 API 호출 실패 (${ym}):`, err);
+      // 개별 월 실패는 무시하고 다음 월 시도
+    }
+  }
+
+  if (allJeonseDeposits.length === 0) {
+    console.warn(
+      `[Molit] 전세 데이터 없음: aptCode=${aptCode}, lawdCd=${lawdCd} (해외 IP 차단 가능성)`,
+    );
+    const result = { jeonseRate: null, jeonsePrice: null, tradePrice: null };
+    cacheService.set(cacheKey, result, 300); // 5분 캐시 (재시도 방지)
+    return result;
+  }
+
+  // ---- 매매 데이터 수집 ----
+  const allTradePrices: number[] = [];
+
+  for (const ym of recentMonths) {
+    try {
+      const { items } = await fetchMolitApi(lawdCd, ym, 1, 100);
+
+      // aptCode(aptSeq) 또는 단지명으로 필터링
+      const targetName = aptNameFromApi ?? aptCode;
+      const matched = items.filter((item) => {
+        if (item.aptCode && item.aptCode === aptCode) return true;
+        return calcNameSimilarity(targetName, item.apartmentName) >= 0.7;
+      });
+
+      matched.forEach((item) => {
+        if (item.price > 0) allTradePrices.push(item.price);
+      });
+
+      console.log(`[Molit] 매매 조회 ${ym}: 매칭 ${matched.length}건`);
+
+      if (allTradePrices.length >= 10) break;
+    } catch (err) {
+      console.warn(`[Molit] 매매 API 호출 실패 (${ym}):`, err);
+    }
+  }
+
+  if (allTradePrices.length === 0) {
+    console.warn(
+      `[Molit] 매매 데이터 없음: aptCode=${aptCode}, lawdCd=${lawdCd}`,
+    );
+    const result = { jeonseRate: null, jeonsePrice: null, tradePrice: null };
+    cacheService.set(cacheKey, result, 300);
+    return result;
+  }
+
+  // ---- 전세가율 계산 ----
+  const jeonseMedian = Math.round(calcMedian(allJeonseDeposits));
+  const tradeMedian = Math.round(calcMedian(allTradePrices));
+
+  if (tradeMedian === 0) {
+    const result = { jeonseRate: null, jeonsePrice: jeonseMedian, tradePrice: null };
+    cacheService.set(cacheKey, result, 300);
+    return result;
+  }
+
+  // 소수점 1자리 반올림
+  const jeonseRate = Math.round((jeonseMedian / tradeMedian) * 1000) / 10;
+
+  console.log(
+    `[Molit] 전세가율 계산 완료: aptCode=${aptCode}, 전세=${jeonseMedian}만원, 매매=${tradeMedian}만원, 전세가율=${jeonseRate}%`,
+  );
+
+  const result = {
+    jeonseRate,
+    jeonsePrice: jeonseMedian,
+    tradePrice: tradeMedian,
+  };
+
+  // 5분 캐시
+  cacheService.set(cacheKey, result, 300);
   return result;
 }
 

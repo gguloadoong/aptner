@@ -1,4 +1,4 @@
-/* Aptner App 전역 스타일 */
+/* 봄집 App 전역 스타일 */
 
 /* iOS safe area 지원 */
 .pb-safe {
@@ -20,7 +20,7 @@
   color: white;
 }
 .marker-down {
-  background-color: #00C896;
+  background-color: #3B82F6;
   color: white;
 }
 .marker-flat {

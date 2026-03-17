@@ -89,7 +89,7 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
             className={[
               'px-3 py-1 rounded-full text-xs font-semibold transition-colors',
               dateRange === range
-                ? 'bg-[#1B64DA] text-white'
+                ? 'bg-[#0066FF] text-white'
                 : 'bg-[#F5F6F8] text-[#8B95A1] hover:bg-gray-200',
             ].join(' ')}
           >
@@ -120,10 +120,10 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#1B64DA"
+            stroke="#0066FF"
             strokeWidth={2}
-            dot={{ r: 3, fill: '#1B64DA', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#1B64DA' }}
+            dot={{ r: 3, fill: '#0066FF', strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: '#0066FF' }}
             connectNulls={false}
             strokeDasharray="0"
           />

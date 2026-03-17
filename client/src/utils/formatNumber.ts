@@ -61,9 +61,13 @@ export function formatUnits(units: number): string {
   return `${units.toLocaleString('ko-KR')}세대`;
 }
 
-// 면적 포맷 (예: "84" -> "84㎡")
-export function formatArea(area: string): string {
-  return `${area}㎡`;
+// 전용면적 ㎡ → 평 병기 변환 (1평 = 3.3058㎡)
+// 예: "84" -> "84㎡ · 25평"
+export function formatArea(areaStr: string): string {
+  const sqm = parseFloat(areaStr);
+  if (isNaN(sqm)) return `${areaStr}㎡`;
+  const pyeong = Math.round(sqm / 3.3058);
+  return `${areaStr}㎡ · ${pyeong}평`;
 }
 
 // 거래량 포맷

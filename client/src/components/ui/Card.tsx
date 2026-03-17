@@ -24,7 +24,7 @@ const Card = React.memo<CardProps>(
           'bg-white rounded-xl border border-[#E5E8EB] shadow-sm',
           paddingStyles[padding],
           hoverable
-            ? 'cursor-pointer transition-all duration-200 hover:shadow-md hover:border-[#1B64DA]/30 active:scale-[0.99]'
+            ? 'cursor-pointer transition-all duration-200 hover:shadow-md hover:border-blue-200 active:scale-[0.99]'
             : '',
           className,
         ].join(' ')}

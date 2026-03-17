@@ -1,9 +1,11 @@
 // ============================================================
 // 청약 정보 서비스
-// TODO: 실제 LH 청약홈 API 연동 시 이 파일의 Mock 데이터를 교체하세요.
-// LH 청약홈 OpenAPI: https://apply.lh.or.kr/lhapply/api/open/api.do
-// 현재는 실제 데이터 형태를 갖춘 Mock 데이터로 구현됩니다.
+// LH 청약홈 OpenAPI 연동:
+//   - 분양정보: https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getApplyhomeInfoDetail
+//   - 경쟁률:   https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail
+// 실 키 미설정 시 Mock 데이터로 graceful fallback
 // ============================================================
+import axios from 'axios';
 import {
   Subscription,
   SubscriptionDetail,
@@ -11,6 +13,169 @@ import {
   SubscriptionStatus,
 } from '../types';
 import { cacheService, CACHE_TTL } from './cache.service';
+
+// LH API 타임아웃: 10초
+const LH_API_TIMEOUT = 10_000;
+
+// ============================================================
+// LH 청약홈 실 API 연동 함수
+// ============================================================
+
+/**
+ * 실제 LH 청약홈 API 키인지 여부를 판별합니다.
+ * 미설정이거나 demo 플레이스홀더 값이면 false를 반환합니다.
+ * 실제 공공데이터포털 인증키는 최소 20자 이상이어야 합니다.
+ */
+function isRealLhApiKey(): boolean {
+  const key = process.env.LH_SUBSCRIPTION_API_KEY;
+  if (!key) return false;
+  if (key === 'demo_key_replace_with_real_key') return false;
+  // 실제 공공데이터포털 키는 URL-encoded 문자열로 최소 20자 이상
+  if (key.length < 20) return false;
+  return true;
+}
+
+/**
+ * LH 청약홈 분양정보 상세 목록을 실 API로 조회합니다.
+ * API 키 미설정 시 빈 배열을 반환합니다.
+ * 실패 시 에러를 throw하며, 호출부에서 Mock fallback 처리합니다.
+ *
+ * @param page - 페이지 번호 (1부터 시작)
+ * @param perPage - 페이지당 건수
+ */
+export async function fetchRealSubscriptions(page = 1, perPage = 20): Promise<any[]> {
+  if (!isRealLhApiKey()) {
+    console.warn('[Subscription] LH_SUBSCRIPTION_API_KEY 미설정 → 실 API 호출 스킵');
+    return [];
+  }
+
+  const apiKey = process.env.LH_SUBSCRIPTION_API_KEY;
+  const keyPrefix = apiKey ? `${apiKey.substring(0, 8)}...` : '없음';
+  console.log(`[Subscription] 분양공고 실 API 호출: page=${page}, perPage=${perPage}, key=${keyPrefix}`);
+
+  const response = await axios.get(
+    'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail',
+    {
+      params: {
+        serviceKey: apiKey,
+        page,
+        perPage,
+      },
+      timeout: LH_API_TIMEOUT,
+    }
+  );
+
+  const data = response.data?.data ?? [];
+  console.log(`[Subscription] 분양공고 실 API 응답: ${data.length}건`);
+  return data;
+}
+
+/**
+ * LH API 날짜 문자열(YYYYMMDD 또는 YYYY-MM-DD)을 YYYY-MM-DD 형식으로 정규화합니다.
+ * 잘못된 포맷이 들어오면 빈 문자열을 반환합니다.
+ */
+function normalizeDateStr(raw: string | undefined | null): string {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  // YYYYMMDD → YYYY-MM-DD 변환
+  if (/^\d{8}$/.test(s)) {
+    return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+  }
+  // 이미 YYYY-MM-DD 형식이면 그대로 반환
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+  return '';
+}
+
+/**
+ * LH API 응답을 Subscription 타입으로 변환합니다.
+ *
+ * 날짜 필드: API는 YYYYMMDD 형식으로 반환하므로 normalizeDateStr()로 변환합니다.
+ * 가격 필드: LTTOT_TOP_AMOUNT는 만원 단위로 제공됩니다.
+ *            값이 1,000 이상이면 원 단위로 간주하여 만원으로 환산합니다.
+ */
+function adaptLhItem(item: any): Subscription {
+  // 날짜 필드 정규화 (YYYYMMDD → YYYY-MM-DD)
+  const startDate = normalizeDateStr(item.RCEPT_BGNDE ?? item.SPSPLY_RCEPT_BGNDE);
+  // 일반공급 2순위 마감일을 우선 사용하고, 없으면 접수 마감일로 fallback
+  const endDate = normalizeDateStr(
+    item.GNRL_RNK2_ETC_AREA_ENDDE ?? item.RCEPT_ENDDE ?? item.SPSPLY_RCEPT_ENDDE,
+  );
+  const announceDate = normalizeDateStr(item.PRZWNER_PRESNATN_DE) || addDays(endDate || startDate, 14);
+
+  const address = item.HSSPLY_ADRES ?? '';
+  // SUBSCRPT_AREA_CODE_NM: 예) "서울특별시" / 없으면 주소 첫 토큰 사용
+  const sido = item.SUBSCRPT_AREA_CODE_NM ?? address.split(' ')[0] ?? '';
+  const sigungu = address.split(' ')[1] ?? '';
+
+  // 분양가 처리: LTTOT_TOP_AMOUNT가 만원 단위인지 원 단위인지 판별
+  // 10억(100,000만원) 이상의 큰 값이면 원 단위로 간주하여 10,000으로 나눔
+  const rawPrice = Number(item.LTTOT_TOP_AMOUNT) || 0;
+  const priceInManwon = rawPrice > 1_000_000 ? Math.round(rawPrice / 10000) : rawPrice;
+
+  return {
+    id: item.HOUSE_MANAGE_NO ?? item.PBLANC_NO ?? String(Math.random()),
+    name: item.HOUSE_NM ?? '단지명 없음',
+    constructor: item.CNSTRCT_ENTRPS_NM ?? '',
+    sido,
+    sigungu,
+    address,
+    minPrice: priceInManwon,
+    maxPrice: priceInManwon,
+    totalSupply: Number(item.TOT_SUPLY_HSHLDCO) || 0,
+    startDate,
+    endDate,
+    announceDate,
+    type: item.HOUSE_DTL_SECD_NM === '공공' ? '특별공급' : '일반공급',
+    areas: [],
+    status: calcStatus(startDate, endDate),
+    dDay: endDate ? calcDDay(endDate) : 0,
+  };
+}
+
+/**
+ * LH 청약홈 분양공고 상세(경쟁률 포함) 목록을 실 API로 조회합니다.
+ * API 키 미설정 시 빈 배열을 반환합니다.
+ * 실패 시 에러를 throw하며, 호출부에서 Mock fallback 처리합니다.
+ *
+ * @param page - 페이지 번호 (1부터 시작)
+ * @param perPage - 페이지당 건수
+ */
+export async function fetchRealCompetitionRate(page = 1, perPage = 20): Promise<any[]> {
+  if (!isRealLhApiKey()) {
+    console.warn('[Subscription] LH_SUBSCRIPTION_API_KEY 미설정 → 경쟁률 API 호출 스킵');
+    return [];
+  }
+
+  const apiKey = process.env.LH_COMPETITION_API_KEY;
+
+  // LH_COMPETITION_API_KEY 도 별도 키이므로 유효성 확인 (20자 이상 실 키만 허용)
+  if (!apiKey || apiKey === 'demo_key_replace_with_real_key' || apiKey.length < 20) {
+    console.warn('[Subscription] LH_COMPETITION_API_KEY 미설정 또는 유효하지 않음 → 경쟁률 API 호출 스킵');
+    return [];
+  }
+
+  const keyPrefix = `${apiKey.substring(0, 8)}...`;
+  console.log(`[Subscription] 경쟁률 실 API 호출: page=${page}, perPage=${perPage}, key=${keyPrefix}`);
+
+  const response = await axios.get(
+    'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail',
+    {
+      params: {
+        serviceKey: apiKey,
+        page,
+        perPage,
+      },
+      timeout: LH_API_TIMEOUT,
+    }
+  );
+
+  const data = response.data?.data ?? [];
+  console.log(`[Subscription] 경쟁률 실 API 응답: ${data.length}건`);
+  return data;
+}
+
 
 /**
  * 현재 날짜 기준으로 N일 후(전)의 날짜 문자열 반환
@@ -264,6 +429,122 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
     lat: 37.3947,
     lng: 127.1116,
   },
+
+  // ---- 진행중(ongoing) 추가 2개 ----
+  {
+    id: 'SUB009',
+    name: '동탄2 아이파크 더레이크',
+    constructor: 'HDC현대산업개발',
+    sido: '경기도',
+    sigungu: '화성시',
+    address: '경기도 화성시 동탄 일원',
+    // 경기 화성 동탄 59㎡ 4.5억, 84㎡ 7.8억 수준
+    minPrice: 45000,
+    maxPrice: 78000,
+    totalSupply: 1284,
+    startDate: daysFromNow(-5),   // 5일 전 시작
+    endDate: daysFromNow(8),      // 8일 후 마감
+    announceDate: daysFromNow(22),
+    type: '일반공급',
+    areas: [
+      { typeName: '59A', area: 59.7, supply: 500, price: 45000 },
+      { typeName: '84A', area: 84.9, supply: 784, price: 78000 },
+    ],
+    lat: 37.2191,
+    lng: 127.0812,
+  },
+  {
+    id: 'SUB010',
+    name: '과천 푸르지오 어울림 라비엔오',
+    constructor: '대우건설',
+    sido: '경기도',
+    sigungu: '과천시',
+    address: '경기도 과천시 일원',
+    // 경기 과천 59㎡ 8.9억, 84㎡ 13.5억 수준
+    minPrice: 89000,
+    maxPrice: 135000,
+    totalSupply: 429,
+    startDate: daysFromNow(-3),   // 3일 전 시작
+    endDate: daysFromNow(4),      // 4일 후 마감
+    announceDate: daysFromNow(18),
+    type: '일반공급',
+    areas: [
+      { typeName: '59A', area: 59.8, supply: 180, price: 89000 },
+      { typeName: '84A', area: 84.9, supply: 249, price: 135000 },
+    ],
+    lat: 37.4295,
+    lng: 126.9891,
+  },
+
+  // ---- 예정(upcoming) 추가 2개 ----
+  {
+    id: 'SUB011',
+    name: '부산 북항 르엘',
+    constructor: '롯데건설',
+    sido: '부산광역시',
+    sigungu: '동구',
+    address: '부산광역시 동구 범일동 일원',
+    // 부산 동구 59㎡ 6.8억, 84㎡ 11.2억 수준
+    minPrice: 68000,
+    maxPrice: 112000,
+    totalSupply: 1096,
+    startDate: daysFromNow(18),   // 18일 후 시작
+    endDate: daysFromNow(22),     // 22일 후 마감
+    announceDate: daysFromNow(36),
+    type: '일반공급',
+    areas: [
+      { typeName: '59A', area: 59.9, supply: 450, price: 68000 },
+      { typeName: '84A', area: 84.8, supply: 646, price: 112000 },
+    ],
+    lat: 35.1162,
+    lng: 129.0523,
+  },
+  {
+    id: 'SUB012',
+    name: '세종 6-3생활권 힐스테이트',
+    constructor: '현대건설',
+    sido: '세종특별자치시',
+    sigungu: '세종시',
+    address: '세종특별자치시 어진동 일원',
+    // 세종 59㎡ 3.8억, 84㎡ 5.5억 수준
+    minPrice: 38000,
+    maxPrice: 55000,
+    totalSupply: 842,
+    startDate: daysFromNow(25),   // 25일 후 시작
+    endDate: daysFromNow(29),     // 29일 후 마감
+    announceDate: daysFromNow(43),
+    type: '일반공급',
+    areas: [
+      { typeName: '59A', area: 59.6, supply: 350, price: 38000 },
+      { typeName: '84A', area: 84.7, supply: 492, price: 55000 },
+    ],
+    lat: 36.5012,
+    lng: 127.2719,
+  },
+
+  // ---- 마감(closed) 추가 1개 ----
+  {
+    id: 'SUB013',
+    name: '안산 그랑시티자이 2차',
+    constructor: 'GS건설',
+    sido: '경기도',
+    sigungu: '안산시',
+    address: '경기도 안산시 단원구 일원',
+    // 경기 안산 59㎡ 4.2억, 84㎡ 6.5억 수준
+    minPrice: 42000,
+    maxPrice: 65000,
+    totalSupply: 2037,
+    startDate: daysFromNow(-60),  // 60일 전 시작
+    endDate: daysFromNow(-45),    // 45일 전 마감
+    announceDate: daysFromNow(-31),
+    type: '일반공급',
+    areas: [
+      { typeName: '59A', area: 59.7, supply: 800, price: 42000 },
+      { typeName: '84A', area: 84.8, supply: 1237, price: 65000 },
+    ],
+    lat: 37.3215,
+    lng: 126.8312,
+  },
 ];
 
 /**
@@ -289,8 +570,7 @@ function buildSubscriptions(): Subscription[] {
 export async function getSubscriptions(
   params: SubscriptionQueryParams,
 ): Promise<{ items: Subscription[]; total: number }> {
-  // 날짜를 캐시 키에 포함 → 날짜가 바뀌면 캐시 자동 무효화
-  const today = new Date().toISOString().split('T')[0]; // "2026-03-14"
+  const today = new Date().toISOString().split('T')[0];
   const cacheKey = `subs:${today}:${JSON.stringify(params)}`;
 
   const cached = cacheService.get<{ items: Subscription[]; total: number }>(cacheKey);
@@ -301,7 +581,21 @@ export async function getSubscriptions(
 
   const { page = 1, limit = 20, status, sido, sort } = params;
 
-  let list = buildSubscriptions();
+  // 실 API 사용 가능하면 LH 데이터 사용
+  let list: Subscription[];
+  if (isRealLhApiKey()) {
+    try {
+      const rawItems = await fetchRealSubscriptions(page, 100);
+      list = rawItems.map(adaptLhItem);
+      console.log(`[Subscription] 실 API 데이터 ${list.length}건 사용`);
+    } catch (err) {
+      console.error('[Subscription] 실 API 실패 → Mock fallback:', err);
+      list = buildSubscriptions();
+    }
+  } else {
+    console.warn('[Subscription] LH_SUBSCRIPTION_API_KEY 미설정 → Mock 데이터 사용');
+    list = buildSubscriptions();
+  }
 
   // 상태 필터
   if (status) {

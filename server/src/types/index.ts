@@ -95,6 +95,31 @@ export interface ApartmentMapMarker {
   price: number;
   area: string;
   priceChangeType: 'up' | 'down' | 'flat';
+  /** 세대수 */
+  unitCount?: number;
+  /** 브랜드 단지 여부 (래미안/자이/힐스테이트 등) */
+  isBrand?: boolean;
+  /** 역세권 여부 (500m 이내) */
+  isWalkSubway?: boolean;
+  /** 대단지 여부 (1000세대 이상) */
+  isLargeComplex?: boolean;
+  /** 신축 여부 (2020년 이후) */
+  isNewBuild?: boolean;
+  /** 평지 여부 */
+  isFlat?: boolean;
+  /** 초품아 여부 (초등학교 인접) */
+  hasElementarySchool?: boolean;
+}
+
+/** 단지 필터 조건 */
+export interface ComplexFilter {
+  minUnit?: number;
+  isBrand?: boolean;
+  isWalkSubway?: boolean;
+  isLargeComplex?: boolean;
+  isNewBuild?: boolean;
+  isFlat?: boolean;
+  hasElementarySchool?: boolean;
 }
 
 // ---- 청약 정보 ----
@@ -226,34 +251,62 @@ export interface MolitApiResponse {
 }
 
 export interface MolitTradeItem {
-  /** 아파트명 */
-  아파트?: string[];
-  /** 전용면적 */
-  전용면적?: string[];
-  /** 층 */
-  층?: string[];
-  /** 거래금액 */
-  거래금액?: string[];
-  /** 년 */
-  년?: string[];
-  /** 월 */
-  월?: string[];
-  /** 일 */
-  일?: string[];
-  /** 법정동 */
-  법정동?: string[];
-  /** 법정동본번코드 */
-  법정동본번코드?: string[];
-  /** 법정동부번코드 */
-  법정동부번코드?: string[];
-  /** 건축년도 */
-  건축년도?: string[];
-  /** 도로명 */
-  도로명?: string[];
-  /** 단지코드 */
-  단지코드?: string[];
-  /** 지역코드 */
-  지역코드?: string[];
+  /** 아파트명 (신 API: aptNm) */
+  aptNm?: string[];
+  /** 전용면적 (신 API: excluUseAr) */
+  excluUseAr?: string[];
+  /** 층 (신 API: floor) */
+  floor?: string[];
+  /** 거래금액 (신 API: dealAmount) */
+  dealAmount?: string[];
+  /** 거래년 (신 API: dealYear) */
+  dealYear?: string[];
+  /** 거래월 (신 API: dealMonth) */
+  dealMonth?: string[];
+  /** 거래일 (신 API: dealDay) */
+  dealDay?: string[];
+  /** 읍면동명 (신 API: umdNm) */
+  umdNm?: string[];
+  /** 건축년도 (신 API: buildYear) */
+  buildYear?: string[];
+  /** 도로명 (신 API: roadNm) */
+  roadNm?: string[];
+  /** 단지일련번호 (신 API: aptSeq) */
+  aptSeq?: string[];
+  /** 시군구코드 (신 API: sggCd) */
+  sggCd?: string[];
+  /** 법정동코드 (신 API: umdCd) */
+  umdCd?: string[];
+}
+
+// ---- 지도 뷰포트용 아파트 단지 (실 API 기반) ----
+
+/**
+ * 국토부 실거래가 API에서 집계한 아파트 단지 정보.
+ * 좌표는 FE에서 Kakao JS Geocoder로 변환 예정이므로
+ * 서버는 address(도로명 주소)만 제공합니다.
+ */
+export interface ApartmentComplex {
+  /** 단지 식별자 (aptSeq 또는 aptNm+lawdCd 해시) */
+  id: string;
+  /** 단지명 */
+  name: string;
+  /** 도로명 주소 (Kakao Geocoder 입력용) */
+  address: string;
+  /** 법정동 코드 5자리 (시군구) */
+  lawdCd: string;
+  /** 읍면동명 */
+  umdNm: string;
+  /** 가장 최근 거래가 (만원) */
+  latestPrice: number;
+  /** 가장 최근 거래 일자 (YYYY-MM-DD) */
+  latestDealDate: string;
+  /** 최근 2개월 거래 건수 */
+  tradeCount: number;
+  /** 대표 전용면적 (m²) — 거래 건수 가장 많은 면적 */
+  area: number;
+  /** 건축 연도 (없으면 undefined) */
+  buildYear?: number;
 }
 
 // ---- 요청 파라미터 ----

@@ -5,6 +5,7 @@ import {
   getApartmentsByBounds,
   getHotApartments,
   searchApartments,
+  getSupplyData,
 } from '../services/apartment.service';
 
 // 핫 아파트 목록 조회 훅
@@ -65,5 +66,14 @@ export function useApartmentSearch(keyword: string) {
     queryFn: () => searchApartments(keyword),
     enabled: keyword.length >= 2,
     staleTime: 2 * 60 * 1000,
+  });
+}
+
+// 입주 물량 예정 훅
+export function useSupplyData(region = '전국', months = 12) {
+  return useQuery({
+    queryKey: ['supply', region, months],
+    queryFn: () => getSupplyData(region, months),
+    staleTime: 60 * 60 * 1000, // 1시간
   });
 }

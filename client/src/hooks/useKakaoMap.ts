@@ -1,5 +1,79 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { MapApartment, MarkerType, LayerFilters, AreaFilter, PriceFilter } from '../types';
+import type { MapApartment, MarkerType, LayerFilters, AreaFilter, PriceFilter, UnitCountFilter, ComplexFeature, ApartmentComplex, KakaoCircle } from '../types';
+
+// ────────────────────────────────────────────────────────────
+// 서울 주요 구(區) 중심 좌표 상수 (히트맵 레이어용)
+// ────────────────────────────────────────────────────────────
+const SEOUL_DISTRICT_CENTERS: { name: string; lat: number; lng: number }[] = [
+  { name: '강남구',   lat: 37.5172, lng: 127.0473 },
+  { name: '서초구',   lat: 37.4837, lng: 127.0324 },
+  { name: '송파구',   lat: 37.5145, lng: 127.1059 },
+  { name: '강동구',   lat: 37.5301, lng: 127.1238 },
+  { name: '마포구',   lat: 37.5663, lng: 126.9014 },
+  { name: '용산구',   lat: 37.5324, lng: 126.9904 },
+  { name: '성동구',   lat: 37.5634, lng: 127.0369 },
+  { name: '광진구',   lat: 37.5385, lng: 127.0823 },
+  { name: '동작구',   lat: 37.5124, lng: 126.9394 },
+  { name: '관악구',   lat: 37.4784, lng: 126.9516 },
+  { name: '영등포구', lat: 37.5264, lng: 126.8963 },
+  { name: '강서구',   lat: 37.5509, lng: 126.8495 },
+  { name: '양천구',   lat: 37.5171, lng: 126.8665 },
+  { name: '구로구',   lat: 37.4955, lng: 126.8874 },
+  { name: '금천구',   lat: 37.4601, lng: 126.9001 },
+  { name: '노원구',   lat: 37.6542, lng: 127.0568 },
+  { name: '도봉구',   lat: 37.6688, lng: 127.0472 },
+  { name: '강북구',   lat: 37.6398, lng: 127.0254 },
+  { name: '성북구',   lat: 37.5894, lng: 127.0167 },
+  { name: '중랑구',   lat: 37.6063, lng: 127.0927 },
+  { name: '동대문구', lat: 37.5744, lng: 127.0397 },
+  { name: '중구',     lat: 37.5641, lng: 126.9979 },
+  { name: '종로구',   lat: 37.5730, lng: 126.9794 },
+  { name: '은평구',   lat: 37.6026, lng: 126.9291 },
+  { name: '서대문구', lat: 37.5791, lng: 126.9368 },
+];
+
+// 위도·경도 두 점 간 거리 계산 (Haversine 공식, km 단위)
+function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// 주어진 마커 좌표에서 가장 가까운 구(區) 이름 반환
+function findNearestDistrict(lat: number, lng: number): string {
+  let minDist = Infinity;
+  let nearest = SEOUL_DISTRICT_CENTERS[0].name;
+  for (const d of SEOUL_DISTRICT_CENTERS) {
+    const dist = calcDistance(lat, lng, d.lat, d.lng);
+    if (dist < minDist) {
+      minDist = dist;
+      nearest = d.name;
+    }
+  }
+  return nearest;
+}
+
+// 거래량 비율(0~1)에 따른 원형 오버레이 색상 반환
+function getHeatmapColor(ratio: number): string {
+  if (ratio >= 0.8) return 'rgba(249, 115, 22, 0.7)';  // 상위 20%: 진한 오렌지
+  if (ratio >= 0.6) return 'rgba(249, 115, 22, 0.5)';  // 20~40%: 오렌지
+  if (ratio >= 0.4) return 'rgba(251, 191, 36, 0.4)';  // 40~60%: 노랑
+  if (ratio >= 0.2) return 'rgba(251, 191, 36, 0.2)';  // 60~80%: 연노랑
+  return 'rgba(209, 213, 219, 0.2)';                    // 하위 20%: 회색
+}
+
+// 히트맵 구별 집계 결과 타입
+export interface DistrictHeatmapData {
+  name: string;
+  lat: number;
+  lng: number;
+  count: number;   // 마커 개수
+  ratio: number;   // 최대값 대비 비율 (0~1)
+}
 
 interface UseKakaoMapOptions {
   initialLat?: number;
@@ -7,7 +81,8 @@ interface UseKakaoMapOptions {
   initialLevel?: number;
   onMarkerClick?: (apartment: MapApartment) => void;
   // M-4: async 핸들러 허용을 위해 반환 타입을 void | Promise<void>로 확장
-  onBoundsChange?: (swLat: number, swLng: number, neLat: number, neLng: number) => void | Promise<void>;
+  // 줌 레벨도 함께 전달 (레벨 기반 렌더링 전략용)
+  onBoundsChange?: (swLat: number, swLng: number, neLat: number, neLng: number, zoom: number) => void | Promise<void>;
 }
 
 interface KakaoMapState {
@@ -22,6 +97,8 @@ export interface MarkerFilterOptions {
   priceFilter: PriceFilter;
   areaFilter: AreaFilter;
   layerFilters: LayerFilters;
+  unitCountFilter: UnitCountFilter;
+  complexFeatures: Set<ComplexFeature>;
 }
 
 // 카카오맵 초기화 및 마커 관리 훅
@@ -38,7 +115,12 @@ export function useKakaoMap(
   } = options;
 
   const mapRef = useRef<unknown>(null);
-  const overlaysRef = useRef<unknown[]>([]);
+  // 차분 업데이트를 위해 Map<id, overlay> 구조로 변경 (DOM 조작 최소화)
+  const overlaysRef = useRef<Map<string, { setMap: (m: unknown) => void }>>(new Map());
+  // 히트맵 원형 오버레이 목록 (구별 Circle 인스턴스)
+  const heatmapCirclesRef = useRef<KakaoCircle[]>([]);
+  // debounce 타이머 참조
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<KakaoMapState>({
     isLoaded: false,
     isError: false,
@@ -65,30 +147,44 @@ export function useKakaoMap(
       const map = new kakao.maps.Map(containerRef.current, mapOptions);
       mapRef.current = map;
 
-      // 지도 이동/줌 이벤트 리스너
+      // 지도 이동/줌 이벤트 리스너 (300ms debounce - 드래그 중 과도한 API 호출 방지)
       kakao.maps.event.addListener(map, 'idle', () => {
         if (!mapRef.current) return;
-        const m = mapRef.current as {
-          getCenter: () => { getLat: () => number; getLng: () => number };
-          getLevel: () => number;
-          getBounds: () => {
-            getSouthWest: () => { getLat: () => number; getLng: () => number };
-            getNorthEast: () => { getLat: () => number; getLng: () => number };
+
+        // 기존 타이머 취소
+        if (debounceTimerRef.current !== null) {
+          clearTimeout(debounceTimerRef.current);
+        }
+
+        debounceTimerRef.current = setTimeout(() => {
+          if (!mapRef.current) return;
+          const m = mapRef.current as {
+            getCenter: () => { getLat: () => number; getLng: () => number };
+            getLevel: () => number;
+            getBounds: () => {
+              getSouthWest: () => { getLat: () => number; getLng: () => number };
+              getNorthEast: () => { getLat: () => number; getLng: () => number };
+            };
           };
-        };
-        const center = m.getCenter();
-        const level = m.getLevel();
-        const bounds = m.getBounds();
-        const sw = bounds.getSouthWest();
-        const ne = bounds.getNorthEast();
+          const center = m.getCenter();
+          const level = m.getLevel();
+          const bounds = m.getBounds();
+          const sw = bounds.getSouthWest();
+          const ne = bounds.getNorthEast();
 
-        setState((prev) => ({
-          ...prev,
-          center: { lat: center.getLat(), lng: center.getLng() },
-          level,
-        }));
+          setState((prev) => ({
+            ...prev,
+            center: { lat: center.getLat(), lng: center.getLng() },
+            level,
+          }));
 
-        onBoundsChange?.(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng());
+          // 줌 레벨 기반 렌더링 전략
+          // level <= 5: 너무 멀리 줌아웃 → 마커 표시 안 함 (향후 구별 클러스터)
+          // level 6-14: 개별 단지 마커 표시
+          if (level >= 6 && level <= 14) {
+            onBoundsChange?.(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng(), level);
+          }
+        }, 300);
       });
 
       setState((prev) => ({ ...prev, isLoaded: true }));
@@ -122,36 +218,46 @@ export function useKakaoMap(
 
     return () => {
       if (timer !== undefined) clearInterval(timer);
+      // debounce 타이머 정리
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+      }
       // 기존 오버레이 제거 (메모리 누수 방지)
       overlaysRef.current.forEach((overlay) => {
-        (overlay as { setMap: (m: null) => void }).setMap(null);
+        overlay.setMap(null);
       });
-      overlaysRef.current = [];
+      overlaysRef.current.clear();
     };
   }, [initMap]);
 
-  // 마커 업데이트 (필터 옵션 적용)
+  // 마커 업데이트 (필터 옵션 적용) — Map 기반 차분 업데이트로 DOM 조작 최소화
   const updateMarkers = useCallback(
     (apartments: MapApartment[], filterOptions?: MarkerFilterOptions) => {
       if (!mapRef.current || !isKakaoAvailable()) return;
 
       const { kakao } = window;
 
-      // 기존 마커 제거
-      overlaysRef.current.forEach((overlay) => {
-        (overlay as { setMap: (m: null) => void }).setMap(null);
-      });
-      overlaysRef.current = [];
-
       // 필터 적용하여 표시할 아파트만 추출
       const visibleApts = filterOptions
         ? apartments.filter((apt) => isVisible(apt, filterOptions))
         : apartments;
 
-      // 새 마커 생성
-      visibleApts.forEach((apt) => {
-        const content = createMarkerElement(apt, onMarkerClick);
+      // 표시할 ID Set 생성
+      const visibleIds = new Set(visibleApts.map((apt) => apt.id));
 
+      // 차분 업데이트 1: 더 이상 필요 없는 마커 제거
+      overlaysRef.current.forEach((overlay, id) => {
+        if (!visibleIds.has(id)) {
+          overlay.setMap(null);
+          overlaysRef.current.delete(id);
+        }
+      });
+
+      // 차분 업데이트 2: 새로 추가된 마커만 생성
+      visibleApts.forEach((apt) => {
+        if (overlaysRef.current.has(apt.id)) return; // 이미 존재하면 스킵
+
+        const content = createMarkerElement(apt, onMarkerClick);
         const overlay = new kakao.maps.CustomOverlay({
           position: new kakao.maps.LatLng(apt.lat, apt.lng),
           content,
@@ -160,10 +266,50 @@ export function useKakaoMap(
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         overlay.setMap(mapRef.current as any);
-        overlaysRef.current.push(overlay);
+        overlaysRef.current.set(apt.id, overlay as unknown as { setMap: (m: unknown) => void });
       });
     },
     [onMarkerClick]
+  );
+
+  // 단지 마커 업데이트 (ApartmentComplex 배열용 — 호갱노노 스타일)
+  // lat/lng가 있는 단지만 표시
+  const updateComplexMarkers = useCallback(
+    (complexes: ApartmentComplex[], onComplexClick?: (complex: ApartmentComplex) => void) => {
+      if (!mapRef.current || !isKakaoAvailable()) return;
+
+      const { kakao } = window;
+
+      // 좌표가 있는 단지만 필터링
+      const validComplexes = complexes.filter((c) => c.lat != null && c.lng != null);
+      const validIds = new Set(validComplexes.map((c) => `complex-${c.id}`));
+
+      // 기존 단지 마커 중 더 이상 필요 없는 것 제거
+      overlaysRef.current.forEach((overlay, id) => {
+        if (id.startsWith('complex-') && !validIds.has(id)) {
+          overlay.setMap(null);
+          overlaysRef.current.delete(id);
+        }
+      });
+
+      // 새로 추가된 단지 마커 생성 (호갱노노 스타일 마커 사용)
+      validComplexes.forEach((complex) => {
+        const markerId = `complex-${complex.id}`;
+        if (overlaysRef.current.has(markerId)) return;
+
+        const content = createComplexMarkerElement(complex, onComplexClick);
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(complex.lat!, complex.lng!),
+          content,
+          yAnchor: 1,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        overlay.setMap(mapRef.current as any);
+        overlaysRef.current.set(markerId, overlay as unknown as { setMap: (m: unknown) => void });
+      });
+    },
+    []
   );
 
   // 지도 중심 이동
@@ -181,14 +327,104 @@ export function useKakaoMap(
     }
   }, []);
 
+  // 히트맵 원형 오버레이 제거 (마커 모드 전환 시 호출)
+  const clearHeatmapOverlays = useCallback(() => {
+    heatmapCirclesRef.current.forEach((circle) => circle.setMap(null));
+    heatmapCirclesRef.current = [];
+  }, []);
+
+  // 히트맵 원형 오버레이 업데이트
+  // apartments 배열에서 구(區) 단위 집계 후 kakao.maps.Circle로 표시
+  const updateHeatmapOverlays = useCallback((apartments: MapApartment[]) => {
+    if (!mapRef.current || !isKakaoAvailable()) return;
+    const { kakao } = window;
+
+    // 기존 히트맵 오버레이 제거
+    clearHeatmapOverlays();
+
+    if (apartments.length === 0) return;
+
+    // 1) 구(區)별 마커 개수 집계
+    const districtMap = new Map<string, { lat: number; lng: number; count: number }>();
+    for (const apt of apartments) {
+      const districtName = findNearestDistrict(apt.lat, apt.lng);
+      const existing = districtMap.get(districtName);
+      // 구의 대표 좌표는 SEOUL_DISTRICT_CENTERS 중심값 사용
+      const center = SEOUL_DISTRICT_CENTERS.find((d) => d.name === districtName)!;
+      if (existing) {
+        existing.count += 1;
+      } else {
+        districtMap.set(districtName, { lat: center.lat, lng: center.lng, count: 1 });
+      }
+    }
+
+    // 2) 최대 거래량 계산 (비율 산출용)
+    const maxCount = Math.max(...Array.from(districtMap.values()).map((d) => d.count));
+    if (maxCount === 0) return;
+
+    // 3) 각 구에 Circle 오버레이 생성 (반지름: 거래량에 비례, 최소 800m ~ 최대 2000m)
+    districtMap.forEach((data, name) => {
+      const ratio = data.count / maxCount;
+      const fillColor = getHeatmapColor(ratio);
+      const radius = 800 + ratio * 1200; // 800m ~ 2000m
+
+      const circle = new kakao.maps.Circle({
+        center: new kakao.maps.LatLng(data.lat, data.lng),
+        radius,
+        strokeWeight: 1,
+        strokeColor: fillColor.replace(/[\d.]+\)$/, '0.9)'),
+        strokeOpacity: 0.6,
+        strokeStyle: 'solid',
+        fillColor: fillColor,
+        fillOpacity: 1,
+        // 라벨 대신 CustomOverlay로 구 이름 표시 (접근성 고려)
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      circle.setMap(mapRef.current as any);
+      heatmapCirclesRef.current.push(circle);
+
+      // 구 이름 + 건수 레이블 (CustomOverlay)
+      const labelEl = document.createElement('div');
+      labelEl.style.cssText = [
+        'background: rgba(255,255,255,0.85)',
+        'border-radius: 6px',
+        'padding: 3px 7px',
+        'font-size: 11px',
+        'font-weight: 700',
+        'color: #191F28',
+        'white-space: nowrap',
+        'pointer-events: none',
+        'box-shadow: 0 1px 4px rgba(0,0,0,0.15)',
+      ].join(';');
+      labelEl.textContent = `${name} ${data.count}건`;
+
+      const labelOverlay = new kakao.maps.CustomOverlay({
+        position: new kakao.maps.LatLng(data.lat, data.lng),
+        content: labelEl,
+        yAnchor: 0.5,
+        zIndex: 5,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      labelOverlay.setMap(mapRef.current as any);
+      // CustomOverlay도 정리 대상에 포함 (setMap(null) 인터페이스 공유)
+      heatmapCirclesRef.current.push(labelOverlay as unknown as KakaoCircle);
+    });
+  }, [clearHeatmapOverlays]);
+
   return {
-    map: mapRef.current,
+    // ESLint react-hooks/exhaustive-deps 규칙 준수:
+    // ref.current를 렌더 중 직접 반환하지 않고 getter 함수로 감싸서 반환
+    getMap: () => mapRef.current,
     isLoaded: state.isLoaded,
     isError: state.isError,
     center: state.center,
     level: state.level,
     updateMarkers,
+    updateComplexMarkers,
     moveToLocation,
+    updateHeatmapOverlays,
+    clearHeatmapOverlays,
   };
 }
 
@@ -239,6 +475,21 @@ export function createMarkerElement(
         inner = createPriceMarker(apt);
     }
     wrapper.appendChild(inner);
+  }
+
+  // 거래량 급등 마커인 경우 불꽃 배지 추가
+  if (apt.volumeSurge) {
+    const badge = document.createElement('span');
+    badge.style.cssText = [
+      'position: absolute',
+      'top: -6px',
+      'right: -6px',
+      'font-size: 14px',
+      'line-height: 1',
+      'z-index: 40',
+    ].join(';');
+    badge.textContent = '🔥';
+    wrapper.appendChild(badge);
   }
 
   wrapper.addEventListener('click', () => {
@@ -337,7 +588,7 @@ function createHotMarker(apt: MapApartment): HTMLElement {
   return wrapper;
 }
 
-// C. 신고가 마커 (type: allTimeHigh) — 2단 구조
+// C. 최고가 경신 마커 (type: allTimeHigh) — 2단 구조
 function createAllTimeHighMarker(apt: MapApartment): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.style.cssText = [
@@ -350,7 +601,7 @@ function createAllTimeHighMarker(apt: MapApartment): HTMLElement {
     'transition: transform 0.15s ease',
   ].join(';');
 
-  // 상단: 신고가 뱃지
+  // 상단: 최고가 뱃지
   const top = document.createElement('div');
   top.style.cssText = [
     'background-color: #F39C12',
@@ -362,7 +613,7 @@ function createAllTimeHighMarker(apt: MapApartment): HTMLElement {
 
   const label = document.createElement('span');
   label.style.cssText = 'font-size:10px; font-weight:800; color:#FFFFFF;';
-  label.textContent = '▲ 신고가';
+  label.textContent = '▲ 최고가';
   top.appendChild(label);
 
   // 하단: 가격
@@ -391,8 +642,8 @@ function createSubOngoingMarker(apt: MapApartment): HTMLElement {
   wrapper.style.cssText = [
     'min-width: 68px',
     'border-radius: 10px',
-    'border: 2px solid #1B64DA',
-    'box-shadow: 0 3px 12px rgba(27,100,218,0.35)',
+    'border: 2px solid #0066FF',
+    'box-shadow: 0 3px 12px rgba(0,102,255,0.35)',
     'z-index: 30',
     'overflow: hidden',
     'transition: transform 0.15s ease',
@@ -401,7 +652,7 @@ function createSubOngoingMarker(apt: MapApartment): HTMLElement {
   // 상단: 청약중 + D-day
   const top = document.createElement('div');
   top.style.cssText = [
-    'background-color: #1B64DA',
+    'background-color: #0066FF',
     'padding: 3px 8px',
     'display: flex',
     'align-items: center',
@@ -427,7 +678,7 @@ function createSubOngoingMarker(apt: MapApartment): HTMLElement {
   ].join(';');
 
   const priceText = document.createElement('span');
-  priceText.style.cssText = 'font-size:11px; font-weight:700; color:#1B64DA;';
+  priceText.style.cssText = 'font-size:11px; font-weight:700; color:#0066FF;';
   priceText.textContent = formatPriceForMarker(apt.price);
   bottom.appendChild(priceText);
 
@@ -494,7 +745,9 @@ export function isVisible(apt: MapApartment, filters: MarkerFilterOptions): bool
   return (
     passPriceFilter(apt, filters.priceFilter) &&
     passAreaFilter(apt, filters.areaFilter) &&
-    passLayerFilter(apt, filters.layerFilters)
+    passLayerFilter(apt, filters.layerFilters) &&
+    passUnitCountFilter(apt, filters.unitCountFilter) &&
+    passComplexFeaturesFilter(apt, filters.complexFeatures)
   );
 }
 
@@ -518,6 +771,23 @@ function passAreaFilter(apt: MapApartment, areaFilter: AreaFilter): boolean {
   if (areaFilter === '84') return areaList.some((a) => a.startsWith('84'));
   if (areaFilter === '109plus') return areaList.some((a) => parseInt(a, 10) >= 109);
   return true;
+}
+
+// 세대수 필터
+function passUnitCountFilter(apt: MapApartment, filter: UnitCountFilter): boolean {
+  if (filter === 'all') return true;
+  if (apt.totalUnits == null) return true; // 필드 없으면 통과
+  if (filter === '500plus') return apt.totalUnits >= 500;
+  if (filter === '1000plus') return apt.totalUnits >= 1000;
+  if (filter === '2000plus') return apt.totalUnits >= 2000;
+  return true;
+}
+
+// 단지 특성 필터 — OR 방식: 선택된 특성 중 하나라도 해당되면 통과
+function passComplexFeaturesFilter(apt: MapApartment, selected: Set<ComplexFeature>): boolean {
+  if (selected.size === 0) return true;
+  if (!apt.features || apt.features.length === 0) return false;
+  return [...selected].some((f) => apt.features!.includes(f));
 }
 
 // 레이어 필터
@@ -572,4 +842,119 @@ function calcDDay(deadline: string): number | null {
 function formatMonthDay(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}.${d.getDate()}`;
+}
+
+// ────────────────────────────────────────────────────────────
+// 호갱노노 스타일 단지 마커 팩토리 (ApartmentComplex용)
+// ────────────────────────────────────────────────────────────
+
+// 단지 가격 마커 텍스트 변환 (만원 단위 입력)
+function formatComplexPrice(manwon: number): string {
+  const eok = manwon / 10000;
+  if (eok >= 1) {
+    // 소수점 1자리 (예: 3.2억, 12.5억)
+    return `${eok % 1 === 0 ? eok : parseFloat(eok.toFixed(1))}억`;
+  }
+  return `${manwon.toLocaleString('ko-KR')}만`;
+}
+
+// 거래횟수에 따른 마커 border opacity (거래 많을수록 진하게)
+function getTradeCountOpacity(tradeCount: number): number {
+  if (tradeCount >= 10) return 1.0;
+  if (tradeCount >= 5) return 0.85;
+  if (tradeCount >= 3) return 0.7;
+  return 0.5;
+}
+
+// 호갱노노 스타일 단지 마커 DOM 엘리먼트 생성
+// 디자인: 흰 배경 + 회색 테두리, 선택 시 봄집 초록 배경
+// 거래 많을수록 테두리 진하게
+export function createComplexMarkerElement(
+  complex: ApartmentComplex,
+  onClick?: (complex: ApartmentComplex) => void
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:relative; display:inline-block; cursor:pointer;';
+
+  const priceText = formatComplexPrice(complex.latestPrice);
+  const borderOpacity = getTradeCountOpacity(complex.tradeCount);
+  // 거래 많을수록 테두리 진하게
+  const borderColor = `rgba(229, 232, 235, ${borderOpacity + 0.3})`;
+
+  const el = document.createElement('div');
+  el.className = 'apt-marker';
+  el.style.cssText = [
+    'display: inline-flex',
+    'align-items: center',
+    'justify-content: center',
+    'padding: 5px 10px',
+    'border-radius: 6px',
+    'background: #FFFFFF',
+    `border: 1.5px solid ${borderColor}`,
+    'box-shadow: 0 1px 6px rgba(0,0,0,0.12)',
+    'transition: transform 0.15s ease, background 0.15s ease',
+    'position: relative',
+    'white-space: nowrap',
+  ].join(';');
+
+  const priceSpan = document.createElement('span');
+  priceSpan.className = 'price';
+  priceSpan.style.cssText = [
+    'font-size: 12px',
+    'font-weight: 700',
+    'line-height: 1',
+    // 거래횟수 높을수록 더 진한 색 (최고가 단지는 빨간색)
+    'color: #191F28',
+  ].join(';');
+  priceSpan.textContent = priceText;
+
+  el.appendChild(priceSpan);
+
+  // 말풍선 꼬리 (삼각형)
+  const tail = document.createElement('div');
+  tail.style.cssText = [
+    'position: absolute',
+    'bottom: -5px',
+    'left: 50%',
+    'transform: translateX(-50%)',
+    'width: 0',
+    'height: 0',
+    'border-left: 4px solid transparent',
+    'border-right: 4px solid transparent',
+    'border-top: 5px solid #FFFFFF',
+  ].join(';');
+
+  const tailBorder = document.createElement('div');
+  tailBorder.style.cssText = [
+    'position: absolute',
+    'bottom: -7px',
+    'left: 50%',
+    'transform: translateX(-50%)',
+    'width: 0',
+    'height: 0',
+    'border-left: 5px solid transparent',
+    'border-right: 5px solid transparent',
+    `border-top: 6px solid ${borderColor}`,
+    'z-index: -1',
+  ].join(';');
+
+  el.appendChild(tailBorder);
+  el.appendChild(tail);
+  wrapper.appendChild(el);
+
+  // 마우스오버 호버 효과
+  wrapper.addEventListener('mouseenter', () => {
+    el.style.transform = 'scale(1.08)';
+    el.style.zIndex = '100';
+  });
+  wrapper.addEventListener('mouseleave', () => {
+    el.style.transform = 'scale(1)';
+    el.style.zIndex = '';
+  });
+
+  wrapper.addEventListener('click', () => {
+    onClick?.(complex);
+  });
+
+  return wrapper;
 }

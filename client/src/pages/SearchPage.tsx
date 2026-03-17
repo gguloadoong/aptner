@@ -1,7 +1,8 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApartmentSearch } from '../hooks/useApartment';
 import ApartmentCard from '../components/apartment/ApartmentCard';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { Loading, Button, IconButton } from '@wanteddev/wds';
+import { IconChevronLeft } from '@wanteddev/wds-icon';
 import SearchBar from '../components/ui/SearchBar';
 
 // 검색 결과 페이지
@@ -13,15 +14,18 @@ export default function SearchPage() {
   const { data: results = [], isLoading, isError, refetch } = useApartmentSearch(query);
 
   return (
-    <div className="min-h-screen bg-[#F5F6F8]">
+    <div className="min-h-screen bg-[#F7FAF8]">
       {/* 헤더 */}
       <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-            <svg className="w-5 h-5 text-[#191F28]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
+          <IconButton
+            variant="normal"
+            onClick={() => navigate(-1)}
+            aria-label="뒤로가기"
+            className="flex-shrink-0"
+          >
+            <IconChevronLeft />
+          </IconButton>
           <div className="flex-1">
             <SearchBar placeholder="아파트명, 지역 검색" />
           </div>
@@ -38,7 +42,7 @@ export default function SearchPage() {
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <LoadingSpinner message="검색중..." />
+            <Loading size="32px" />
           </div>
         ) : isError ? (
           /* MINOR-02: 에러 상태 표시 + 재시도 버튼 */
@@ -50,12 +54,13 @@ export default function SearchPage() {
               <p className="text-base font-bold text-[#191F28]">검색 중 오류가 발생했습니다</p>
               <p className="text-sm text-[#8B95A1] mt-1">잠시 후 다시 시도해주세요</p>
             </div>
-            <button
+            <Button
               onClick={() => refetch()}
-              className="px-6 py-2.5 bg-[#1B64DA] text-white text-sm font-semibold rounded-xl hover:bg-[#1550B2] transition-colors"
+              variant="outlined"
+              size="small"
             >
               다시 시도
-            </button>
+            </Button>
           </div>
         ) : results.length === 0 ? (
           <EmptySearch keyword={query} />

@@ -2,7 +2,10 @@ import api from './api';
 import type { Subscription, SubscriptionStatus, SortOrder } from '../types';
 import { MOCK_SUBSCRIPTIONS } from '../mocks/subscriptions.mock';
 
-const USE_MOCK = import.meta.env.VITE_KAKAO_MAP_KEY === 'demo_key_replace_with_real_key';
+const USE_MOCK =
+  import.meta.env.VITE_USE_MOCK === 'true' ||
+  import.meta.env.VITE_KAKAO_MAP_KEY === 'demo_key_replace_with_real_key' ||
+  !import.meta.env.VITE_API_BASE_URL; // API URL 없으면 자동 Mock
 
 // FE 약칭 → BE 전체 명칭 매핑 (MAJOR-05 수정)
 const REGION_MAP: Record<string, string> = {

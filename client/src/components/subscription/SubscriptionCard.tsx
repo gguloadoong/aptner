@@ -55,13 +55,13 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
         <div>
           <p className="text-[10px] text-[#8B95A1] mb-0.5">최저 분양가</p>
           <p className="text-sm font-bold text-[#191F28]">
-            {formatPrice(subscription.startPrice)}
+            {subscription.startPrice ? formatPrice(subscription.startPrice) : '분양가 미정'}
           </p>
         </div>
         <div>
           <p className="text-[10px] text-[#8B95A1] mb-0.5">공급세대</p>
           <p className="text-sm font-bold text-[#191F28]">
-            {subscription.supplyUnits.toLocaleString()}세대
+            {subscription.supplyUnits ? subscription.supplyUnits.toLocaleString() : '--'}세대
           </p>
         </div>
         <div>

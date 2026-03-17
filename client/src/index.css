@@ -1,29 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #1B64DA;
+  --color-primary: #0066FF;
   --color-price-up: #FF4B4B;
-  --color-price-down: #00C896;
+  --color-price-down: #3B82F6;
   --color-surface: #FFFFFF;
-  --color-background: #F5F6F8;
+  --color-background: #F8FAFC;
   --color-text-900: #191F28;
   --color-text-600: #8B95A1;
   --color-border: #E5E8EB;
 }
 
 @layer base {
-  * {
-    box-sizing: border-box;
-  }
-
+  /* WDS reset이 box-sizing/margin/padding 처리 — 폰트 패밀리만 설정 */
   html, body {
-    margin: 0;
-    padding: 0;
-    background-color: #F5F6F8;
-    color: #191F28;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
   #root {
@@ -34,9 +25,9 @@
 
 /* 지도 마커 — 청약 진행중 pulse 애니메이션 (섹션 1-D) */
 @keyframes markerPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(27, 100, 218, 0.50); }
-  60%  { box-shadow: 0 0 0 10px rgba(27, 100, 218, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(27, 100, 218, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(0, 102, 255, 0.50); }
+  60%  { box-shadow: 0 0 0 10px rgba(0, 102, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 102, 255, 0); }
 }
 
 /* 마커 외곽 ring 엘리먼트 */
@@ -44,9 +35,19 @@
   position: absolute;
   inset: -4px;
   border-radius: 14px;
-  border: 2px solid rgba(27, 100, 218, 0.60);
+  border: 2px solid rgba(0, 102, 255, 0.60);
   animation: markerPulse 2s ease-out infinite;
   pointer-events: none;
+}
+
+/* 히어로 카드 진입 애니메이션 */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* 스켈레톤 shimmer 애니메이션 (섹션 4-1) */

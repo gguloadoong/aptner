@@ -5,9 +5,9 @@ import { useToastStore, type Toast, type ToastType } from '../../stores/toastSto
 const TYPE_STYLES: Record<ToastType, { bg: string; border: string; icon: string; iconColor: string }> = {
   success: {
     bg: 'bg-white',
-    border: 'border-l-4 border-l-[#00C896]',
+    border: 'border-l-4 border-l-[#0066FF]',
     icon: 'M5 13l4 4L19 7',
-    iconColor: 'text-[#00C896]',
+    iconColor: 'text-[#0066FF]',
   },
   error: {
     bg: 'bg-white',
@@ -17,9 +17,9 @@ const TYPE_STYLES: Record<ToastType, { bg: string; border: string; icon: string;
   },
   info: {
     bg: 'bg-white',
-    border: 'border-l-4 border-l-[#1B64DA]',
+    border: 'border-l-4 border-l-[#0066FF]',
     icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-    iconColor: 'text-[#1B64DA]',
+    iconColor: 'text-[#0066FF]',
   },
 };
 

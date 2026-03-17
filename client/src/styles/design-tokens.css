@@ -1,5 +1,5 @@
 /**
- * Aptner Design Tokens
+ * 봄집 Design Tokens
  * Version: 1.0.0
  * 기준 뷰포트: 375px (모바일 퍼스트)
  * 참조: DESIGN_SYSTEM.md
@@ -20,17 +20,17 @@
   /* ============================================================
      COLOR — Brand
      ============================================================ */
-  --color-primary:        #1B64DA;
-  --color-primary-light:  #EBF1FC;
-  --color-primary-dark:   #1451B5;
+  --color-primary:        #0066FF;  /* WDS blue */
+  --color-primary-light:  #EFF6FF;  /* light blue */
+  --color-primary-dark:   #0052CC;  /* dark blue */
 
   /* ============================================================
      COLOR — Price Change (국내 부동산 컨벤션: 상승=빨강, 하락=초록)
      ============================================================ */
   --color-price-up:         #FF4B4B;
   --color-price-up-bg:      #FFF3F3;
-  --color-price-down:       #00C896;
-  --color-price-down-bg:    #F0FBF7;
+  --color-price-down:       #3B82F6;  /* blue */
+  --color-price-down-bg:    #EFF6FF;  /* light blue */
   --color-price-neutral:    #8B95A1;
 
   /* ============================================================
@@ -48,7 +48,7 @@
   /* ============================================================
      COLOR — Semantic (State Colors)
      ============================================================ */
-  --color-status-active:    #1B64DA;
+  --color-status-active:    #0066FF;
   --color-status-upcoming:  #F59E0B;
   --color-status-closed:    #8B95A1;
 
@@ -67,14 +67,14 @@
   /* ============================================================
      COLOR — Background
      ============================================================ */
-  --color-bg-page:     #F5F6F8;
+  --color-bg-page:     #F8FAFC;  /* cool light blue-gray */
   --color-bg-card:     #FFFFFF;
   --color-bg-overlay:  rgba(0, 0, 0, 0.5);
 
   /* ============================================================
      COLOR — Chart
      ============================================================ */
-  --color-chart-line:    #1B64DA;
+  --color-chart-line:    #0066FF;
   --color-chart-grid:    #E5E8EB;
   --color-chart-axis:    #8B95A1;
   --color-chart-tooltip: #191F28;
@@ -82,7 +82,7 @@
   /* ============================================================
      GRADIENT
      ============================================================ */
-  --gradient-subscription-banner: linear-gradient(135deg, #1B64DA 0%, #2979FF 100%);
+  --gradient-subscription-banner: linear-gradient(135deg, #0066FF 0%, #60A5FA 100%);
   --gradient-skeleton:
     linear-gradient(
       90deg,
@@ -192,7 +192,20 @@
   --shadow-rank-gold:     0 2px 6px rgba(255, 215, 0, 0.50);
   --shadow-rank-silver:   0 2px 6px rgba(192, 192, 192, 0.50);
   --shadow-rank-bronze:   0 2px 6px rgba(205, 127, 50, 0.50);
-  --shadow-marker-blue:   0 2px 8px rgba(27, 100, 218, 0.40);
+  --shadow-marker-blue:   0 2px 8px rgba(0, 102, 255, 0.40);
+
+  /* ============================================================
+     GLASSMORPHISM — Montage 스타일
+     ============================================================ */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.40);
+  --glass-backdrop: blur(12px);
+
+  /* ============================================================
+     COLOR — 봄 테마 추가
+     ============================================================ */
+  --color-blossom: #FECDD3;     /* 벚꽃 핑크 */
+  --color-spring-green: #86EFAC; /* 연한 봄 그린 */
 
   /* ============================================================
      TRANSITION / ANIMATION
@@ -279,18 +292,13 @@
   --breakpoint-md:  768px;
   --breakpoint-lg:  1024px;
   --breakpoint-xl:  1280px;
+
 }
 
 /* ============================================================
    BASE STYLES
+   WDS global.css가 이미 reset 처리하므로 폰트/색상만 오버라이드
    ============================================================ */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
 
 html {
   font-size: 16px;

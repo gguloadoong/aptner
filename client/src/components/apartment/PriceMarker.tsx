@@ -15,7 +15,7 @@ const PriceMarker = React.memo<PriceMarkerProps>(
       changeType === 'up'
         ? 'bg-[#FF4B4B]'
         : changeType === 'down'
-          ? 'bg-[#00C896]'
+          ? 'bg-[#3B82F6]'
           : 'bg-[#8B95A1]';
 
     return (
@@ -25,7 +25,7 @@ const PriceMarker = React.memo<PriceMarkerProps>(
           'px-2 py-1 rounded-xl text-white text-xs font-bold shadow-md border-2 border-white',
           'transition-transform duration-150 active:scale-95 cursor-pointer',
           bgColor,
-          isSelected ? 'scale-110 ring-2 ring-offset-1 ring-[#1B64DA]' : '',
+          isSelected ? 'scale-110 ring-2 ring-offset-1 ring-[#0066FF]' : '',
         ].join(' ')}
       >
         {formatPriceShort(price)}

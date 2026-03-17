@@ -1,8 +1,8 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSubscriptionDetail } from '../hooks/useSubscription';
 import SubscriptionBadge from '../components/subscription/SubscriptionBadge';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { formatPrice, calcDday } from '../utils/formatNumber';
+import { Loading } from '@wanteddev/wds';
+import { formatPrice, calcDday, formatArea } from '../utils/formatNumber';
 import type { SubscriptionSchedule } from '../types';
 
 // 청약 상세 페이지
@@ -15,7 +15,7 @@ export default function SubscriptionDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner message="청약 정보 로딩중..." />
+        <Loading size="32px" />
       </div>
     );
   }
@@ -24,7 +24,7 @@ export default function SubscriptionDetailPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-[#FF4B4B] font-semibold">청약 정보를 불러올 수 없습니다</p>
-        <button onClick={() => navigate(-1)} className="text-[#1B64DA] text-sm">
+        <button onClick={() => navigate(-1)} className="text-blue-600 text-sm">
           돌아가기
         </button>
       </div>
@@ -33,10 +33,10 @@ export default function SubscriptionDetailPage() {
 
   const dday = calcDday(subscription.deadline);
   const isDdayUrgent =
-    dday !== '마감' && dday !== 'D-day' && parseInt(dday.replace('D-', '')) <= 3;
+    dday !== '마감' && (dday === 'D-day' || parseInt(dday.replace('D-', '')) <= 3);
 
   return (
-    <div className="min-h-screen bg-[#F5F6F8]">
+    <div className="min-h-screen bg-[#F7FAF8]">
       {/* 헤더 */}
       <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4">
         <div className="flex items-center gap-3">
@@ -82,17 +82,29 @@ export default function SubscriptionDetailPage() {
           <h2 className="text-xl font-black text-[#191F28] leading-snug mb-1">
             {subscription.name}
           </h2>
-          <p className="text-sm text-[#8B95A1]">{subscription.location}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-[#8B95A1]">{subscription.location}</p>
+            {/* 지도 CTA: 단지명+지역명으로 지도 검색 이동 */}
+            <button
+              onClick={() => {
+                const searchQuery = encodeURIComponent(`${subscription.name} ${subscription.location}`);
+                navigate(`/map?search=${searchQuery}`);
+              }}
+              className="text-[13px] font-medium text-blue-600 border border-blue-400 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors flex-shrink-0 ml-2"
+            >
+              지도에서 주변 시세 보기
+            </button>
+          </div>
 
           {/* 핵심 수치 */}
           <div className="grid grid-cols-2 gap-4 mt-5">
-            <div className="bg-[#F5F6F8] rounded-xl p-4">
+            <div className="bg-[#F7FAF8] rounded-xl p-4">
               <p className="text-xs text-[#8B95A1] mb-1">최저 분양가</p>
               <p className="text-lg font-black text-[#191F28]">
                 {formatPrice(subscription.startPrice)}
               </p>
             </div>
-            <div className="bg-[#F5F6F8] rounded-xl p-4">
+            <div className="bg-[#F7FAF8] rounded-xl p-4">
               <p className="text-xs text-[#8B95A1] mb-1">최고 분양가</p>
               <p className="text-lg font-black text-[#191F28]">
                 {formatPrice(subscription.maxPrice)}
@@ -121,8 +133,8 @@ export default function SubscriptionDetailPage() {
                 className="border border-[#E5E8EB] rounded-xl p-4"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-base font-bold text-[#191F28]">{area.area}㎡</span>
-                  <span className="text-sm font-black text-[#1B64DA]">
+                  <span className="text-base font-bold text-[#191F28]">{formatArea(area.area)}</span>
+                  <span className="text-sm font-black text-blue-600">
                     {formatPrice(area.price)}
                   </span>
                 </div>
@@ -150,12 +162,12 @@ export default function SubscriptionDetailPage() {
                 {/* 가점/추첨 비율 바 */}
                 <div className="mt-2 h-1.5 bg-[#E5E8EB] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#1B64DA] rounded-full"
+                    className="h-full bg-[#0066FF] rounded-full"
                     style={{ width: `${area.generalRatio}%` }}
                   />
                 </div>
                 <div className="flex justify-between mt-0.5">
-                  <span className="text-[10px] text-[#1B64DA]">가점 {area.generalRatio}%</span>
+                  <span className="text-[10px] text-blue-600">가점 {area.generalRatio}%</span>
                   <span className="text-[10px] text-[#8B95A1]">추첨 {area.lotteryRatio}%</span>
                 </div>
               </div>
@@ -167,13 +179,13 @@ export default function SubscriptionDetailPage() {
         <div className="bg-white px-5 py-5">
           <h3 className="text-base font-bold text-[#191F28] mb-3">총 공급 현황</h3>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-[#F5F6F8] rounded-xl p-3">
+            <div className="bg-[#F7FAF8] rounded-xl p-3">
               <p className="text-xs text-[#8B95A1]">총 공급세대</p>
               <p className="text-lg font-black text-[#191F28] mt-1">
                 {subscription.supplyUnits.toLocaleString()}세대
               </p>
             </div>
-            <div className="bg-[#F5F6F8] rounded-xl p-3">
+            <div className="bg-[#F7FAF8] rounded-xl p-3">
               <p className="text-xs text-[#8B95A1]">면적 종류</p>
               <p className="text-lg font-black text-[#191F28] mt-1">
                 {subscription.areas.length}가지
@@ -239,7 +251,7 @@ function SubscriptionTimeline({
               className={[
                 'w-3 h-3 rounded-full border-2 flex-shrink-0 z-10',
                 step.done
-                  ? 'bg-[#1B64DA] border-[#1B64DA]'
+                  ? 'bg-[#0066FF] border-[#0066FF]'
                   : 'bg-white border-[#E5E8EB]',
               ].join(' ')}
             />
@@ -250,7 +262,7 @@ function SubscriptionTimeline({
 
           {/* 내용 */}
           <div className="flex-1 pb-1">
-            <p className={`text-sm font-semibold ${step.done ? 'text-[#1B64DA]' : 'text-[#191F28]'}`}>
+            <p className={`text-sm font-semibold ${step.done ? 'text-blue-600' : 'text-[#191F28]'}`}>
               {step.label}
             </p>
             <p className="text-xs text-[#8B95A1] mt-0.5">
