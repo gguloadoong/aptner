@@ -2,13 +2,19 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCompareStore } from '../stores/compareStore';
-import { useApartmentDetail } from '../hooks/useApartment';
+import { useApartmentDetail, useApartmentHistory } from '../hooks/useApartment';
+import { useQuery } from '@tanstack/react-query';
+import { getJeonseRate } from '../services/apartment.service';
 import { formatPriceShort, formatChange, formatUnits, formatArea } from '../utils/formatNumber';
 import {
   Button, TextButton, Loading,
   Box, FlexBox, Typography, TopNavigation, TopNavigationButton,
 } from '@wanteddev/wds';
 import { IconChevronLeft, IconClose, IconArrowRight } from '@wanteddev/wds-icon';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import type { TradeHistory } from '../types';
 
 // 비교 행 — 레이블 + 단지별 값 나란히 표시
 interface CompareRowProps {
@@ -174,11 +180,196 @@ function AptHeaderCell({ name, address, id, onRemove }: AptHeaderCellProps) {
   );
 }
 
+// 단지별 전세가율 조회 훅
+function useJeonseRate(id: string | undefined) {
+  return useQuery({
+    queryKey: ['apartment', id, 'jeonse-rate'],
+    queryFn: () => getJeonseRate(id!),
+    enabled: !!id,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+// 단지별 색상 팔레트 (파랑/오렌지/초록)
+const CHART_COLORS = ['#0066FF', '#FF6B2B', '#22C55E'] as const;
+
+// 가격 추이 비교 차트 — recharts LineChart
+interface PriceHistoryChartProps {
+  ids: string[];
+  names: string[];
+}
+
+function PriceHistoryChart({ ids, names }: PriceHistoryChartProps) {
+  // 각 단지 히스토리를 병렬 조회 (최대 3개)
+  const h0 = useApartmentHistory(ids[0], undefined, 24);
+  const h1 = useApartmentHistory(ids[1], undefined, 24);
+  const h2 = useApartmentHistory(ids[2], undefined, 24);
+  const histories = [h0, h1, h2].slice(0, ids.length);
+
+  const isLoading = histories.some((h) => h.isLoading);
+
+  // 히스토리 데이터를 날짜 기준으로 병합
+  const chartData = React.useMemo(() => {
+    // 각 단지의 날짜 집합 수집
+    const dateSet = new Set<string>();
+    histories.forEach((h) => {
+      (h.data ?? []).forEach((t: TradeHistory) => dateSet.add(t.date));
+    });
+
+    // 날짜 오름차순 정렬
+    const sortedDates = Array.from(dateSet).sort();
+
+    // 단지별 날짜→가격 맵 생성
+    const priceByDateByApt: Record<string, number>[] = histories.map((h) => {
+      const map: Record<string, number> = {};
+      (h.data ?? []).forEach((t: TradeHistory) => {
+        // 같은 날짜에 여러 거래가 있을 경우 마지막 값 사용
+        map[t.date] = t.price;
+      });
+      return map;
+    });
+
+    return sortedDates.map((date) => {
+      const entry: Record<string, string | number | null> = { date };
+      ids.forEach((_, idx) => {
+        entry[`apt${idx}`] = priceByDateByApt[idx]?.[date] != null
+          ? priceByDateByApt[idx][date] / 10000  // 만원 → 억원
+          : null;
+      });
+      return entry;
+    });
+  }, [histories, ids]);
+
+  const hasData = chartData.length > 0;
+
+  // 로딩 스켈레톤
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '16px',
+          border: '1px solid var(--semantic-line-normal)',
+          padding: '24px',
+          marginTop: '16px',
+        }}
+      >
+        <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '16px' }}>
+          가격 추이 비교
+        </Typography>
+        <div
+          style={{
+            height: '240px',
+            borderRadius: '12px',
+            backgroundColor: 'var(--semantic-background-normal-alternative)',
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }}
+        />
+      </Box>
+    );
+  }
+
+  // 데이터 없는 경우
+  if (!hasData) {
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '16px',
+          border: '1px solid var(--semantic-line-normal)',
+          padding: '24px',
+          marginTop: '16px',
+          textAlign: 'center',
+        }}
+      >
+        <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '12px' }}>
+          가격 추이 비교
+        </Typography>
+        <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
+          거래 데이터가 없습니다
+        </Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        backgroundColor: 'var(--semantic-background-normal-normal)',
+        borderRadius: '16px',
+        border: '1px solid var(--semantic-line-normal)',
+        padding: '24px',
+        marginTop: '16px',
+      }}
+    >
+      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '20px' }}>
+        가격 추이 비교 (최근 24개월)
+      </Typography>
+      <ResponsiveContainer width="100%" height={260}>
+        <LineChart data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--semantic-line-normal)" />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 11, fill: 'var(--semantic-label-assistive)' }}
+            tickFormatter={(v: string) => v.slice(0, 7)}
+            interval="preserveStartEnd"
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: 'var(--semantic-label-assistive)' }}
+            tickFormatter={(v: number) => `${v.toFixed(0)}억`}
+            width={48}
+          />
+          <Tooltip
+            formatter={(value: number, name: string) => {
+              const idx = parseInt(name.replace('apt', ''), 10);
+              return [`${value.toFixed(2)}억`, names[idx] ?? name];
+            }}
+            labelFormatter={(label: string) => label}
+            contentStyle={{
+              fontSize: '12px',
+              borderRadius: '8px',
+              border: '1px solid var(--semantic-line-normal)',
+              backgroundColor: 'var(--semantic-background-normal-normal)',
+            }}
+          />
+          <Legend
+            formatter={(value: string) => {
+              const idx = parseInt(value.replace('apt', ''), 10);
+              return (
+                <span style={{ fontSize: '12px', color: 'var(--semantic-label-alternative)' }}>
+                  {names[idx] ?? value}
+                </span>
+              );
+            }}
+          />
+          {ids.map((_, idx) => (
+            <Line
+              key={`apt${idx}`}
+              type="monotone"
+              dataKey={`apt${idx}`}
+              stroke={CHART_COLORS[idx]}
+              strokeWidth={2}
+              dot={false}
+              connectNulls
+              activeDot={{ r: 4 }}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </Box>
+  );
+}
+
 // 비교 테이블
 function CompareTable({ ids }: { ids: string[] }) {
   const q0 = useApartmentDetail(ids[0]);
   const q1 = useApartmentDetail(ids[1]);
   const q2 = useApartmentDetail(ids[2]);
+
+  // 전세가율 조회 (단지별)
+  const jr0 = useJeonseRate(ids[0]);
+  const jr1 = useJeonseRate(ids[1]);
+  const jr2 = useJeonseRate(ids[2]);
 
   const queries = [q0, q1, q2].slice(0, ids.length);
   const isLoading = queries.some((q) => q.isLoading);
@@ -287,6 +478,19 @@ function CompareTable({ ids }: { ids: string[] }) {
         highlight="max"
         rawValues={apts.map((apt) => apt?.priceChange ?? 0)}
       />
+      {/* 전세가율 행 — 낮을수록 투자 위험 낮음 → min 강조 */}
+      <CompareRow
+        label="전세가율"
+        values={[jr0, jr1, jr2].slice(0, ids.length).map((jr) => {
+          if (jr.isLoading) return <span style={{ color: 'var(--semantic-label-assistive)' }}>...</span>;
+          if (jr.data == null) return '-';
+          return `${jr.data.toFixed(1)}%`;
+        })}
+        highlight="min"
+        rawValues={[jr0, jr1, jr2].slice(0, ids.length).map((jr) =>
+          jr.data != null ? jr.data : Infinity
+        )}
+      />
 
       {/* 면적 정보 섹션 */}
       <SectionHeaderRow label="면적 구성" colCount={colCount} />
@@ -387,9 +591,15 @@ export default function ComparePage() {
             </>
           )}
 
-          {/* 비교 테이블 (2개 이상) */}
+          {/* 비교 테이블 (2개 이상) + 가격 추이 차트 */}
           {compareList.length >= 2 && (
-            <CompareTable ids={compareList.map((item) => item.id)} />
+            <>
+              <CompareTable ids={compareList.map((item) => item.id)} />
+              <PriceHistoryChart
+                ids={compareList.map((item) => item.id)}
+                names={compareList.map((item) => item.name)}
+              />
+            </>
           )}
         </Box>
       </Box>

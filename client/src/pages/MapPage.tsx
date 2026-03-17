@@ -88,8 +88,8 @@ export default function MapPage() {
       areas: [String(complex.area)],
       recentPrice: complex.latestPrice,
       recentPriceArea: String(complex.area),
-      priceChange: 0,
-      priceChangeType: 'flat',
+      priceChange: complex.priceChange ?? 0,
+      priceChangeType: complex.priceChangeType ?? 'flat',
     });
   }, [setSelectedApartment]);
 

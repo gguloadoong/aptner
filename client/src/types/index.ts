@@ -198,4 +198,6 @@ export interface ApartmentComplex {
   buildYear?: number;    // 준공연도
   lat?: number;          // Geocoder 변환 후 채워짐
   lng?: number;          // Geocoder 변환 후 채워짐
+  priceChange?: number;           // 가격 변동률 (%) — BE 응답 시 채워짐
+  priceChangeType?: 'up' | 'down' | 'flat'; // 가격 변동 방향 — BE 응답 시 채워짐
 }

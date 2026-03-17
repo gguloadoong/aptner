@@ -7,7 +7,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { getRegionTrend } from '../services/trend.service';
 import { cacheService, CACHE_TTL } from '../services/cache.service';
-import { SiDo, SiGunGu, TrendQueryParams } from '../types';
+import { SiDo, SiGunGu, TrendQueryParams, HotTradeApartment } from '../types';
+import { getHotTradeApartments } from '../services/hot-trade.service';
 
 const router = Router();
 
@@ -92,6 +93,32 @@ const SI_GUN_GU_LIST: SiGunGu[] = [
   { code: '28245', name: '계양구', siDoCode: '28' },
   { code: '28260', name: '서구', siDoCode: '28' },
 ];
+
+/**
+ * GET /api/trends/hot-trades
+ * 거래량 급등 단지 Top 10 조회
+ * - 날짜 기반 시드로 일주일 동안 동일한 Mock 값 유지
+ * - 1시간 캐시
+ */
+router.get('/hot-trades', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const cacheKey = 'trends:hot-trades';
+    const cached = cacheService.get<HotTradeApartment[]>(cacheKey);
+    if (cached) {
+      res.json({ success: true, data: cached });
+      return;
+    }
+
+    const data = await getHotTradeApartments();
+
+    // 1시간 캐시
+    cacheService.set(cacheKey, data, 3600);
+
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * GET /api/trends/region
