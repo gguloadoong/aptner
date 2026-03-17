@@ -1,7 +1,11 @@
-/* 봄집 — WDS 전용 글로벌 CSS
- * Tailwind 완전 제거. WDS 컴포넌트 + Box/FlexBox/Grid 만 사용.
+/* 봄집 — 글로벌 CSS
+ * WDS 컴포넌트 + Box/FlexBox/Grid 사용.
+ * MapPage 등 일부 페이지에서 Tailwind 유틸리티 클래스 사용.
  * 색상/타이포는 WDS semantic 토큰에 위임.
  */
+
+/* Tailwind CSS v4 — MapPage 레이아웃 유틸리티 클래스 지원 */
+@import "tailwindcss";
 
 /* 폰트 */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css');

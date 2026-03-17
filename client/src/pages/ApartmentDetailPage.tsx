@@ -15,7 +15,8 @@ import {
 } from '@wanteddev/wds-icon';
 import { AlertButton } from '../components/apartment/PriceAlertModal';
 import { formatPriceShort, formatChange, formatUnits, formatArea } from '../utils/formatNumber';
-import { MOCK_APARTMENTS } from '../mocks/apartments.mock';
+import { useApartmentSearch } from '../hooks/useApartment';
+// MOCK_APARTMENTS 제거 — NearbyApartments가 API 기반으로 전환됨
 import { useBookmarkStore } from '../stores/bookmarkStore';
 import { useCompareStore } from '../stores/compareStore';
 
@@ -60,7 +61,8 @@ export default function ApartmentDetailPage() {
   }, [apartment?.id, apartment?.lawdCd]);
 
   React.useEffect(() => {
-    if (apartment) setSelectedArea(apartment.areas[0]);
+    // areas 배열이 비어있을 수 있으므로 안전하게 접근
+    if (apartment && apartment.areas.length > 0) setSelectedArea(apartment.areas[0]);
   }, [apartment]);
 
   const { data: tradeHistory = [], isLoading: isHistoryLoading } = useApartmentHistory(
@@ -143,7 +145,7 @@ export default function ApartmentDetailPage() {
               apartmentId={id ?? ''}
               apartmentName={apartment.name}
               currentPrice={apartment.recentPrice}
-              area={selectedArea ?? apartment.areas[0] ?? '84'}
+              area={selectedArea ?? apartment.areas?.[0] ?? '84'}
             />
             {/* 공유 버튼 */}
             <IconButton variant="normal" onClick={handleShare} aria-label="공유">
@@ -383,13 +385,23 @@ function calcStats(prices: number[]) {
   return { min, max, avg };
 }
 
-// 주변 단지 카드
+// 주변 단지 카드 — district 기반 API 검색으로 교체 (MOCK 제거)
 function NearbyApartments({ currentId, district }: { currentId: string; district: string }) {
   const navigate = useNavigate();
+  const { data: searchResult, isLoading } = useApartmentSearch(district);
 
-  const nearby = MOCK_APARTMENTS
-    .filter((apt: { id: string; district: string }) => apt.id !== currentId && apt.district === district)
+  // 현재 단지를 제외한 최대 3개 표시
+  const nearby = (searchResult ?? [])
+    .filter((apt) => apt.id !== currentId)
     .slice(0, 3);
+
+  if (isLoading) {
+    return (
+      <FlexBox flexDirection="column" gap="8px">
+        {[1, 2, 3].map((i) => <Skeleton key={i} variant="rectangle" width="100%" height="56px" />)}
+      </FlexBox>
+    );
+  }
 
   if (nearby.length === 0) {
     return (
@@ -401,15 +413,7 @@ function NearbyApartments({ currentId, district }: { currentId: string; district
 
   return (
     <FlexBox flexDirection="column" gap="12px">
-      {nearby.map((apt: {
-        id: string;
-        name: string;
-        dong: string;
-        recentPrice: number;
-        recentPriceArea: string;
-        priceChange: number;
-        priceChangeType: 'up' | 'down' | 'flat';
-      }) => (
+      {nearby.map((apt) => (
         <button
           key={apt.id}
           onClick={() => navigate(`/apartment/${apt.id}`)}

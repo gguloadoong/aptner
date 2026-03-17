@@ -182,8 +182,8 @@ export default function MapPage() {
     }
   };
 
-  // 데스크탑 패널용 필터된 아파트 목록 (세대수/단지특성/평형대 포함)
-  const filteredList = MOCK_MAP_APARTMENTS.filter((apt) => {
+  // 데스크탑 패널용 필터된 아파트 목록 (API 응답 mapApartments 기준 — MOCK 단일화)
+  const filteredList = mapApartments.filter((apt) => {
     const matchSearch = !searchValue || apt.name.includes(searchValue);
     const matchPyeong = matchPyeongFilter(String(apt.area));
     return matchSearch && matchPyeong && isVisible(apt, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
@@ -214,7 +214,7 @@ export default function MapPage() {
     : null;
 
   return (
-    <div className="relative w-full h-screen bg-gray-200 flex">
+    <div className="relative w-full bg-gray-200 flex" style={{ height: '100svh' }}>
       {/* ─── 데스크탑 좌측 사이드 패널 ─── */}
       <aside className="hidden md:flex flex-col w-[380px] flex-shrink-0 bg-white border-r border-[#E5E8EB] z-20 h-full overflow-hidden">
         {/* 패널 헤더 */}
@@ -389,44 +389,62 @@ export default function MapPage() {
           </div>
 
           {filteredList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <svg className="w-10 h-10 text-[#E5E8EB]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: '8px' }}>
+              <svg width="40" height="40" style={{ color: '#E5E8EB' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              <p className="text-sm text-[#8B95A1]">검색 결과가 없습니다</p>
+              <p style={{ fontSize: '14px', color: '#8B95A1' }}>검색 결과가 없습니다</p>
             </div>
           ) : (
             <ul>
               {filteredList.map((apt) => {
                 const isSelected = selectedApartment?.id === apt.id;
                 const eok = apt.price / 10000;
-                const markerBg =
-                  eok >= 20
-                    ? 'bg-[#D63031]'
-                    : eok >= 10
-                    ? 'bg-[#FF4B4B]'
-                    : eok >= 5
-                    ? 'bg-[#FF9500]'
-                    : 'bg-[#8B95A1]';
+                const markerBgColor =
+                  eok >= 20 ? '#D63031' : eok >= 10 ? '#FF4B4B' : eok >= 5 ? '#FF9500' : '#8B95A1';
 
                 return (
                   <li key={apt.id}>
                     <button
                       onClick={() => handleMarkerClick(apt)}
-                      className={[
-                        'w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors border-b border-[#E5E8EB]',
-                        isSelected ? 'bg-blue-50' : 'hover:bg-[#F7FAF8]',
-                      ].join(' ')}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        textAlign: 'left',
+                        borderBottom: '1px solid #E5E8EB',
+                        background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                        border: 'none',
+                        borderBottomWidth: '1px',
+                        borderBottomStyle: 'solid',
+                        borderBottomColor: '#E5E8EB',
+                      }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#F7FAF8'; }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFFFFF'; }}
                     >
-                      <div className={`flex-shrink-0 ${markerBg} text-white text-xs font-bold px-2.5 py-1 rounded-full min-w-[52px] text-center`}>
+                      <div style={{
+                        flexShrink: 0,
+                        backgroundColor: markerBgColor,
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        minWidth: '52px',
+                        textAlign: 'center',
+                      }}>
                         {formatPriceShort(apt.price)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-[#191F28] truncate">{apt.name}</p>
-                        <p className="text-xs text-[#8B95A1] mt-0.5">{apt.area}㎡ 기준</p>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '14px', fontWeight: 700, color: '#191F28', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.name}</p>
+                        <p style={{ fontSize: '12px', color: '#8B95A1', marginTop: '2px' }}>{apt.area}㎡ 기준</p>
                       </div>
                       {isSelected && (
-                        <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg width="16" height="16" style={{ color: '#2563EB', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                         </svg>
                       )}
@@ -1082,14 +1100,8 @@ function MockMapBackground({
       </div>
       {apartments.slice(0, 8).map((apt, i) => {
         const eok = apt.price / 10000;
-        const markerBg =
-          eok >= 20
-            ? 'bg-[#D63031]'
-            : eok >= 10
-            ? 'bg-[#FF4B4B]'
-            : eok >= 5
-            ? 'bg-[#FF9500]'
-            : 'bg-[#8B95A1]';
+        const markerBgColor =
+          eok >= 20 ? '#D63031' : eok >= 10 ? '#FF4B4B' : eok >= 5 ? '#FF9500' : '#8B95A1';
         const positions = [
           { top: '20%', left: '25%' },
           { top: '35%', left: '60%' },
@@ -1103,8 +1115,20 @@ function MockMapBackground({
         return (
           <button
             key={apt.id}
-            className={`absolute ${markerBg} text-white text-xs font-bold px-2.5 py-1.5 rounded-full shadow-md border-2 border-white cursor-pointer hover:scale-110 transition-transform`}
-            style={positions[i]}
+            style={{
+              position: 'absolute',
+              backgroundColor: markerBgColor,
+              color: '#FFFFFF',
+              fontSize: '12px',
+              fontWeight: 700,
+              padding: '4px 10px',
+              borderRadius: '999px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.20)',
+              border: '2px solid #FFFFFF',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+              ...positions[i],
+            }}
             onClick={() => onMarkerClick(apt)}
           >
             {formatPriceShort(apt.price)}
