@@ -74,11 +74,15 @@ export default function SubscriptionPage() {
               </div>
             </FlexBox>
 
-            {/* 상태 탭 — WDS Tab */}
+            {/* 상태 탭 — WDS Tab (onValueChange + onClick 이중 바인딩으로 안정성 확보) */}
             <Tab value={status} onValueChange={(v) => setStatus(v as SubscriptionStatus)}>
               <TabList size="medium">
                 {STATUS_TABS.map((tab) => (
-                  <TabListItem key={tab.value} value={tab.value}>
+                  <TabListItem
+                    key={tab.value}
+                    value={tab.value}
+                    onClick={() => setStatus(tab.value)}
+                  >
                     {tab.label}
                   </TabListItem>
                 ))}
@@ -103,7 +107,11 @@ export default function SubscriptionPage() {
             <Tab value={status} onValueChange={(v) => setStatus(v as SubscriptionStatus)}>
               <TabList size="medium">
                 {STATUS_TABS.map((tab) => (
-                  <TabListItem key={tab.value} value={tab.value}>
+                  <TabListItem
+                    key={tab.value}
+                    value={tab.value}
+                    onClick={() => setStatus(tab.value)}
+                  >
                     {tab.label}
                   </TabListItem>
                 ))}
