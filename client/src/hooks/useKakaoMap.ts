@@ -119,6 +119,8 @@ export function useKakaoMap(
   const overlaysRef = useRef<Map<string, { setMap: (m: unknown) => void }>>(new Map());
   // 히트맵 원형 오버레이 목록 (구별 Circle 인스턴스)
   const heatmapCirclesRef = useRef<KakaoCircle[]>([]);
+  // 구 단위 평균가 오버레이 목록 (줌아웃 시 표시)
+  const districtOverlaysRef = useRef<{ setMap: (m: unknown) => void }[]>([]);
   // debounce 타이머 참조
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [state, setState] = useState<KakaoMapState>({
@@ -227,6 +229,9 @@ export function useKakaoMap(
         overlay.setMap(null);
       });
       overlaysRef.current.clear();
+      // 구 단위 오버레이 정리
+      districtOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      districtOverlaysRef.current = [];
     };
   }, [initMap]);
 
@@ -333,6 +338,102 @@ export function useKakaoMap(
     heatmapCirclesRef.current = [];
   }, []);
 
+  // 구 단위 평균가 오버레이 전체 제거
+  const clearDistrictOverlays = useCallback(() => {
+    districtOverlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    districtOverlaysRef.current = [];
+  }, []);
+
+  // 구 단위 평균가 오버레이 업데이트 (줌 레벨 <= 9 시 호출)
+  // apartments 배열에서 구별 평균 가격을 계산하여 CustomOverlay로 표시 (호갱노노 스타일)
+  const updateDistrictOverlays = useCallback(
+    (apartments: MapApartment[], onDistrictClick?: (districtName: string) => void) => {
+      if (!mapRef.current || !isKakaoAvailable()) return;
+      const { kakao } = window;
+
+      // 기존 구 오버레이 제거 후 재생성
+      clearDistrictOverlays();
+
+      if (apartments.length === 0) return;
+
+      // 1) 구(區)별 평균가 집계
+      const districtPriceMap = new Map<string, { lat: number; lng: number; totalPrice: number; count: number }>();
+      for (const apt of apartments) {
+        const districtName = findNearestDistrict(apt.lat, apt.lng);
+        const center = SEOUL_DISTRICT_CENTERS.find((d) => d.name === districtName)!;
+        const existing = districtPriceMap.get(districtName);
+        if (existing) {
+          existing.totalPrice += apt.price;
+          existing.count += 1;
+        } else {
+          districtPriceMap.set(districtName, {
+            lat: center.lat,
+            lng: center.lng,
+            totalPrice: apt.price,
+            count: 1,
+          });
+        }
+      }
+
+      // 2) 각 구에 커스텀 오버레이 생성
+      districtPriceMap.forEach((data, name) => {
+        const avgPrice = Math.round(data.totalPrice / data.count);
+        const avgEok = avgPrice / 10000;
+        // 평균가 구간별 색상 (가격 마커와 동일한 기준)
+        const color = getDistrictPriceColor(avgPrice);
+        // 가격 텍스트 포맷 (억 단위)
+        const priceText = avgEok >= 1
+          ? `${avgEok % 1 === 0 ? avgEok : parseFloat(avgEok.toFixed(1))}억`
+          : `${avgPrice.toLocaleString('ko-KR')}만`;
+
+        const el = document.createElement('div');
+        el.style.cssText = [
+          'background: #FFFFFF',
+          `border: 2px solid ${color}`,
+          'border-radius: 8px',
+          'padding: 6px 10px',
+          'box-shadow: 0 2px 8px rgba(0,0,0,0.15)',
+          'text-align: center',
+          'font-size: 12px',
+          'font-weight: 600',
+          'cursor: pointer',
+          'white-space: nowrap',
+          'line-height: 1.4',
+          'transition: transform 0.15s ease',
+          'color: #191F28',
+        ].join(';');
+        // innerHTML 대신 DOM API 사용 (컨벤션 준수)
+        const nameNode = document.createTextNode(name);
+        const br = document.createElement('br');
+        const priceSpan = document.createElement('span');
+        priceSpan.style.cssText = `color:${color};font-weight:700`;
+        priceSpan.textContent = priceText;
+        el.appendChild(nameNode);
+        el.appendChild(br);
+        el.appendChild(priceSpan);
+
+        // 호버 효과
+        el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.06)'; });
+        el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)'; });
+        if (onDistrictClick) {
+          el.addEventListener('click', () => onDistrictClick(name));
+        }
+
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(data.lat, data.lng),
+          content: el,
+          yAnchor: 0.5,
+          zIndex: 10,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        overlay.setMap(mapRef.current as any);
+        districtOverlaysRef.current.push(overlay as unknown as { setMap: (m: unknown) => void });
+      });
+    },
+    [clearDistrictOverlays]
+  );
+
   // 히트맵 원형 오버레이 업데이트
   // apartments 배열에서 구(區) 단위 집계 후 kakao.maps.Circle로 표시
   const updateHeatmapOverlays = useCallback((apartments: MapApartment[]) => {
@@ -425,6 +526,8 @@ export function useKakaoMap(
     moveToLocation,
     updateHeatmapOverlays,
     clearHeatmapOverlays,
+    updateDistrictOverlays,
+    clearDistrictOverlays,
   };
 }
 
@@ -826,6 +929,11 @@ function getPriceMarkerColor(priceManwon: number): string {
   if (eok >= 10) return '#FF4B4B';
   if (eok >= 5) return '#FF9500';
   return '#8B95A1';
+}
+
+// 구 단위 평균가 오버레이용 색상 (가격 마커 색상과 동일한 기준 사용)
+function getDistrictPriceColor(priceManwon: number): string {
+  return getPriceMarkerColor(priceManwon);
 }
 
 // D-Day 계산 (마감일까지 남은 일수, 음수면 null)
