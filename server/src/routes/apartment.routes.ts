@@ -125,7 +125,17 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    const data = await searchApartments(q.trim());
+    // URL 인코딩이 두 번 적용된 경우 대비 추가 디코딩 시도
+    let keyword = q.trim();
+    try {
+      const decoded = decodeURIComponent(keyword);
+      // 디코딩 후 달라지면 다시 적용 (예: %EB%9E%98... → 래미안)
+      if (decoded !== keyword) keyword = decoded.trim();
+    } catch {
+      // decodeURIComponent 실패 시 원래 값 그대로 사용
+    }
+
+    const data = await searchApartments(keyword);
 
     res.json({
       success: true,

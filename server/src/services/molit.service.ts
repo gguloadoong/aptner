@@ -1059,6 +1059,94 @@ async function fetchMolitApi(
 }
 
 // ============================================================
+// 시군구 코드 → 대표 좌표 Map
+// 실 API에서 lat/lng를 제공하지 않을 때 사용합니다.
+// aptCode 앞 5자리 (시군구 코드) 기준으로 구/군의 중심 좌표를 반환합니다.
+// ============================================================
+const LAWD_CD_COORDS: Record<string, { lat: number; lng: number }> = {
+  // 서울 (11)
+  '11110': { lat: 37.5920, lng: 126.9776 }, // 종로구
+  '11140': { lat: 37.5636, lng: 126.9975 }, // 중구
+  '11170': { lat: 37.5543, lng: 127.0093 }, // 용산구
+  '11200': { lat: 37.5613, lng: 127.0369 }, // 성동구
+  '11215': { lat: 37.5492, lng: 127.0868 }, // 광진구
+  '11230': { lat: 37.5809, lng: 127.0450 }, // 동대문구
+  '11260': { lat: 37.6063, lng: 127.0927 }, // 중랑구
+  '11290': { lat: 37.5894, lng: 127.0144 }, // 성북구
+  '11305': { lat: 37.6396, lng: 127.0254 }, // 강북구
+  '11320': { lat: 37.6688, lng: 127.0470 }, // 도봉구
+  '11350': { lat: 37.6541, lng: 127.0568 }, // 노원구
+  '11380': { lat: 37.6024, lng: 126.9287 }, // 은평구
+  '11410': { lat: 37.5794, lng: 126.9368 }, // 서대문구
+  '11440': { lat: 37.5538, lng: 126.9086 }, // 마포구
+  '11470': { lat: 37.5392, lng: 126.8565 }, // 양천구
+  '11500': { lat: 37.5263, lng: 126.8966 }, // 강서구
+  '11530': { lat: 37.4943, lng: 126.8956 }, // 구로구
+  '11545': { lat: 37.4567, lng: 126.8957 }, // 금천구
+  '11560': { lat: 37.5219, lng: 126.9241 }, // 영등포구
+  '11590': { lat: 37.5124, lng: 126.9393 }, // 동작구
+  '11620': { lat: 37.4784, lng: 126.9516 }, // 관악구
+  '11650': { lat: 37.4836, lng: 127.0325 }, // 서초구
+  '11680': { lat: 37.5172, lng: 127.0473 }, // 강남구
+  '11710': { lat: 37.5146, lng: 127.1053 }, // 송파구
+  '11740': { lat: 37.5301, lng: 127.1238 }, // 강동구
+  // 경기 주요 (41)
+  '41110': { lat: 37.3945, lng: 127.1113 }, // 성남 수정구
+  '41130': { lat: 37.4375, lng: 127.1378 }, // 성남 중원구
+  '41135': { lat: 37.3595, lng: 127.1156 }, // 성남 분당구
+  '41150': { lat: 37.2636, lng: 127.0286 }, // 수원 장안구
+  '41170': { lat: 37.2415, lng: 127.0576 }, // 수원 팔달구
+  '41190': { lat: 37.2599, lng: 127.0573 }, // 수원 영통구
+  '41280': { lat: 37.4140, lng: 126.7483 }, // 부천시
+  '41290': { lat: 37.6566, lng: 126.8320 }, // 고양 덕양구
+  '41310': { lat: 37.3219, lng: 126.8318 }, // 안산 단원구
+  '41360': { lat: 37.0081, lng: 127.2715 }, // 평택시
+  '41390': { lat: 37.3943, lng: 126.9558 }, // 안양 만안구
+  '41410': { lat: 37.3945, lng: 126.9368 }, // 안양 동안구
+  '41450': { lat: 37.3001, lng: 127.0088 }, // 의왕시
+  '41460': { lat: 37.3601, lng: 126.9268 }, // 군포시
+  '41480': { lat: 37.4295, lng: 126.9891 }, // 과천시
+  '41550': { lat: 37.3946, lng: 127.0547 }, // 광주시
+  '41570': { lat: 37.5497, lng: 127.1946 }, // 하남시
+  '41590': { lat: 37.2191, lng: 127.0812 }, // 화성시
+  '41610': { lat: 37.2902, lng: 127.0457 }, // 수원 영통구(광교)
+  '41630': { lat: 37.3944, lng: 127.1204 }, // 성남 분당
+  '41670': { lat: 37.6738, lng: 126.7712 }, // 고양 일산동구
+  // 인천 (28)
+  '28110': { lat: 37.4562, lng: 126.7052 }, // 미추홀구
+  '28140': { lat: 37.4762, lng: 126.6462 }, // 연수구
+  '28177': { lat: 37.5335, lng: 126.6969 }, // 서구
+  '28200': { lat: 37.5143, lng: 126.7228 }, // 부평구
+  // 부산 (26)
+  '26110': { lat: 35.1028, lng: 129.0244 }, // 중구
+  '26350': { lat: 35.1631, lng: 129.1624 }, // 해운대구
+  '26440': { lat: 35.1853, lng: 128.9814 }, // 사상구
+};
+
+/**
+ * aptCode에서 시군구 코드를 추출해 대표 좌표를 반환합니다.
+ * aptCode 형식: "11305-46" → 앞 5자리 "11305" 또는 5자리 코드 직접 입력
+ * 매칭 실패 시 null을 반환합니다.
+ */
+function getLawdCdCoords(aptCode: string): { lat: number; lng: number } | null {
+  // "11305-46" → "11305"
+  const lawdCd = aptCode.split('-')[0];
+  if (LAWD_CD_COORDS[lawdCd]) {
+    return LAWD_CD_COORDS[lawdCd];
+  }
+  // 5자리 숫자 코드 그대로 전달된 경우
+  if (/^\d{5}$/.test(aptCode) && LAWD_CD_COORDS[aptCode]) {
+    return LAWD_CD_COORDS[aptCode];
+  }
+  // 앞 4자리 + '0' 패딩 시도 (일부 코드 불일치 대응)
+  const padded = `${lawdCd.slice(0, 4)}0`;
+  if (LAWD_CD_COORDS[padded]) {
+    return LAWD_CD_COORDS[padded];
+  }
+  return null;
+}
+
+// ============================================================
 // 공개 서비스 함수
 // ============================================================
 
@@ -1319,6 +1407,9 @@ export async function getHotApartments(
       const priceChange = latestTrade.price - firstTrade.price;
       const priceChangeRate = firstTrade.price > 0 ? (priceChange / firstTrade.price) * 100 : 0;
 
+      // 실 API에서는 좌표 정보 없음 → aptCode 기반 시군구 대표 좌표로 근사 보정
+      const approxCoords = getLawdCdCoords(apt.key);
+
       return {
         rank: idx + 1,
         aptCode: apt.key,
@@ -1329,9 +1420,8 @@ export async function getHotApartments(
         tradeCount: apt.trades.length,
         priceChange,
         priceChangeRate: Math.round(priceChangeRate * 10) / 10,
-        // 실 API에서는 좌표 정보 없음 → null로 명시 (FE에서 undefined와 구분)
-        lat: null,
-        lng: null,
+        lat: approxCoords?.lat ?? null,
+        lng: approxCoords?.lng ?? null,
       };
     });
 
@@ -1365,6 +1455,8 @@ export async function getHotApartments(
           const latest = apt.trades[apt.trades.length - 1];
           const first = apt.trades[0];
           const pc = latest.price - first.price;
+          // 실 API에서는 좌표 없음 → aptCode 기반 시군구 대표 좌표로 근사 보정
+          const prevCoords = getLawdCdCoords(apt.key);
           return {
             rank: idx + 1,
             aptCode: apt.key,
@@ -1375,9 +1467,8 @@ export async function getHotApartments(
             tradeCount: apt.trades.length,
             priceChange: pc,
             priceChangeRate: Math.round((first.price > 0 ? (pc / first.price) * 100 : 0) * 10) / 10,
-            // 실 API에서는 좌표 정보 없음 → null로 명시
-            lat: null,
-            lng: null,
+            lat: prevCoords?.lat ?? null,
+            lng: prevCoords?.lng ?? null,
           };
         });
         cacheService.set(cacheKey, prevHotList, CACHE_TTL.APARTMENT_TRADE);
@@ -1489,9 +1580,12 @@ export async function getApartmentMapMarkers(
  * aptCode로 특정 아파트 정보를 조회합니다.
  * TODO: 실 API 연동 시 실제 조회 로직 구현
  * - Mock: APT_BASE_DATA에서 aptCode로 검색
- * - 실 API: 일단 Mock 반환
+ * - 국토부 코드 형식("11650", "11305-46") 전달 시:
+ *   1. getLawdCdCoords()로 시군구 대표 좌표 조회
+ *   2. 좌표 범위(±0.1도) 내 가장 가까운 Mock 단지 반환
+ *   3. 매칭 단지 없어도 시군구 대표 좌표로 기본 응답 생성 (404 방지)
  *
- * @param aptCode - 아파트 코드 (예: APT001)
+ * @param aptCode - 아파트 코드 (APT001 형식 또는 국토부 코드 형식)
  */
 export async function getApartmentById(aptCode: string): Promise<HotApartment | null> {
   const cacheKey = `apt:${aptCode}`;
@@ -1502,8 +1596,48 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
     return cached;
   }
 
-  // Mock 데이터에서 aptCode로 검색
-  const found = APT_BASE_DATA.find((apt) => apt.aptCode === aptCode);
+  // 1차: Mock 데이터에서 정확한 aptCode 검색 (APT001 형식)
+  let found = APT_BASE_DATA.find((apt) => apt.aptCode === aptCode);
+
+  // 2차: 국토부 코드 형식(숫자 또는 "숫자-숫자")이면 시군구 좌표로 근사 매핑
+  if (!found && /^\d/.test(aptCode)) {
+    const coords = getLawdCdCoords(aptCode);
+    if (coords) {
+      // 좌표 ±0.1도 이내 가장 가까운 Mock 단지 선택
+      const nearby = APT_BASE_DATA.filter(
+        (apt) => Math.abs(apt.lat - coords.lat) < 0.1 && Math.abs(apt.lng - coords.lng) < 0.1,
+      );
+      if (nearby.length > 0) {
+        // 직선 거리 최솟값 단지 선택
+        found = nearby.reduce((closest, apt) => {
+          const d = Math.hypot(apt.lat - coords.lat, apt.lng - coords.lng);
+          const dc = Math.hypot(closest.lat - coords.lat, closest.lng - coords.lng);
+          return d < dc ? apt : closest;
+        });
+        console.log(`[Molit] 국토부 코드 "${aptCode}" → 근사 단지 "${found.aptCode}" (${found.apartmentName}) 반환`);
+      } else {
+        // 인근 단지가 없어도 시군구 대표 좌표로 최소 응답 생성 (FE 404 방지)
+        console.log(`[Molit] 국토부 코드 "${aptCode}" → 시군구 대표 좌표 기본 응답 생성`);
+        const fallback: HotApartment = {
+          rank: 0,
+          aptCode,
+          apartmentName: `아파트 (${aptCode})`,
+          lawdNm: aptCode.split('-')[0],
+          recentPrice: 0,
+          area: 84,
+          tradeCount: 0,
+          priceChange: 0,
+          priceChangeRate: 0,
+          lat: coords.lat,
+          lng: coords.lng,
+          areas: [{ area: 84, recentPrice: 0 }],
+        };
+        cacheService.set(cacheKey, fallback, CACHE_TTL.APARTMENT_TRADE);
+        return fallback;
+      }
+    }
+  }
+
   if (!found) {
     console.log(`[Molit] 아파트 없음: aptCode=${aptCode}`);
     return null;
