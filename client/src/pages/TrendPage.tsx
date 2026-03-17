@@ -193,7 +193,14 @@ export default function TrendPage() {
                       formatter={(value) => [`${value}%`, '변동률']}
                       contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: 12 }}
                     />
-                    <Bar dataKey="change" fill="var(--color-chart-line, #0066FF)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="change" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                      {chartData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.change > 0 ? '#FF4B4B' : entry.change < 0 ? '#3B82F6' : 'var(--color-chart-line, #0066FF)'}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
 
