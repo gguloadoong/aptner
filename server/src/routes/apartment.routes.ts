@@ -12,9 +12,11 @@ import {
   getApartmentMapMarkers,
   getApartmentById,
   searchApartments,
+  getJeonseRate,
 } from '../services/molit.service';
+import { getComplexesByViewport } from '../services/complex.service';
 import { apiRateLimiter } from '../middleware/security';
-import { TradeQueryParams } from '../types';
+import { ComplexFilter, TradeQueryParams } from '../types';
 
 const router = Router();
 
@@ -181,6 +183,88 @@ router.get('/hot', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
+ * GET /api/apartments/complexes
+ * 지도 뷰포트 내 실 아파트 단지 + 최근 2개월 실거래가 집계
+ *
+ * 국토부 실거래가 API를 직접 호출해 단지별로 집계한 후 반환합니다.
+ * 좌표 변환은 FE에서 Kakao JS Geocoder로 처리하므로 서버는 address만 제공.
+ *
+ * Query params:
+ *   - swLat: 남서쪽 위도 (필수)
+ *   - swLng: 남서쪽 경도 (필수)
+ *   - neLat: 북동쪽 위도 (필수)
+ *   - neLng: 북동쪽 경도 (필수)
+ *   - zoom: 지도 줌 레벨 (선택)
+ *           5 이하 → 상위 50개 / 6~7 → 상위 100개 / 8 이상 → 상위 200개
+ */
+router.get('/complexes', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { swLat, swLng, neLat, neLng, zoom } = req.query as Partial<Record<string, string>>;
+
+    // 필수 좌표 파라미터 검증
+    if (!swLat || !swLng || !neLat || !neLng) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_PARAMS',
+          message: 'swLat, swLng, neLat, neLng 는 모두 필수 파라미터입니다.',
+        },
+      });
+      return;
+    }
+
+    const swLatNum = parseFloat(swLat);
+    const swLngNum = parseFloat(swLng);
+    const neLatNum = parseFloat(neLat);
+    const neLngNum = parseFloat(neLng);
+
+    // 좌표 유효성 검증
+    if (isNaN(swLatNum) || isNaN(swLngNum) || isNaN(neLatNum) || isNaN(neLngNum)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDS',
+          message: '좌표 파라미터는 숫자여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    // 줌 레벨에 따른 반환 개수 결정
+    // 5 이하: 50개 / 6~7: 100개 / 8 이상: 200개 (기본)
+    const zoomNum = zoom ? parseInt(zoom, 10) : 8;
+    let limit: number;
+    if (zoomNum <= 5) {
+      limit = 50;
+    } else if (zoomNum <= 7) {
+      limit = 100;
+    } else {
+      limit = 200;
+    }
+
+    const data = await getComplexesByViewport(
+      swLatNum,
+      swLngNum,
+      neLatNum,
+      neLngNum,
+      limit,
+    );
+
+    res.json({
+      success: true,
+      data,
+      meta: {
+        total: data.length,
+        zoom: zoomNum,
+        limit,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/apartments/map
  * 지도 뷰포트 내 아파트 마커 조회
  *
@@ -209,13 +293,13 @@ router.get('/map', async (req: Request, res: Response, next: NextFunction) => {
 
     const swLatNum = parseFloat(swLat);
     const swLngNum = parseFloat(swLng);
-    const neLarNum = parseFloat(neLat);
+    const neLatNum = parseFloat(neLat);
     const neLngNum = parseFloat(neLng);
 
     // 좌표 유효성 검증
     if (
       isNaN(swLatNum) || isNaN(swLngNum) ||
-      isNaN(neLarNum) || isNaN(neLngNum)
+      isNaN(neLatNum) || isNaN(neLngNum)
     ) {
       res.status(400).json({
         success: false,
@@ -234,12 +318,31 @@ router.get('/map', async (req: Request, res: Response, next: NextFunction) => {
     else if (priceFilter === 'over10') maxPrice = undefined; // 하한만 있음 (필터 없이 전체 반환)
     else if (priceFilter && !isNaN(Number(priceFilter))) maxPrice = Number(priceFilter);
 
+    // 불리언 쿼리파라미터 파서 (문자열 'true'/'false' → boolean)
+    const parseBool = (v: string | undefined): boolean | undefined =>
+      v === 'true' ? true : v === 'false' ? false : undefined;
+
+    // 단지 특성 필터 파싱
+    const complexFilter: ComplexFilter = {
+      minUnit: req.query.minUnit ? parseInt(req.query.minUnit as string, 10) : undefined,
+      isBrand: parseBool(req.query.isBrand as string),
+      isWalkSubway: parseBool(req.query.isWalkSubway as string),
+      isLargeComplex: parseBool(req.query.isLargeComplex as string),
+      isNewBuild: parseBool(req.query.isNewBuild as string),
+      isFlat: parseBool(req.query.isFlat as string),
+      hasElementarySchool: parseBool(req.query.hasElementarySchool as string),
+    };
+
+    // 모든 필드가 undefined이면 필터 객체 자체를 전달하지 않음 (불필요한 캐시 키 증가 방지)
+    const hasAnyComplexFilter = Object.values(complexFilter).some((v) => v !== undefined);
+
     const data = await getApartmentMapMarkers(
       swLatNum,
       swLngNum,
-      neLarNum,
+      neLatNum,
       neLngNum,
       maxPrice,
+      hasAnyComplexFilter ? complexFilter : undefined,
     );
 
     res.json({
@@ -250,6 +353,64 @@ router.get('/map', async (req: Request, res: Response, next: NextFunction) => {
     next(error);
   }
 });
+
+/**
+ * GET /api/apartments/:aptCode/jeonse-rate
+ * 특정 아파트의 전세가율 조회
+ *
+ * Path params:
+ *   - aptCode: 단지 시퀀스 코드 또는 단지명
+ *
+ * Query params:
+ *   - lawdCd: 법정동 코드 앞 5자리 (필수, 예: 11650)
+ *
+ * 응답 예시:
+ *   { "success": true, "data": { "jeonseRate": 72.3, "jeonsePrice": 45000, "tradePrice": 62000 } }
+ *   전세가율 계산 불가 시 jeonseRate/jeonsePrice/tradePrice 는 null
+ */
+router.get(
+  '/:aptCode/jeonse-rate',
+  apiRateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { aptCode } = req.params;
+      const { lawdCd } = req.query as Partial<Record<string, string>>;
+
+      // lawdCd 필수 검증
+      if (!lawdCd) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'MISSING_PARAMS',
+            message: 'lawdCd(지역코드)는 필수 파라미터입니다.',
+          },
+        });
+        return;
+      }
+
+      // lawdCd 형식 검증 (5자리 숫자)
+      if (!/^\d{5}$/.test(lawdCd)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_LAWD_CD',
+            message: 'lawdCd는 5자리 숫자여야 합니다. (예: 11650)',
+          },
+        });
+        return;
+      }
+
+      const data = await getJeonseRate(String(aptCode), lawdCd);
+
+      res.json({
+        success: true,
+        data,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 /**
  * GET /api/apartments/:aptCode/history
@@ -315,9 +476,41 @@ router.get(
 );
 
 /**
+ * GET /api/apartments/:aptCode/sale-price
+ * 특정 아파트 분양가 조회
+ * 현재 승인 대기 중 — 데이터 구조만 확정하고 빈 데이터 반환
+ *
+ * Path params:
+ *   - aptCode: 아파트 코드 (예: APT001)
+ *
+ * 응답 예시:
+ *   { "success": true, "data": { "salePrice": null, "unit": "만원", "note": "승인 대기중" } }
+ */
+router.get(
+  '/:aptCode/sale-price',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { aptCode } = req.params;
+      console.log(`[Apartment] 분양가 조회: aptCode=${aptCode}`);
+
+      res.json({
+        success: true,
+        data: {
+          salePrice: null,
+          unit: '만원',
+          note: '승인 대기중',
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
  * GET /api/apartments/:aptCode
  * 특정 아파트 상세 정보 조회
- * 주의: /search, /hot, /map, /trades, /:aptCode/history 라우트보다 반드시 뒤에 선언
+ * 주의: /search, /hot, /map, /trades, /:aptCode/history, /:aptCode/sale-price 라우트보다 반드시 뒤에 선언
  *
  * Path params:
  *   - aptCode: 아파트 코드 (예: APT001)

@@ -19,6 +19,10 @@ export interface Apartment {
   weeklyRankChange?: number | 'new';
   isRecordHigh?: boolean;  // BE HotApartment: 역대 최고가 여부
   hotRank?: number;        // BE HotApartment: HOT 단지 순위
+  features?: ComplexFeature[]; // 단지 특성 (브랜드/역세권/대단지/신축/평지/초품아)
+  hotTags?: string[];          // HOT 이유 태그 (예: ['거래 급증', '최고가 경신'])
+  rankChange?: number;         // 순위 변동: +2 = 2단계 상승, -1 = 하락, 0 = 유지
+  lawdCd?: string;             // 법정동 코드 (5자리, 전세가율 조회용)
 }
 
 // 실거래 내역
@@ -101,6 +105,10 @@ export interface MapApartment {
   subDeadline?: string;      // 청약 마감일 YYYY-MM-DD (청약 마커 전용)
   subStartDate?: string;     // 청약 시작일 YYYY-MM-DD (청약 마커 전용)
   subId?: string;            // 청약 ID (Subscription 테이블 FK)
+  totalUnits?: number;       // 세대수 필터용
+  features?: ComplexFeature[]; // 단지 특성 필터용
+  volumeSurge?: boolean;     // 거래량 급등 여부
+  volumeChangeRate?: number;  // 전주 대비 거래량 변화율 (%)
 }
 
 // 카카오맵 타입 선언
@@ -116,10 +124,17 @@ export interface KakaoMaps {
     Map: new (container: HTMLElement, options: object) => KakaoMap;
     LatLng: new (lat: number, lng: number) => KakaoLatLng;
     CustomOverlay: new (options: object) => KakaoCustomOverlay;
+    // 거래량 히트맵 레이어용 원형 오버레이
+    Circle: new (options: object) => KakaoCircle;
     event: {
       addListener: (target: object, type: string, handler: () => void) => void;
     };
   };
+}
+
+// 카카오맵 Circle 오버레이 인터페이스
+export interface KakaoCircle {
+  setMap: (map: unknown) => void;
 }
 
 export interface KakaoMap {
@@ -156,8 +171,31 @@ export interface ApiResponse<T> {
 // 가격 필터 타입
 export type PriceFilter = 'all' | 'under5' | '5to10' | 'over10';
 
+// 세대수 필터 (단일 선택)
+export type UnitCountFilter = 'all' | '500plus' | '1000plus' | '2000plus';
+
+// 단지 특성 (다중 선택)
+export type ComplexFeature = 'brand' | 'station' | 'large' | 'new' | 'flat' | 'school';
+
 // 청약 상태 탭 타입
 export type SubscriptionStatus = 'ongoing' | 'upcoming' | 'closed';
 
 // 정렬 기준 타입
 export type SortOrder = 'deadline' | 'price' | 'latest';
+
+// BE /api/apartments/complexes 응답 단지 타입
+// lat/lng는 Geocoder 변환 후 채워짐
+export interface ApartmentComplex {
+  id: string;
+  name: string;
+  address: string;       // 도로명 주소
+  lawdCd: string;        // 법정동 코드
+  umdNm: string;         // 읍면동명
+  latestPrice: number;   // 최근 거래가 (만원)
+  latestDealDate: string; // 최근 거래일 YYYY-MM-DD
+  tradeCount: number;    // 최근 거래횟수
+  area: number;          // 기준 면적 (㎡)
+  buildYear?: number;    // 준공연도
+  lat?: number;          // Geocoder 변환 후 채워짐
+  lng?: number;          // Geocoder 변환 후 채워짐
+}

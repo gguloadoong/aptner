@@ -19,27 +19,45 @@ export const helmetMiddleware = helmet({
 /**
  * CORS 미들웨어
  * 환경변수 ALLOWED_ORIGINS에 설정된 도메인만 허용합니다.
+ * ALLOWED_ORIGINS=* 로 설정 시 전체 허용 (개발/스테이징 용도)
+ * *.vercel.app 패턴도 지원합니다.
  */
 export function corsMiddleware(): RequestHandler {
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) ?? [
+  const rawOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((o) => o.trim()) ?? [
     'http://localhost:5173',
   ];
 
-  console.log(`[Security] CORS 허용 도메인: ${allowedOrigins.join(', ')}`);
+  // 전체 허용 와일드카드 여부
+  const allowAll = rawOrigins.includes('*');
+
+  console.log(`[Security] CORS 허용 도메인: ${rawOrigins.join(', ')}`);
 
   return cors({
     origin: (origin, callback) => {
-      // origin이 없는 경우: 개발은 허용, 프로덕션은 차단 (MAJOR-08 수정)
+      // origin이 없는 경우: 서버 간 요청(헬스체크, Railway 내부 등) 허용
       if (!origin) {
-        if (process.env.NODE_ENV === 'production') {
-          callback(new Error('CORS: Origin 헤더가 없는 요청은 허용되지 않습니다.'));
-        } else {
-          callback(null, true);
-        }
+        callback(null, true);
         return;
       }
 
-      if (allowedOrigins.includes(origin)) {
+      // * 전체 허용 모드
+      if (allowAll) {
+        callback(null, true);
+        return;
+      }
+
+      // 정확한 도메인 일치 또는 *.vercel.app 패턴 확인
+      const isAllowed = rawOrigins.some((allowed) => {
+        if (allowed === origin) return true;
+        // 와일드카드 패턴 처리: *.vercel.app → ^https?://[^.]+\.vercel\.app$
+        if (allowed.startsWith('*.')) {
+          const suffix = allowed.slice(1); // .vercel.app
+          return origin.endsWith(suffix);
+        }
+        return false;
+      });
+
+      if (isAllowed) {
         callback(null, true);
       } else {
         console.warn(`[Security] CORS 차단: ${origin}`);

@@ -1,417 +1,711 @@
+import { useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useHotApartments } from '../hooks/useApartment';
 import { useSubscriptions } from '../hooks/useSubscription';
-import ApartmentCard from '../components/apartment/ApartmentCard';
-import SubscriptionCard from '../components/subscription/SubscriptionCard';
+import HeroApartmentCard from '../components/apartment/HeroApartmentCard';
+import UrgentSubscriptionCard from '../components/subscription/UrgentSubscriptionCard';
+import RegionChip from '../components/home/RegionChip';
 import SearchBar from '../components/ui/SearchBar';
-import { CardSkeleton } from '../components/ui/LoadingSpinner';
-import { formatPriceShort, formatChange } from '../utils/formatNumber';
+import BomzipLogo from '../components/ui/BomzipLogo';
+import { formatPriceShort, formatChange, calcDday } from '../utils/formatNumber';
 import { MOCK_REGION_TRENDS } from '../mocks/trends.mock';
+import HotTag from '../components/apartment/HotTag';
+import RankChange from '../components/apartment/RankChange';
+import { useBookmarkStore } from '../stores/bookmarkStore';
+import CompareBar from '../components/apartment/CompareBar';
+import {
+  BottomNavigation,
+  BottomNavigationItem,
+  Button,
+  TextButton,
+  IconButton,
+  Box,
+  FlexBox,
+  Typography,
+  Skeleton,
+} from '@wanteddev/wds';
+import { useIsPC } from '../hooks/useBreakpoint';
+import {
+  IconHome,
+  IconHomeFill,
+  IconLocation,
+  IconLocationFill,
+  IconCalendar,
+  IconChevronRight,
+  IconSearch,
+} from '@wanteddev/wds-icon';
+import type { Apartment } from '../types';
 
-// 홈 페이지
 export default function HomePage() {
   const navigate = useNavigate();
+  const isMobile = !useIsPC();
+
+  // 찜 개수 (헤더 배지용)
+  const bookmarkCount = useBookmarkStore((s) => s.bookmarkCount);
 
   // 핫 아파트 상위 10개
-  const { data: hotApartments = [], isLoading: isAptLoading } = useHotApartments(undefined, 10);
+  const { data: hotApartments = [], isLoading: isAptLoading } = useHotApartments(
+    undefined,
+    10
+  );
 
-  // 진행 중인 청약 3개
+  // 진행 중인 청약 (마감임박 필터용)
   const { data: subData, isLoading: isSubLoading } = useSubscriptions({
     status: 'ongoing',
     sort: 'deadline',
   });
-  const ongoingSubscriptions = subData?.data.slice(0, 3) ?? [];
+
+  // D-14 이내 청약만 필터링
+  const urgentSubscriptions = useMemo(() => {
+    const all = subData?.data ?? [];
+    return all.filter((sub) => {
+      const ddayStr = calcDday(sub.deadline);
+      if (ddayStr === '마감') return false;
+      const n = ddayStr === 'D-day' ? 0 : parseInt(ddayStr.replace('D-', ''), 10);
+      return n <= 14;
+    });
+  }, [subData]);
+
+  const topApt = hotApartments[0] ?? null;
+  const restApts = hotApartments.slice(1, 8);
 
   return (
-    <div className="min-h-screen bg-[#F5F6F8]">
-      {/* 모바일 헤더 (md 미만) */}
-      <header className="md:hidden bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-[#1B64DA] rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-black">A</span>
-            </div>
-            <span className="text-lg font-black text-[#191F28]">Aptner</span>
-          </div>
-          <button
-            onClick={() => navigate('/map')}
-            className="flex items-center gap-1.5 text-xs font-semibold text-[#1B64DA] bg-blue-50 px-3 py-1.5 rounded-full"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-            </svg>
-            지도 보기
-          </button>
-        </div>
-        <SearchBar placeholder="아파트명, 지역 검색 (ex. 반포 래미안)" />
-      </header>
+    <div style={{ minHeight: '100svh', backgroundColor: 'var(--semantic-background-normal-alternative)' }}>
 
-      {/* 데스크탑 헤더 (md 이상) */}
-      <header className="hidden md:block bg-white border-b border-[#E5E8EB] sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-6">
-          {/* 로고 */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-8 h-8 bg-[#1B64DA] rounded-xl flex items-center justify-center">
-              <span className="text-white text-sm font-black">A</span>
-            </div>
-            <span className="text-xl font-black text-[#191F28]">Aptner</span>
-          </div>
+      {/* 모바일 헤더 — useMediaQuery로 조건부 렌더링 */}
+      {isMobile && (
+        <Box
+          sx={{
+            backgroundColor: 'var(--semantic-background-normal-normal)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            borderBottom: '1px solid var(--semantic-line-normal)',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+          }}
+        >
+          <Box sx={{ padding: '16px 20px 12px 20px' }}>
+            {/* 로고 + 찜 배지 행 */}
+            <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '12px' }}>
+              <BomzipLogo size="md" showText={true} />
+              <FlexBox alignItems="center" gap="6px">
+                {bookmarkCount > 0 && (
+                  <button
+                    onClick={() => navigate('/bookmarks')}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      borderRadius: '9999px',
+                      backgroundColor: '#FFF3F3',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                    aria-label="찜 목록"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="#FF4B4B" stroke="none">
+                      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF4B4B' }}>{bookmarkCount}</span>
+                  </button>
+                )}
+                <IconButton
+                  variant="normal"
+                  onClick={() => navigate('/search')}
+                  aria-label="검색"
+                >
+                  <IconSearch />
+                </IconButton>
+              </FlexBox>
+            </FlexBox>
 
-          {/* 검색바 - 중앙 */}
-          <div className="flex-1 max-w-xl">
-            <SearchBar placeholder="아파트명, 지역 검색 (ex. 반포 래미안)" />
-          </div>
+            {/* 검색바 */}
+            <SearchBar placeholder="아파트 단지명 또는 지역 검색" />
+          </Box>
+        </Box>
+      )}
 
-          {/* 네비 링크 - 우측 */}
-          <nav className="flex items-center gap-1 flex-shrink-0">
-            <button
-              onClick={() => navigate('/map')}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#8B95A1] hover:text-[#1B64DA] hover:bg-blue-50 rounded-xl transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
-              지도
-            </button>
-            <button
-              onClick={() => navigate('/subscription')}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#8B95A1] hover:text-[#1B64DA] hover:bg-blue-50 rounded-xl transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-              </svg>
-              청약
-            </button>
-            <button
-              onClick={() => navigate('/trend')}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#8B95A1] hover:text-[#1B64DA] hover:bg-blue-50 rounded-xl transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-              트렌드
-            </button>
-          </nav>
-        </div>
-      </header>
+      {/* PC 전용 콘텐츠 헤더 */}
+      {!isMobile && (
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            backdropFilter: 'blur(8px)',
+            borderBottom: '1px solid var(--semantic-line-normal)',
+          }}
+        >
+          <Box sx={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 32px' }}>
+            <SearchBar placeholder="아파트 단지명 또는 지역 검색" />
+          </Box>
+        </Box>
+      )}
 
       {/* 메인 콘텐츠 */}
-      <main className="pb-24 md:pb-8">
-        <div className="md:max-w-7xl md:mx-auto md:px-6">
+      <Box
+        as="main"
+        sx={{ paddingBottom: isMobile ? '96px' : '40px' }}
+      >
+        <Box sx={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
 
-          {/* 지역별 시세 섹션 */}
-          <section className="px-5 pt-5 md:px-0 md:pt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-[#191F28]">지역별 시세</h2>
-              <button
-                onClick={() => navigate('/trend')}
-                className="text-xs text-[#1B64DA] font-medium hover:underline"
-              >
-                더보기
-              </button>
-            </div>
-            {/* 모바일: 3열, 데스크탑: 6열 */}
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-              {MOCK_REGION_TRENDS.map((trend) => (
-                <RegionTrendCard key={trend.region} trend={trend} />
-              ))}
-            </div>
-          </section>
-
-          {/* 진행 중 청약 배너 */}
-          <section className="px-5 pt-6 md:px-0">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-bold text-[#191F28]">진행 중 청약</h2>
-              <button
-                onClick={() => navigate('/subscription')}
-                className="text-xs text-[#1B64DA] font-medium hover:underline"
-              >
-                전체보기
-              </button>
-            </div>
-
-            {isSubLoading ? (
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex-shrink-0 w-72">
-                    <CardSkeleton />
-                  </div>
-                ))}
-              </div>
-            ) : ongoingSubscriptions.length === 0 ? (
-              <EmptyState message="진행 중인 청약이 없습니다" />
-            ) : (
-              /* 모바일: 가로 스크롤, 데스크탑: 3열 그리드 */
-              <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5 md:mx-0 md:px-0 md:overflow-visible md:grid md:grid-cols-3">
-                {ongoingSubscriptions.map((sub) => (
-                  <div key={sub.id} className="flex-shrink-0 w-72 md:w-auto md:flex-shrink">
-                    <SubscriptionCard subscription={sub} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* 핫한 아파트 TOP 10 */}
-          <section className="px-5 pt-6 md:px-0">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-base font-bold text-[#191F28]">핫한 아파트 TOP 10</h2>
-                <p className="text-xs text-[#8B95A1] mt-0.5">조회수 + 거래량 기준 주간 랭킹</p>
-              </div>
-              <button
-                onClick={() => navigate('/trend')}
-                className="text-xs text-[#1B64DA] font-medium hover:underline"
-              >
-                더보기
-              </button>
-            </div>
-
-            {isAptLoading ? (
-              /* 로딩 스켈레톤 — 모바일 3개, 데스크탑 6개 */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <HotApartmentSkeleton key={i} className="md:hidden" />
-                ))}
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <HotApartmentSkeleton key={`dt-${i}`} className="hidden md:block" />
-                ))}
-              </div>
-            ) : hotApartments.length === 0 ? (
-              /* 빈 상태 UI */
-              <HotApartmentEmpty />
-            ) : (
-              /* 모바일: 1열, 데스크탑: 2열 그리드 */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {hotApartments.map((apt, index) => (
-                  <ApartmentCard
-                    key={apt.id}
-                    apartment={apt}
-                    rank={index + 1}
-                    showRankChange
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* 지도 바로가기 배너 (데스크탑) */}
-          <section className="hidden md:block px-0 pt-6">
-            <button
-              onClick={() => navigate('/map')}
-              className="w-full bg-gradient-to-r from-[#1B64DA] to-[#3B82F6] rounded-2xl p-6 text-left hover:opacity-95 transition-opacity"
+          {/* 모바일 슬로건 */}
+          {isMobile && (
+            <Typography
+              variant="caption1"
+              weight="medium"
+              sx={{ color: 'var(--semantic-label-assistive)', display: 'block', paddingTop: '16px', paddingBottom: '4px' }}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-black text-white">지도로 아파트 찾기</h3>
-                  <p className="text-sm text-blue-100 mt-1">서울 주요 아파트 실거래가를 지도에서 확인하세요</p>
+              봄처럼 따뜻하게, 집처럼 포근하게
+            </Typography>
+          )}
+
+          {/* 데스크탑 2열 레이아웃 */}
+          <div
+            style={{
+              display: isMobile ? 'block' : 'grid',
+              gridTemplateColumns: isMobile ? undefined : '1fr 360px',
+              gap: isMobile ? undefined : '40px',
+              paddingTop: isMobile ? undefined : '32px',
+            }}
+          >
+
+            {/* 좌측: HOT 랭킹 */}
+            <div>
+              <Box as="section" sx={{ paddingTop: isMobile ? '20px' : '0' }}>
+                {/* 섹션 헤더 */}
+                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '16px' }}>
+                  <div>
+                    <Typography
+                      variant={isMobile ? 'title3' : 'title2'}
+                      weight="bold"
+                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
+                    >
+                      이번 주 HOT
+                    </Typography>
+                    <Typography
+                      variant="caption1"
+                      weight="medium"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                    >
+                      조회 · 거래량 기준 주간 랭킹
+                    </Typography>
+                  </div>
+                  <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
+                    전체 보기
+                  </TextButton>
+                </FlexBox>
+
+                {/* 1위 히어로 카드 */}
+                {isAptLoading ? (
+                  <HotApartmentSkeleton isHero />
+                ) : topApt ? (
+                  <HeroApartmentCard apartment={topApt} />
+                ) : (
+                  <HotApartmentEmpty />
+                )}
+
+                {/* 2~8위 컴팩트 리스트 */}
+                {!isAptLoading && restApts.length > 0 && (
+                  <Box
+                    sx={{
+                      marginTop: '8px',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                      overflow: 'hidden',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    {restApts.map((apt, i) => (
+                      <CompactApartmentRow
+                        key={apt.id}
+                        apartment={apt}
+                        rank={i + 2}
+                        isLast={i === restApts.length - 1}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* 스켈레톤 리스트 (로딩 중) */}
+                {isAptLoading && (
+                  <Box
+                    sx={{
+                      marginTop: '8px',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {[2, 3, 4, 5, 6].map((rank) => (
+                      <FlexBox
+                        key={rank}
+                        alignItems="center"
+                        gap="12px"
+                        style={{ padding: '12px 16px', borderBottom: '1px solid var(--semantic-background-normal-alternative)' }}
+                      >
+                        <Skeleton variant="circle" width="24px" height="24px" />
+                        <FlexBox flex="1" justifyContent="space-between" gap="12px">
+                          <Skeleton variant="text" width="55%" height="13px" />
+                          <Skeleton variant="text" width="18%" height="13px" />
+                        </FlexBox>
+                      </FlexBox>
+                    ))}
+                  </Box>
+                )}
+
+                {/* TOP 10 전체 보기 버튼 */}
+                <Button
+                  variant="solid"
+                  color="primary"
+                  fullWidth
+                  onClick={() => navigate('/trend')}
+                  style={{ marginTop: '12px' }}
+                >
+                  TOP 10 전체 보기
+                </Button>
+              </Box>
+
+              {/* 지도 바로가기 배너 (모바일에서만 이쪽에 위치) */}
+              {isMobile && (
+                <Box sx={{ marginTop: '20px' }}>
+                  <MapBanner />
+                </Box>
+              )}
+            </div>
+
+            {/* 우측: 청약 + 지역 시세 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '24px' : '28px' }}>
+
+              {/* Section 2: 마감 임박 청약 */}
+              <Box as="section" sx={{ paddingTop: isMobile ? '20px' : '0' }}>
+                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '16px' }}>
+                  <div>
+                    <Typography
+                      variant="heading1"
+                      weight="bold"
+                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
+                    >
+                      마감 임박 청약
+                    </Typography>
+                    <Typography
+                      variant="caption1"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                    >
+                      D-14 이내 마감 예정
+                    </Typography>
+                  </div>
+                  <TextButton size="small" color="primary" onClick={() => navigate('/subscription')}>
+                    전체 보기
+                  </TextButton>
+                </FlexBox>
+
+                {isSubLoading ? (
+                  <FlexBox flexDirection="column" gap="8px">
+                    {[1, 2, 3].map((i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          height: '68px',
+                          backgroundColor: 'var(--semantic-background-normal-normal)',
+                          borderRadius: '12px',
+                          border: '1px solid var(--semantic-line-normal)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '0 16px',
+                        }}
+                      >
+                        <Skeleton variant="rectangle" width="44px" height="28px" />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <Skeleton variant="text" width="65%" height="13px" />
+                          <Skeleton variant="text" width="40%" height="11px" />
+                        </div>
+                      </Box>
+                    ))}
+                  </FlexBox>
+                ) : urgentSubscriptions.length === 0 ? (
+                  <Box
+                    sx={{
+                      padding: '28px 16px',
+                      textAlign: 'center',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                    }}
+                  >
+                    <Typography variant="body2" weight="medium" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                      현재 마감 임박 청약이 없습니다
+                    </Typography>
+                    <Box sx={{ marginTop: '12px' }}>
+                      <TextButton
+                        size="small"
+                        color="primary"
+                        onClick={() => navigate('/subscription')}
+                        trailingContent={<IconChevronRight />}
+                      >
+                        진행 중 청약 보기
+                      </TextButton>
+                    </Box>
+                  </Box>
+                ) : (
+                  <FlexBox flexDirection="column" gap="8px">
+                    {urgentSubscriptions.slice(0, 4).map((sub) => (
+                      <UrgentSubscriptionCard key={sub.id} subscription={sub} />
+                    ))}
+                  </FlexBox>
+                )}
+              </Box>
+
+              {/* Section 3: 지역 시세 */}
+              <Box as="section">
+                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
+                  <div>
+                    <Typography
+                      variant="heading1"
+                      weight="bold"
+                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
+                    >
+                      지역 시세
+                    </Typography>
+                    <Typography
+                      variant="caption1"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                    >
+                      주간 평균 실거래가
+                    </Typography>
+                  </div>
+                  <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
+                    더보기
+                  </TextButton>
+                </FlexBox>
+
+                {/* 가로 스크롤 pill 칩 */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    flexWrap: isMobile ? undefined : 'wrap',
+                  } as React.CSSProperties}
+                >
+                  {MOCK_REGION_TRENDS.map((trend) => (
+                    <RegionChip key={trend.region} trend={trend} />
+                  ))}
                 </div>
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
-                </div>
-              </div>
-            </button>
-          </section>
-        </div>
-      </main>
+              </Box>
+
+              {/* 지도 바로가기 배너 (데스크탑에서만 우측 하단에 위치) */}
+              {!isMobile && (
+                <Box as="section">
+                  <MapBanner />
+                </Box>
+              )}
+            </div>
+          </div>
+        </Box>
+      </Box>
 
       {/* 모바일 하단 내비게이션 */}
-      <div className="md:hidden">
-        <BottomNav />
+      {isMobile && <BottomNav />}
+
+      {/* 단지 비교 바 */}
+      <CompareBar />
+    </div>
+  );
+}
+
+// MapBanner — 지도 바로가기 배너
+function MapBanner() {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      onClick={() => navigate('/map')}
+      style={{
+        width: '100%',
+        background: 'linear-gradient(135deg, #0066FF 0%, #3B82F6 100%)',
+        borderRadius: '16px',
+        padding: '20px',
+        textAlign: 'left',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'opacity 150ms ease',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.95'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+    >
+      <FlexBox alignItems="center" justifyContent="space-between">
+        <div>
+          <Typography variant="body1" weight="bold" sx={{ color: 'white', display: 'block', lineHeight: 1.3 }}>
+            지도로 아파트 찾기
+          </Typography>
+          <Typography variant="caption1" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block', marginTop: '4px' }}>
+            서울 주요 아파트 실거래가를 지도에서 확인
+          </Typography>
+        </div>
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            marginLeft: '12px',
+          }}
+        >
+          <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2}
+              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2}
+              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
+      </FlexBox>
+    </button>
+  );
+}
+
+// CompactApartmentRow — 2~8위 컴팩트 행
+interface CompactApartmentRowProps {
+  apartment: Apartment;
+  rank: number;
+  isLast: boolean;
+}
+
+function CompactApartmentRow({ apartment, rank, isLast }: CompactApartmentRowProps) {
+  const navigate = useNavigate();
+
+  const isUp = apartment.priceChangeType === 'up';
+  const isDown = apartment.priceChangeType === 'down';
+  const priceColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
+  const changeArrow = isUp ? '▲' : isDown ? '▼' : '';
+
+  const hasHotTags = apartment.hotTags && apartment.hotTags.length > 0;
+
+  const renderRankBadge = () => {
+    const badgeBase: React.CSSProperties = {
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '11px',
+      fontWeight: 900,
+      color: 'white',
+    };
+
+    if (rank === 2) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
+          <span style={{ ...badgeBase, backgroundColor: '#C0C0C0', boxShadow: '0 2px 4px rgba(192,192,192,0.5)' }}>2</span>
+          <RankChange change={apartment.rankChange} />
+        </div>
+      );
+    }
+    if (rank === 3) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
+          <span style={{ ...badgeBase, backgroundColor: '#CD7F32', boxShadow: '0 2px 4px rgba(205,127,50,0.5)' }}>3</span>
+          <RankChange change={apartment.rankChange} />
+        </div>
+      );
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
+        <span style={{ fontSize: '14px', fontWeight: 900, color: '#C9D1D9', textAlign: 'center', lineHeight: 1.3 }}>{rank}</span>
+        <RankChange change={apartment.rankChange} />
       </div>
-    </div>
-  );
-}
+    );
+  };
 
-// 지역 트렌드 카드
-function RegionTrendCard({ trend }: { trend: (typeof MOCK_REGION_TRENDS)[0] }) {
-  const isUp = trend.priceChange > 0;
-  const isDown = trend.priceChange < 0;
-
-  return (
-    <div className="bg-white rounded-xl border border-[#E5E8EB] p-3 hover:border-[#1B64DA] transition-colors cursor-pointer">
-      <p className="text-xs font-bold text-[#191F28] mb-1 truncate">{trend.region}</p>
-      <p className="text-sm font-black text-[#191F28]">
-        {formatPriceShort(trend.avgPrice)}
-      </p>
-      <p className={[
-        'text-xs font-semibold mt-0.5',
-        isUp ? 'text-[#FF4B4B]' : isDown ? 'text-[#00C896]' : 'text-[#8B95A1]',
-      ].join(' ')}>
-        {isUp ? '▲' : isDown ? '▼' : ''} {formatChange(trend.priceChange)}
-      </p>
-    </div>
-  );
-}
-
-// 빈 상태 (일반)
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="py-8 text-center bg-white rounded-xl border border-[#E5E8EB]">
-      <p className="text-sm text-[#8B95A1]">{message}</p>
-    </div>
-  );
-}
-
-// 핫 아파트 전용 스켈레톤 — shimmer 애니메이션 (섹션 4-1)
-function HotApartmentSkeleton({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`bg-white rounded-xl border border-[#E5E8EB] px-4 py-3.5 ${className}`}
-      style={{ height: '76px' }}
+      style={{
+        minHeight: '54px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '10px 16px',
+        cursor: 'pointer',
+        transition: 'background-color 100ms',
+        borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
+      }}
+      onClick={() => navigate(`/apartment/${apartment.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && navigate(`/apartment/${apartment.id}`)}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
     >
-      <div className="flex items-center gap-3">
-        {/* rank 원형 */}
-        <div
-          className="skeleton-shimmer flex-shrink-0 rounded-full"
-          style={{ width: '24px', height: '24px' }}
-        />
-        {/* 단지명 + 가격 */}
-        <div className="flex-1 flex items-center justify-between gap-3">
-          <div
-            className="skeleton-shimmer rounded"
-            style={{ width: '62%', height: '14px' }}
-          />
-          <div
-            className="skeleton-shimmer rounded flex-shrink-0"
-            style={{ width: '25%', height: '14px' }}
-          />
-        </div>
+      {/* 순위 뱃지 */}
+      {renderRankBadge()}
+
+      {/* 단지명 + 위치 + HOT 태그 */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          weight="medium"
+          sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}
+        >
+          {apartment.name}
+        </Typography>
+        <Typography
+          variant="caption2"
+          sx={{ color: 'var(--semantic-label-assistive)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}
+        >
+          {apartment.district} · {apartment.dong}
+        </Typography>
+        {hasHotTags && (
+          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+            {apartment.hotTags!.slice(0, 2).map((tag) => (
+              <HotTag key={tag} tag={tag} />
+            ))}
+          </div>
+        )}
       </div>
-      {/* 주소 행 */}
-      <div className="flex items-center gap-3 mt-2 pl-9">
-        <div
-          className="skeleton-shimmer rounded"
-          style={{ width: '40%', height: '11px', background: 'linear-gradient(90deg, #F0F2F4 25%, #F8F9FA 50%, #F0F2F4 75%)', backgroundSize: '800px 100%' }}
-        />
+
+      {/* 가격 + 변동률 */}
+      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+        <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)' }}>
+          {formatPriceShort(apartment.recentPrice)}
+        </span>
+        <Typography
+          variant="caption2"
+          weight="medium"
+          sx={{ color: priceColor, display: 'block', marginTop: '2px' }}
+        >
+          {changeArrow} {formatChange(apartment.priceChange)}
+        </Typography>
       </div>
     </div>
   );
 }
 
-// 핫 아파트 전용 빈 상태 UI (섹션 4-2)
+// HotApartmentSkeleton
+function HotApartmentSkeleton({ isHero = false }: { isHero?: boolean }) {
+  if (isHero) {
+    return (
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '16px',
+          padding: '20px',
+          borderLeft: '4px solid var(--semantic-line-normal)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+        }}
+      >
+        <FlexBox justifyContent="space-between" alignItems="center">
+          <Skeleton variant="rectangle" width="36px" height="20px" />
+          <Skeleton variant="text" width="28px" height="16px" />
+        </FlexBox>
+        <Skeleton variant="text" width="58%" height="24px" style={{ marginTop: '12px' }} />
+        <Skeleton variant="text" width="38%" height="14px" style={{ marginTop: '8px' }} />
+        <FlexBox alignItems="flex-end" gap="8px" style={{ marginTop: '20px' }}>
+          <Skeleton variant="text" width="112px" height="32px" />
+          <Skeleton variant="text" width="56px" height="16px" style={{ marginBottom: '4px' }} />
+        </FlexBox>
+        <Skeleton variant="text" width="80px" height="12px" style={{ marginTop: '8px' }} />
+      </Box>
+    );
+  }
+  return (
+    <Box sx={{ backgroundColor: 'var(--semantic-background-normal-normal)', borderRadius: '12px', border: '1px solid var(--semantic-line-normal)', padding: '14px 16px', height: '70px' }}>
+      <FlexBox alignItems="center" gap="12px">
+        <Skeleton variant="circle" width="24px" height="24px" />
+        <FlexBox flex="1" alignItems="center" justifyContent="space-between" gap="12px">
+          <Skeleton variant="text" width="60%" height="13px" />
+          <Skeleton variant="text" width="22%" height="13px" />
+        </FlexBox>
+      </FlexBox>
+    </Box>
+  );
+}
+
+// HotApartmentEmpty
 function HotApartmentEmpty() {
   const navigate = useNavigate();
 
   return (
-    <div
-      className="bg-white rounded-xl border border-[#E5E8EB] flex flex-col items-center justify-center text-center"
-      style={{ padding: '32px 16px' }}
+    <Box
+      sx={{
+        backgroundColor: 'var(--semantic-background-normal-normal)',
+        borderRadius: '16px',
+        border: '1px solid var(--semantic-line-normal)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: '40px 16px',
+      }}
     >
-      {/* 아파트 아이콘 SVG */}
-      <svg
-        width="40"
-        height="40"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#E5E8EB"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--semantic-line-normal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
-
-      <p
-        className="mt-3"
-        style={{ fontSize: '14px', fontWeight: 700, color: '#8B95A1' }}
-      >
+      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '12px', display: 'block' }}>
         이번 주 핫한 아파트를 불러오는 중
-      </p>
-      <p
-        className="mt-1"
-        style={{ fontSize: '12px', color: '#8B95A1' }}
-      >
+      </Typography>
+      <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '4px', display: 'block' }}>
         잠시 후 다시 확인해 주세요
-      </p>
-
-      <button
-        onClick={() => navigate('/map')}
-        style={{
-          marginTop: '16px',
-          height: '36px',
-          padding: '0 20px',
-          borderRadius: '18px',
-          border: '1px solid #1B64DA',
-          color: '#1B64DA',
-          fontSize: '13px',
-          fontWeight: 600,
-          background: 'transparent',
-          cursor: 'pointer',
-        }}
-      >
-        지도에서 직접 찾기 →
-      </button>
-    </div>
+      </Typography>
+      <Box sx={{ marginTop: '16px' }}>
+        <Button
+          variant="outlined"
+          color="primary"
+          size="small"
+          onClick={() => navigate('/map')}
+          trailingContent={<IconChevronRight />}
+        >
+          지도에서 직접 찾기
+        </Button>
+      </Box>
+    </Box>
   );
 }
 
-// 하단 내비게이션 (모바일 전용)
+// BottomNav — WDS BottomNavigation 적용 (모바일 전용)
 export function BottomNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const navItems = [
-    {
-      path: '/',
-      label: '홈',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
-    },
-    {
-      path: '/map',
-      label: '지도',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-        </svg>
-      ),
-    },
-    {
-      path: '/subscription',
-      label: '청약',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
-      ),
-    },
-    {
-      path: '/trend',
-      label: '트렌드',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
-      ),
-    },
-  ];
-
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E8EB] z-30 pb-safe">
-      <div className="flex">
-        {navItems.map((item) => {
-          const isActive = pathname === item.path;
-          return (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className={[
-                'flex-1 flex flex-col items-center gap-1 py-3 transition-colors',
-                isActive ? 'text-[#1B64DA]' : 'text-[#8B95A1]',
-              ].join(' ')}
-            >
-              {item.icon}
-              <span className="text-[10px] font-semibold">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30 }}>
+      <BottomNavigation
+        value={pathname}
+        onValueChange={(value) => navigate(value)}
+      >
+        <BottomNavigationItem
+          value="/"
+          label="홈"
+          icon={pathname === '/' ? <IconHomeFill /> : <IconHome />}
+        />
+        <BottomNavigationItem
+          value="/map"
+          label="지도"
+          icon={pathname === '/map' ? <IconLocationFill /> : <IconLocation />}
+        />
+        <BottomNavigationItem
+          value="/subscription"
+          label="청약"
+          icon={<IconCalendar />}
+        />
+        <BottomNavigationItem
+          value="/trend"
+          label="트렌드"
+          icon={<IconSearch />}
+        />
+      </BottomNavigation>
+    </div>
   );
 }

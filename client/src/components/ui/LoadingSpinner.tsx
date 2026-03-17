@@ -1,4 +1,5 @@
-import React from 'react';
+import { Loading, Skeleton, FlexBox, Box } from '@wanteddev/wds';
+import { Typography } from '@wanteddev/wds';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
@@ -6,53 +7,66 @@ interface LoadingSpinnerProps {
   fullScreen?: boolean;
 }
 
-// 로딩 스피너 컴포넌트
-const LoadingSpinner = React.memo<LoadingSpinnerProps>(
-  ({ size = 'md', message, fullScreen = false }) => {
-    const sizeStyles = {
-      sm: 'w-5 h-5 border-2',
-      md: 'w-8 h-8 border-3',
-      lg: 'w-12 h-12 border-4',
-    };
+// WDS Loading 컴포넌트 래퍼 - 기존 인터페이스 유지
+const LoadingSpinner = ({ size = 'md', message, fullScreen = false }: LoadingSpinnerProps) => {
+  const sizeMap = {
+    sm: '20px',
+    md: '32px',
+    lg: '48px',
+  } as const;
 
-    const spinner = (
-      <div className="flex flex-col items-center gap-3">
-        <div
-          className={[
-            'rounded-full border-[#1B64DA] border-t-transparent animate-spin',
-            sizeStyles[size],
-          ].join(' ')}
-          style={{ borderWidth: size === 'sm' ? 2 : size === 'md' ? 3 : 4 }}
-        />
-        {message && (
-          <p className="text-sm text-[#8B95A1]">{message}</p>
-        )}
-      </div>
+  const spinner = (
+    <FlexBox flexDirection="column" alignItems="center" gap="12px">
+      <Loading size={sizeMap[size]} />
+      {message && (
+        <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+          {message}
+        </Typography>
+      )}
+    </FlexBox>
+  );
+
+  if (fullScreen) {
+    return (
+      <Box
+        sx={{
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(255,255,255,0.8)',
+          zIndex: 50,
+        }}
+      >
+        {spinner}
+      </Box>
     );
-
-    if (fullScreen) {
-      return (
-        <div className="fixed inset-0 flex items-center justify-center bg-white/80 z-50">
-          {spinner}
-        </div>
-      );
-    }
-
-    return spinner;
   }
-);
+
+  return spinner;
+};
 
 LoadingSpinner.displayName = 'LoadingSpinner';
 export default LoadingSpinner;
 
-// 카드 스켈레톤
-export const CardSkeleton = React.memo(() => (
-  <div className="bg-white rounded-xl border border-[#E5E8EB] p-4 animate-pulse">
-    <div className="h-4 bg-gray-200 rounded w-3/4 mb-3" />
-    <div className="h-3 bg-gray-200 rounded w-1/2 mb-4" />
-    <div className="h-6 bg-gray-200 rounded w-1/3 mb-2" />
-    <div className="h-3 bg-gray-200 rounded w-1/4" />
-  </div>
-));
+// 카드 스켈레톤 — WDS Skeleton 사용
+export const CardSkeleton = () => (
+  <Box
+    sx={{
+      backgroundColor: 'var(--semantic-background-normal-normal)',
+      borderRadius: '12px',
+      border: '1px solid var(--semantic-line-normal)',
+      padding: '16px',
+    }}
+  >
+    <FlexBox flexDirection="column" gap="12px">
+      <Skeleton variant="text" width="75%" height="16px" />
+      <Skeleton variant="text" width="50%" height="12px" />
+      <Skeleton variant="text" width="33%" height="24px" />
+      <Skeleton variant="text" width="25%" height="12px" />
+    </FlexBox>
+  </Box>
+);
 
 CardSkeleton.displayName = 'CardSkeleton';

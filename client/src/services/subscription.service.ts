@@ -2,7 +2,10 @@ import api from './api';
 import type { Subscription, SubscriptionStatus, SortOrder } from '../types';
 import { MOCK_SUBSCRIPTIONS } from '../mocks/subscriptions.mock';
 
-const USE_MOCK = import.meta.env.VITE_KAKAO_MAP_KEY === 'demo_key_replace_with_real_key';
+const USE_MOCK =
+  import.meta.env.VITE_USE_MOCK === 'true' ||
+  import.meta.env.VITE_KAKAO_MAP_KEY === 'demo_key_replace_with_real_key' ||
+  !import.meta.env.VITE_API_BASE_URL; // API URL 없으면 자동 Mock
 
 // FE 약칭 → BE 전체 명칭 매핑 (MAJOR-05 수정)
 const REGION_MAP: Record<string, string> = {
@@ -60,6 +63,36 @@ function adaptSubscription(raw: any): Subscription {
   };
 }
 
+// Mock 필터/정렬/페이지네이션 공통 로직
+function applyMockFilters(params: {
+  status?: SubscriptionStatus;
+  region?: string;
+  sort?: SortOrder;
+  page?: number;
+  pageSize?: number;
+}): { data: Subscription[]; total: number } {
+  let data = [...MOCK_SUBSCRIPTIONS];
+
+  if (params.status) {
+    data = data.filter((s) => s.status === params.status);
+  }
+  if (params.region && params.region !== '전국') {
+    data = data.filter((s) => s.location.includes(params.region!));
+  }
+  if (params.sort === 'deadline') {
+    data.sort((a, b) => a.deadline.localeCompare(b.deadline));
+  } else if (params.sort === 'price') {
+    data.sort((a, b) => a.startPrice - b.startPrice);
+  } else if (params.sort === 'latest') {
+    data.sort((a, b) => b.startDate.localeCompare(a.startDate));
+  }
+
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? 20;
+  const start = (page - 1) * pageSize;
+  return { data: data.slice(start, start + pageSize), total: data.length };
+}
+
 // 청약 목록 조회
 export async function getSubscriptions(params: {
   status?: SubscriptionStatus;
@@ -70,54 +103,34 @@ export async function getSubscriptions(params: {
 }): Promise<{ data: Subscription[]; total: number }> {
   if (USE_MOCK) {
     await delay(300);
-    let data = [...MOCK_SUBSCRIPTIONS];
-
-    // 상태 필터
-    if (params.status) {
-      data = data.filter((s) => s.status === params.status);
-    }
-
-    // 지역 필터
-    if (params.region && params.region !== '전국') {
-      data = data.filter((s) => s.location.includes(params.region!));
-    }
-
-    // 정렬
-    if (params.sort === 'deadline') {
-      data.sort((a, b) => a.deadline.localeCompare(b.deadline));
-    } else if (params.sort === 'price') {
-      data.sort((a, b) => a.startPrice - b.startPrice);
-    } else if (params.sort === 'latest') {
-      data.sort((a, b) => b.startDate.localeCompare(a.startDate));
-    }
-
-    // 페이지네이션
-    const page = params.page ?? 1;
-    const pageSize = params.pageSize ?? 20;
-    const start = (page - 1) * pageSize;
-    const paginated = data.slice(start, start + pageSize);
-
-    return { data: paginated, total: data.length };
+    return applyMockFilters(params);
   }
 
-  // 실 API: 파라미터 변환 후 전송
-  const beParams: Record<string, unknown> = {
-    page: params.page ?? 1,
-    limit: params.pageSize ?? 20,
-    status: params.status,
-    sort: params.sort,
-    sido: params.region && params.region !== '전국' ? (REGION_MAP[params.region] ?? params.region) : undefined,
-  };
+  try {
+    // 실 API: 파라미터 변환 후 전송
+    const beParams: Record<string, unknown> = {
+      page: params.page ?? 1,
+      limit: params.pageSize ?? 20,
+      status: params.status,
+      sort: params.sort,
+      sido: params.region && params.region !== '전국' ? (REGION_MAP[params.region] ?? params.region) : undefined,
+    };
 
-  const response = await api.get<{ success: true; data: unknown[]; meta: { total: number } }>(
-    '/subscriptions',
-    { params: beParams },
-  );
-  const raw = response.data;
-  return {
-    data: raw.data.map(adaptSubscription),
-    total: raw.meta?.total ?? 0,
-  };
+    const response = await api.get<{ success: true; data: unknown[]; meta: { total: number } }>(
+      '/subscriptions',
+      { params: beParams },
+    );
+    const raw = response.data;
+    return {
+      data: raw.data.map(adaptSubscription),
+      total: raw.meta?.total ?? 0,
+    };
+  } catch (err) {
+    // API 서버 미실행 또는 에러 시 Mock 데이터로 자동 폴백
+    console.warn('[subscription.service] API 호출 실패, Mock 데이터로 폴백:', err);
+    await delay(300);
+    return applyMockFilters(params);
+  }
 }
 
 // 청약 상세 조회

@@ -22,8 +22,16 @@ router.use('/regions', trendRouter);
 router.get('/health', (_req: Request, res: Response) => {
   const stats = cacheService.stats();
 
-  // 실 API 키 존재 여부 확인 (Mock 모드 판단)
-  const isMockMode = !process.env.MOLIT_API_KEY;
+  // API 키 설정 여부 확인 — 길이 20자 이상이면 실 키로 간주
+  const molitKey = process.env.MOLIT_API_KEY ?? '';
+  const lhKey = process.env.LH_SUBSCRIPTION_API_KEY ?? '';
+  const molitConfigured =
+    molitKey.length >= 20 && molitKey !== 'demo_key_replace_with_real_key';
+  const lhConfigured =
+    lhKey.length >= 20 && lhKey !== 'demo_key_replace_with_real_key';
+
+  // 국토부 키가 없으면 Mock 모드
+  const isMockMode = !molitConfigured;
 
   res.json({
     success: true,
@@ -34,6 +42,11 @@ router.get('/health', (_req: Request, res: Response) => {
       environment: process.env.NODE_ENV ?? 'development',
       // 실 API 없이 Mock 데이터로 동작 중임을 클라이언트에 알림
       mockMode: isMockMode,
+      // API 키 설정 여부 (키 값 자체는 노출하지 않음)
+      apis: {
+        molit: molitConfigured ? 'configured' : 'missing',
+        lh: lhConfigured ? 'configured' : 'missing',
+      },
       cache: {
         hits: stats.hits,
         misses: stats.misses,
@@ -46,6 +59,7 @@ router.get('/health', (_req: Request, res: Response) => {
         'GET /api/apartments/hot?region=서울&limit=10',
         'GET /api/apartments/map?swLat=37.4&swLng=126.8&neLat=37.7&neLng=127.2',
         'GET /api/apartments/:aptCode/history?lawdCd=11650',
+        'GET /api/apartments/:aptCode/sale-price',
         'GET /api/subscriptions',
         'GET /api/subscriptions?status=ongoing',
         'GET /api/subscriptions?status=upcoming',

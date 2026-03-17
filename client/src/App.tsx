@@ -1,10 +1,13 @@
 import './App.css';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoadingSpinner from './components/ui/LoadingSpinner';
-import Toast from './components/ui/Toast';
 import ErrorBoundary from './components/ui/ErrorBoundary';
+import AppLayout from './components/layout/AppLayout';
+import { RegionConfig, useToast } from '@wanteddev/wds';
+import { useAlertStore } from './stores/alertStore';
+import { getHotApartments } from './services/apartment.service';
 
 // 페이지 lazy loading — 초기 번들 크기 축소
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -14,6 +17,8 @@ const SubscriptionDetailPage = lazy(() => import('./pages/SubscriptionDetailPage
 const ApartmentDetailPage = lazy(() => import('./pages/ApartmentDetailPage'));
 const TrendPage = lazy(() => import('./pages/TrendPage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
+const ComparePage = lazy(() => import('./pages/ComparePage'));
+const BookmarksPage = lazy(() => import('./pages/BookmarksPage'));
 
 // React Query 클라이언트 설정
 const queryClient = new QueryClient({
@@ -30,30 +35,69 @@ const queryClient = new QueryClient({
   },
 });
 
+// 가격 알림 조건 체크 (앱 진입 시)
+function PriceAlertChecker() {
+  const { alerts, updateTriggered } = useAlertStore();
+  const addToast = useToast();
+
+  useEffect(() => {
+    if (alerts.length === 0) return;
+
+    // 핫 아파트 현재가로 알림 조건 확인
+    getHotApartments(undefined, 50)
+      .then((apartments) => {
+        alerts.forEach((alert) => {
+          if (alert.triggered) return;
+          const apt = apartments.find((a) => a.id === alert.apartmentId);
+          if (!apt) return;
+          if (apt.recentPrice <= alert.targetPrice) {
+            updateTriggered(alert.apartmentId, true);
+            addToast({
+              content: `${alert.apartmentName} 목표가 도달! ${(apt.recentPrice / 10000).toFixed(1)}억`,
+              variant: 'positive',
+              duration: 'long',
+            });
+          }
+        });
+      })
+      .catch(() => {});
+  // 앱 진입 시 1회만 실행
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="w-full relative bg-[#F5F6F8] min-h-screen">
-          {/* 전역 에러 바운더리 - Suspense 내부 렌더링 에러 포착 */}
-          <ErrorBoundary>
-            <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><LoadingSpinner message="페이지 로딩중..." /></div>}>
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/map" element={<MapPage />} />
-                <Route path="/subscription" element={<SubscriptionPage />} />
-                <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
-                <Route path="/apartment/:id" element={<ApartmentDetailPage />} />
-                <Route path="/trend" element={<TrendPage />} />
-                <Route path="/search" element={<SearchPage />} />
-                {/* 404 처리 */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-          {/* 전역 토스트 알림 */}
-          <Toast />
-        </div>
+        <AppLayout>
+          <div className="w-full relative bg-[#F5F6F8] min-h-screen">
+            {/* 전역 에러 바운더리 - Suspense 내부 렌더링 에러 포착 */}
+            <ErrorBoundary>
+              <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><LoadingSpinner message="페이지 로딩중..." /></div>}>
+                <Routes>
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/map" element={<MapPage />} />
+                  <Route path="/subscription" element={<SubscriptionPage />} />
+                  <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
+                  <Route path="/apartment/:id" element={<ApartmentDetailPage />} />
+                  <Route path="/trend" element={<TrendPage />} />
+                  <Route path="/search" element={<SearchPage />} />
+                  <Route path="/compare" element={<ComparePage />} />
+                  <Route path="/bookmarks" element={<BookmarksPage />} />
+                  {/* 404 처리 */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+            {/* WDS RegionConfig - 전역 Toast/Snackbar 렌더링 영역 */}
+            <RegionConfig />
+            {/* 가격 알림 체크 */}
+            <PriceAlertChecker />
+          </div>
+        </AppLayout>
       </BrowserRouter>
     </QueryClientProvider>
   );

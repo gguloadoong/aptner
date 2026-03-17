@@ -1,9 +1,13 @@
 frontend:
-  - client/**
+  - changed-files:
+      - any-glob-to-any-file: 'client/**'
 
 backend:
-  - server/**
+  - changed-files:
+      - any-glob-to-any-file: 'server/**'
 
 docs:
-  - "**/*.md"
-  - .github/**
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.md'
+          - '.github/**'

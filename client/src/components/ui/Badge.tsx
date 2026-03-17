@@ -11,7 +11,7 @@ interface BadgeProps {
 const Badge = React.memo<BadgeProps>(
   ({ children, variant = 'neutral', size = 'sm', className = '' }) => {
     const variantStyles = {
-      primary: 'bg-blue-100 text-[#1B64DA]',
+      primary: 'bg-blue-50 text-blue-600',
       success: 'bg-emerald-100 text-emerald-700',
       warning: 'bg-orange-100 text-orange-700',
       danger: 'bg-red-100 text-[#FF4B4B]',

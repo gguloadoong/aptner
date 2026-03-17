@@ -3,14 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useKakaoMap, isVisible } from '../hooks/useKakaoMap';
 import { useMapStore } from '../stores/mapStore';
 import { useApartmentDetail } from '../hooks/useApartment';
+import { useGeocoder } from '../hooks/useGeocoder';
 import BottomSheet from '../components/ui/BottomSheet';
-import Button from '../components/ui/Button';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { Button, IconButton, useToast } from '@wanteddev/wds';
+import { IconChevronLeft, IconArrowRight } from '@wanteddev/wds-icon';
 import { formatPriceShort, formatChange, formatUnits } from '../utils/formatNumber';
-import type { MapApartment, PriceFilter, AreaFilter } from '../types';
+import type { MapApartment, PriceFilter, AreaFilter, UnitCountFilter, ComplexFeature, ApartmentComplex } from '../types';
 import { MOCK_MAP_APARTMENTS } from '../mocks/apartments.mock';
-import { getApartmentsByBounds } from '../services/apartment.service';
-import { useToastStore } from '../stores/toastStore';
+import { getApartmentsByBounds, getComplexesByBounds } from '../services/apartment.service';
 
 // 지도 페이지 - 모바일: 지도 전체 + 바텀시트, 데스크탑: 좌측 패널 + 우측 지도
 export default function MapPage() {
@@ -20,17 +21,29 @@ export default function MapPage() {
     priceFilter,
     layerFilters,
     areaFilter,
+    unitCountFilter,
+    complexFeatures,
     selectedApartment,
     isBottomSheetOpen,
     setPriceFilter,
     setLayerFilter,
     setAreaFilter,
+    setUnitCountFilter,
+    toggleComplexFeature,
     setSelectedApartment,
     closeBottomSheet,
   } = useMapStore();
-  const addToast = useToastStore((s) => s.addToast);
+  const addToast = useToast();
   const [searchValue, setSearchValue] = useState('');
+  // 평형대 필터 (20/30/40/50평대 구분): 지도 상단 오버레이 칩용
+  const [pyeongFilter, setPyeongFilter] = useState<'all' | '20s' | '30s' | '40s' | '50plus'>('all');
   const [mapApartments, setMapApartments] = useState<MapApartment[]>(MOCK_MAP_APARTMENTS);
+  // 호갱노노 스타일 실 단지 데이터 (Geocoder 변환 후 좌표 포함)
+  const [complexes, setComplexes] = useState<ApartmentComplex[]>([]);
+  // 단지 데이터 로딩 중 여부 (로딩 중 기존 마커 유지, 향후 스켈레톤 UI용)
+  const [, setIsComplexLoading] = useState(false);
+
+  const { batchGeocode } = useGeocoder();
 
   // 바텀시트용 선택 아파트 상세 정보
   const { data: selectedDetail } = useApartmentDetail(selectedApartment?.id);
@@ -57,22 +70,60 @@ export default function MapPage() {
     });
   }, [setSelectedApartment]);
 
-  // 뷰포트 변경 핸들러 - 청약 마커 포함하여 병합된 데이터로 갱신
-  // M-4: getApartmentsByBounds 내부에서 청약 데이터를 병합하므로 마커 소실 방지
+  // 단지 마커 클릭 핸들러 (ApartmentComplex → selectedApartment 변환)
+  const handleComplexClick = useCallback((complex: ApartmentComplex) => {
+    setSelectedApartment({
+      id: complex.id,
+      name: complex.name,
+      address: complex.address,
+      district: complex.umdNm,
+      dong: complex.umdNm,
+      lat: complex.lat ?? 0,
+      lng: complex.lng ?? 0,
+      totalUnits: 0,
+      builtYear: complex.buildYear ?? 0,
+      builder: '',
+      areas: [String(complex.area)],
+      recentPrice: complex.latestPrice,
+      recentPriceArea: String(complex.area),
+      priceChange: 0,
+      priceChangeType: 'flat',
+    });
+  }, [setSelectedApartment]);
+
+  // 뷰포트 변경 핸들러
+  // 1) 기존 MapApartment 마커 갱신 (청약 포함)
+  // 2) 호갱노노 스타일 단지 데이터 갱신 + Geocoder 변환
   const handleBoundsChange = useCallback(
-    async (swLat: number, swLng: number, neLat: number, neLng: number) => {
+    async (swLat: number, swLng: number, neLat: number, neLng: number, zoom: number) => {
+      // 병렬 처리: 기존 마커 데이터 + 단지 데이터 동시 요청
       try {
+        // 기존 마커 데이터 갱신
         const merged = await getApartmentsByBounds(swLat, swLng, neLat, neLng);
         setMapApartments(merged);
       } catch (err) {
-        // API 실패 시 기존 mapApartments 유지 (경고만 출력)
         console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err);
       }
+
+      // 호갱노노 스타일 단지 데이터 갱신 (level 6~12 범위에서만)
+      if (zoom >= 6 && zoom <= 12) {
+        setIsComplexLoading(true);
+        try {
+          const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
+          // Geocoder로 주소 → 좌표 변환 (로딩 중 기존 마커 유지)
+          const geocoded = await batchGeocode(rawComplexes);
+          setComplexes(geocoded);
+        } catch (err) {
+          console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err);
+        } finally {
+          setIsComplexLoading(false);
+        }
+      }
     },
-    []
+    [batchGeocode]
   );
 
-  const { isLoaded, isError, updateMarkers, moveToLocation } = useKakaoMap(
+  const { isLoaded, isError, updateMarkers, updateComplexMarkers, moveToLocation, updateHeatmapOverlays, clearHeatmapOverlays } = useKakaoMap(
     mapContainerRef,
     {
       initialLat: 37.5665,
@@ -83,17 +134,59 @@ export default function MapPage() {
     }
   );
 
-  // 마커 업데이트 — 필터 옵션 전달
-  useEffect(() => {
-    if (isLoaded) {
-      updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters });
-    }
-  }, [isLoaded, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters]);
+  // 마커 뷰 / 히트맵 뷰 토글 상태
+  const [viewMode, setViewMode] = useState<'marker' | 'heatmap'>('marker');
 
-  // 데스크탑 패널용 필터된 아파트 목록
-  const filteredList = MOCK_MAP_APARTMENTS.filter((apt) => {
+  // 기존 마커 업데이트 — 히트맵 모드일 때는 마커 숨김
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (viewMode === 'marker') {
+      updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
+    } else {
+      // 히트맵 모드: 기존 마커 전부 제거 (빈 배열 전달)
+      updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
+    }
+  }, [isLoaded, viewMode, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures]);
+
+  // 호갱노노 스타일 단지 마커 업데이트 (히트맵 모드에서는 숨김)
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (viewMode === 'marker') {
+      updateComplexMarkers(complexes, handleComplexClick);
+    } else {
+      updateComplexMarkers([], handleComplexClick);
+    }
+  }, [isLoaded, viewMode, complexes, updateComplexMarkers, handleComplexClick]);
+
+  // 히트맵 오버레이 업데이트 — 히트맵 모드 진입/데이터 변경 시
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (viewMode === 'heatmap') {
+      updateHeatmapOverlays(mapApartments);
+    } else {
+      clearHeatmapOverlays();
+    }
+  }, [isLoaded, viewMode, mapApartments, updateHeatmapOverlays, clearHeatmapOverlays]);
+
+  // 평형대(㎡) 범위 기준: 20평대=60~85㎡, 30평대=85~115㎡, 40평대=115~135㎡, 50평대+=135㎡+
+  // apt.area는 string("84" 등)이므로 parseFloat으로 수치 변환 후 비교
+  const matchPyeongFilter = (areaStr: string): boolean => {
+    const area = parseFloat(areaStr);
+    if (isNaN(area)) return true;
+    switch (pyeongFilter) {
+      case '20s': return area >= 60 && area < 85;
+      case '30s': return area >= 85 && area < 115;
+      case '40s': return area >= 115 && area < 135;
+      case '50plus': return area >= 135;
+      default: return true; // 'all'
+    }
+  };
+
+  // 데스크탑 패널용 필터된 아파트 목록 (API 응답 mapApartments 기준 — MOCK 단일화)
+  const filteredList = mapApartments.filter((apt) => {
     const matchSearch = !searchValue || apt.name.includes(searchValue);
-    return matchSearch && isVisible(apt, { priceFilter, areaFilter, layerFilters });
+    const matchPyeong = matchPyeongFilter(String(apt.area));
+    return matchSearch && matchPyeong && isVisible(apt, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
   });
 
   // 활성 레이어 개수
@@ -103,14 +196,14 @@ export default function MapPage() {
   // 현재 위치로 이동
   const handleCurrentLocation = () => {
     if (!navigator.geolocation) {
-      addToast('이 브라우저는 위치 서비스를 지원하지 않습니다.', 'error');
+      addToast({ content: '이 브라우저는 위치 서비스를 지원하지 않습니다.', variant: 'negative', duration: 'short' });
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         moveToLocation(pos.coords.latitude, pos.coords.longitude, 5);
       },
-      () => addToast('위치 정보를 가져올 수 없습니다.', 'error')
+      () => addToast({ content: '위치 정보를 가져올 수 없습니다.', variant: 'negative', duration: 'short' })
     );
   };
 
@@ -121,30 +214,27 @@ export default function MapPage() {
     : null;
 
   return (
-    <div className="relative w-full h-screen bg-gray-200 flex">
+    <div className="relative w-full bg-gray-200 flex" style={{ height: '100svh' }}>
       {/* ─── 데스크탑 좌측 사이드 패널 ─── */}
       <aside className="hidden md:flex flex-col w-[380px] flex-shrink-0 bg-white border-r border-[#E5E8EB] z-20 h-full overflow-hidden">
         {/* 패널 헤더 */}
         <div className="px-4 py-4 border-b border-[#E5E8EB] flex-shrink-0">
           <div className="flex items-center gap-2 mb-3">
-            <button
+            <IconButton
+              variant="normal"
               onClick={() => navigate(-1)}
-              className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 rounded-lg transition-colors"
+              aria-label="뒤로가기"
             >
-              <svg className="w-5 h-5 text-[#191F28]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+              <IconChevronLeft />
+            </IconButton>
             <div className="flex items-center gap-1.5">
-              <div className="w-6 h-6 bg-[#1B64DA] rounded-md flex items-center justify-center">
-                <span className="text-white text-xs font-black">A</span>
-              </div>
-              <span className="text-base font-black text-[#191F28]">Aptner 지도</span>
+              <img src="/favicon.svg" alt="봄집" width={24} height={24} className="rounded-md" />
+              <span className="text-base font-black text-[#191F28]">봄집 지도</span>
             </div>
           </div>
 
           {/* 검색바 */}
-          <div className="flex items-center gap-2 bg-[#F5F6F8] rounded-xl px-3 py-2.5">
+          <div className="flex items-center gap-2 bg-[#F7FAF8] rounded-xl px-3 py-2.5">
             <svg className="w-4 h-4 text-[#8B95A1] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -176,7 +266,7 @@ export default function MapPage() {
             {activeLayerCount > 0 && (
               <span
                 className="inline-flex items-center px-1.5 rounded-full text-white text-[10px] font-bold"
-                style={{ background: '#1B64DA', height: '16px' }}
+                style={{ background: '#0066FF', height: '16px' }}
               >
                 {activeLayerCount} 활성
               </span>
@@ -190,7 +280,7 @@ export default function MapPage() {
               onClick={() => setLayerFilter('hot', !layerFilters.hot)}
             />
             <FilterChip
-              label="신고가"
+              label="최고가"
               active={layerFilters.allTimeHigh}
               activeColor="#F39C12"
               onClick={() => setLayerFilter('allTimeHigh', !layerFilters.allTimeHigh)}
@@ -198,13 +288,39 @@ export default function MapPage() {
             <FilterChip
               label="청약"
               active={layerFilters.subscription}
-              activeColor="#1B64DA"
+              activeColor="#0066FF"
               onClick={() => setLayerFilter('subscription', !layerFilters.subscription)}
             />
           </div>
 
-          {/* ── 필터 그룹 3: 평형 ── */}
-          <FilterGroupLabel label="평형" className="mt-3" />
+          {/* ── 필터 그룹 3: 평형대 칩 (20/30/40/50평대) ── */}
+          <FilterGroupLabel label="평형대" className="mt-3" />
+          <div className="flex gap-2 mt-1.5 flex-wrap">
+            {PYEONG_FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setPyeongFilter(opt.value as typeof pyeongFilter)}
+                style={{
+                  height: '28px',
+                  padding: '0 10px',
+                  borderRadius: '14px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  border: pyeongFilter === opt.value ? '1px solid #0066FF' : '1px solid #E5E8EB',
+                  background: pyeongFilter === opt.value ? '#0066FF' : '#FFFFFF',
+                  color: pyeongFilter === opt.value ? '#FFFFFF' : '#4E5968',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── 필터 그룹 4: 세부 평형 (59/74/84/109㎡) ── */}
+          <FilterGroupLabel label="평형(㎡)" className="mt-3" />
           <div className="flex gap-2 mt-1.5 flex-wrap">
             {AREA_FILTERS.map((filter) => (
               <FilterChip
@@ -217,6 +333,53 @@ export default function MapPage() {
               />
             ))}
           </div>
+
+          {/* ── 필터 그룹 4: 세대수 ── */}
+          <div className="mt-4">
+            <p className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wide mb-2">세대수</p>
+            <div className="flex flex-wrap gap-1.5">
+              {UNIT_COUNT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setUnitCountFilter(opt.value)}
+                  className={`h-[32px] px-3 rounded-full text-[12px] font-medium transition-all ${
+                    unitCountFilter === opt.value
+                      ? 'bg-[#191F28] text-white'
+                      : 'bg-white border border-[#E5E8EB] text-[#8B95A1] hover:border-[#191F28]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── 필터 그룹 5: 단지특성 ── */}
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <p className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wide">단지특성</p>
+              {complexFeatures.size > 0 && (
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#0066FF] text-white text-[9px] font-bold">
+                  {complexFeatures.size}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {COMPLEX_FEATURE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => toggleComplexFeature(opt.value)}
+                  className={`h-[32px] px-3 rounded-full text-[12px] font-medium transition-all ${
+                    complexFeatures.has(opt.value)
+                      ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                      : 'bg-white border border-[#E5E8EB] text-[#8B95A1] hover:border-[#191F28]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* 아파트 목록 */}
@@ -226,44 +389,62 @@ export default function MapPage() {
           </div>
 
           {filteredList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <svg className="w-10 h-10 text-[#E5E8EB]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: '8px' }}>
+              <svg width="40" height="40" style={{ color: '#E5E8EB' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              <p className="text-sm text-[#8B95A1]">검색 결과가 없습니다</p>
+              <p style={{ fontSize: '14px', color: '#8B95A1' }}>검색 결과가 없습니다</p>
             </div>
           ) : (
             <ul>
               {filteredList.map((apt) => {
                 const isSelected = selectedApartment?.id === apt.id;
                 const eok = apt.price / 10000;
-                const markerBg =
-                  eok >= 20
-                    ? 'bg-[#D63031]'
-                    : eok >= 10
-                    ? 'bg-[#FF4B4B]'
-                    : eok >= 5
-                    ? 'bg-[#FF9500]'
-                    : 'bg-[#8B95A1]';
+                const markerBgColor =
+                  eok >= 20 ? '#D63031' : eok >= 10 ? '#FF4B4B' : eok >= 5 ? '#FF9500' : '#8B95A1';
 
                 return (
                   <li key={apt.id}>
                     <button
                       onClick={() => handleMarkerClick(apt)}
-                      className={[
-                        'w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors border-b border-[#E5E8EB]',
-                        isSelected ? 'bg-blue-50' : 'hover:bg-[#F5F6F8]',
-                      ].join(' ')}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '14px 16px',
+                        textAlign: 'left',
+                        borderBottom: '1px solid #E5E8EB',
+                        background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s',
+                        border: 'none',
+                        borderBottomWidth: '1px',
+                        borderBottomStyle: 'solid',
+                        borderBottomColor: '#E5E8EB',
+                      }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#F7FAF8'; }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFFFFF'; }}
                     >
-                      <div className={`flex-shrink-0 ${markerBg} text-white text-xs font-bold px-2.5 py-1 rounded-full min-w-[52px] text-center`}>
+                      <div style={{
+                        flexShrink: 0,
+                        backgroundColor: markerBgColor,
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        minWidth: '52px',
+                        textAlign: 'center',
+                      }}>
                         {formatPriceShort(apt.price)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-[#191F28] truncate">{apt.name}</p>
-                        <p className="text-xs text-[#8B95A1] mt-0.5">{apt.area}㎡ 기준</p>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '14px', fontWeight: 700, color: '#191F28', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.name}</p>
+                        <p style={{ fontSize: '12px', color: '#8B95A1', marginTop: '2px' }}>{apt.area}㎡ 기준</p>
                       </div>
                       {isSelected && (
-                        <svg className="w-4 h-4 text-[#1B64DA] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg width="16" height="16" style={{ color: '#2563EB', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                         </svg>
                       )}
@@ -293,7 +474,7 @@ export default function MapPage() {
                 <p className="text-xl font-black text-[#191F28] mt-1">
                   {formatPriceShort(selectedApartment.recentPrice)}
                 </p>
-                <Button className="mt-3 w-full" onClick={() => navigate(`/apartment/${selectedApartment.id}`)}>
+                <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={() => navigate(`/apartment/${selectedApartment.id}`)}>
                   상세보기
                 </Button>
               </div>
@@ -317,14 +498,15 @@ export default function MapPage() {
         <div className="md:hidden absolute top-0 left-0 right-0 z-20 p-4 pt-safe">
           {/* 검색바 + 뒤로가기 */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate(-1)}
-              className="w-10 h-10 bg-white rounded-xl shadow-md flex items-center justify-center flex-shrink-0"
-            >
-              <svg className="w-5 h-5 text-[#191F28]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+            <div className="bg-white rounded-xl shadow-md flex-shrink-0">
+              <IconButton
+                variant="normal"
+                onClick={() => navigate(-1)}
+                aria-label="뒤로가기"
+              >
+                <IconChevronLeft />
+              </IconButton>
+            </div>
             <div className="flex-1 bg-white rounded-xl shadow-md flex items-center gap-2 px-4 py-3">
               <svg className="w-4 h-4 text-[#8B95A1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -360,7 +542,7 @@ export default function MapPage() {
               onClick={() => setLayerFilter('hot', !layerFilters.hot)}
             />
             <MobileFilterChip
-              label="신고가"
+              label="최고가"
               active={layerFilters.allTimeHigh}
               activeColor="#F39C12"
               onClick={() => setLayerFilter('allTimeHigh', !layerFilters.allTimeHigh)}
@@ -368,20 +550,39 @@ export default function MapPage() {
             <MobileFilterChip
               label="청약"
               active={layerFilters.subscription}
-              activeColor="#1B64DA"
+              activeColor="#0066FF"
               onClick={() => setLayerFilter('subscription', !layerFilters.subscription)}
             />
             {activeLayerCount > 0 && (
               <span
                 className="flex-shrink-0 flex items-center px-2 rounded-full text-white text-[10px] font-bold shadow-sm"
-                style={{ background: '#1B64DA', height: '32px' }}
+                style={{ background: '#0066FF', height: '32px' }}
               >
                 {activeLayerCount} 활성
               </span>
             )}
           </div>
 
-          {/* 행 3: 평형 필터 (가로 스크롤) */}
+          {/* 행 3: 평형대 필터 칩 (20/30/40/50평대 — 지도 상단 오버레이) */}
+          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {PYEONG_FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setPyeongFilter(opt.value as typeof pyeongFilter)}
+                className={[
+                  'flex-shrink-0 px-3 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap transition-all',
+                  pyeongFilter === opt.value
+                    ? 'bg-[#0066FF] text-white'
+                    : 'bg-white text-[#4E5968] border border-[#E5E8EB]',
+                ].join(' ')}
+                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 행 4(구 행 3): 세부 평형 필터 (59/74/84/109㎡ — 가로 스크롤) */}
           <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {AREA_FILTERS.map((filter) => (
               <MobileFilterChip
@@ -394,27 +595,109 @@ export default function MapPage() {
               />
             ))}
           </div>
+
+          {/* 행 5: 세대수 필터 (가로 스크롤) */}
+          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {UNIT_COUNT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setUnitCountFilter(opt.value)}
+                className={`flex-shrink-0 h-[32px] px-3 rounded-full text-[12px] font-medium whitespace-nowrap transition-all ${
+                  unitCountFilter === opt.value
+                    ? 'bg-[#191F28] text-white'
+                    : 'bg-white border border-[#E5E8EB] text-[#8B95A1]'
+                }`}
+                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 행 6: 단지특성 필터 (가로 스크롤) */}
+          <div className="flex gap-2 mt-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {COMPLEX_FEATURE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => toggleComplexFeature(opt.value)}
+                className={`flex-shrink-0 h-[32px] px-3 rounded-full text-[12px] font-medium whitespace-nowrap transition-all ${
+                  complexFeatures.has(opt.value)
+                    ? 'bg-blue-50 text-blue-600 border border-blue-200'
+                    : 'bg-white border border-[#E5E8EB] text-[#8B95A1]'
+                }`}
+                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* 마커 범례 (데스크탑 지도 우상단) */}
-        <div className="hidden md:flex absolute top-4 right-4 z-20 bg-white rounded-xl shadow-md px-3 py-2 gap-3 items-center">
-          <span className="text-xs text-[#8B95A1] font-semibold">가격 범례</span>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#8B95A1]" />
-            <span className="text-[11px] text-[#8B95A1]">5억 미만</span>
+        {/* ── 마커/히트맵 뷰 토글 버튼 (지도 우상단) ── */}
+        <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+          {/* 토글 버튼 */}
+          <div className="flex rounded-lg overflow-hidden shadow-md border border-[#E5E8EB]">
+            <button
+              onClick={() => setViewMode('marker')}
+              className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+                viewMode === 'marker' ? 'bg-[#0066FF] text-white' : 'bg-white text-[#4E5968] hover:bg-[#F7FAF8]'
+              }`}
+              aria-label="마커 뷰"
+            >
+              마커
+            </button>
+            <button
+              onClick={() => setViewMode('heatmap')}
+              className={`px-3 py-2 text-[13px] font-medium transition-colors ${
+                viewMode === 'heatmap' ? 'bg-[#0066FF] text-white' : 'bg-white text-[#4E5968] hover:bg-[#F7FAF8]'
+              }`}
+              aria-label="히트맵 뷰"
+            >
+              히트맵
+            </button>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#FF9500]" />
-            <span className="text-[11px] text-[#8B95A1]">5~10억</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#FF4B4B]" />
-            <span className="text-[11px] text-[#8B95A1]">10~20억</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-full bg-[#D63031]" />
-            <span className="text-[11px] text-[#8B95A1]">20억+</span>
-          </div>
+
+          {/* 마커 모드 범례 */}
+          {viewMode === 'marker' && (
+            <div className="hidden md:flex bg-white rounded-xl shadow-md px-3 py-2 gap-3 items-center">
+              <span className="text-xs text-[#8B95A1] font-semibold">가격 범례</span>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#8B95A1]" />
+                <span className="text-[11px] text-[#8B95A1]">5억 미만</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#FF9500]" />
+                <span className="text-[11px] text-[#8B95A1]">5~10억</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#FF4B4B]" />
+                <span className="text-[11px] text-[#8B95A1]">10~20억</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#D63031]" />
+                <span className="text-[11px] text-[#8B95A1]">20억+</span>
+              </div>
+            </div>
+          )}
+
+          {/* 히트맵 모드 범례 */}
+          {viewMode === 'heatmap' && (
+            <div className="hidden md:flex bg-white rounded-xl shadow-md px-3 py-2 gap-3 items-center">
+              <span className="text-xs text-[#8B95A1] font-semibold">거래량</span>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(209,213,219,0.6)' }} />
+                <span className="text-[11px] text-[#8B95A1]">적음</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(251,191,36,0.7)' }} />
+                <span className="text-[11px] text-[#8B95A1]">보통</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(249,115,22,0.8)' }} />
+                <span className="text-[11px] text-[#8B95A1]">많음</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 현재 위치 버튼 */}
@@ -423,7 +706,7 @@ export default function MapPage() {
           className="absolute right-4 bottom-32 md:bottom-8 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors"
           aria-label="현재 위치"
         >
-          <svg className="w-5 h-5 text-[#1B64DA]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
@@ -462,7 +745,10 @@ export default function MapPage() {
                 {formatPriceShort(selectedApartment.recentPrice)}
               </p>
               <Button
-                className="mt-4 w-full"
+                variant="solid"
+                color="primary"
+                fullWidth
+                className="mt-4"
                 onClick={() => navigate(`/apartment/${selectedApartment.id}`)}
               >
                 상세보기
@@ -495,7 +781,7 @@ function FilterGroupLabel({ label, className = '' }: { label: string; className?
 function FilterChip({
   label,
   active,
-  activeColor = '#1B64DA',
+  activeColor = '#0066FF',
   onClick,
 }: {
   label: string;
@@ -529,7 +815,7 @@ function FilterChip({
 function MobileFilterChip({
   label,
   active,
-  activeColor = '#1B64DA',
+  activeColor = '#0066FF',
   onClick,
 }: {
   label: string;
@@ -578,7 +864,7 @@ function SubscriptionInfoSection({
 
   // D-Day 계산
   let dDayText = '';
-  let dDayColor = '#1B64DA';
+  let dDayColor = '#0066FF';
   if (isOngoing && apt.subDeadline) {
     const dl = new Date(apt.subDeadline);
     dl.setHours(0, 0, 0, 0);
@@ -588,7 +874,7 @@ function SubscriptionInfoSection({
     } else if (diff > 0) {
       dDayText = `D-${diff}`;
     }
-    dDayColor = diff <= 7 ? '#D63031' : '#1B64DA';
+    dDayColor = diff <= 7 ? '#D63031' : '#0066FF';
   } else if (!isOngoing && apt.subStartDate) {
     const st = new Date(apt.subStartDate);
     st.setHours(0, 0, 0, 0);
@@ -616,7 +902,7 @@ function SubscriptionInfoSection({
             display: 'inline-flex',
             alignItems: 'center',
             background: isOngoing ? '#E8F1FD' : '#FFF4E5',
-            color: isOngoing ? '#1B64DA' : '#E67E22',
+            color: isOngoing ? '#0066FF' : '#E67E22',
           }}
         >
           {isOngoing ? '청약 진행중' : '청약 예정'}
@@ -638,32 +924,17 @@ function SubscriptionInfoSection({
 
       {/* 청약 상세 보기 버튼 */}
       {apt.subId && (
-        <button
+        <Button
+          variant="solid"
+          color="primary"
+          fullWidth
+          size="small"
           onClick={() => navigate(`/subscription/${apt.subId}`)}
-          style={{
-            marginTop: '10px',
-            width: '100%',
-            height: '40px',
-            borderRadius: '10px',
-            background: '#1B64DA',
-            color: '#FFFFFF',
-            fontSize: '13px',
-            fontWeight: 700,
-            border: 'none',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-          }}
+          trailingContent={<IconArrowRight />}
+          className="mt-3"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-            <polyline points="15 3 21 3 21 9" />
-            <line x1="10" y1="14" x2="21" y2="3" />
-          </svg>
           청약 상세 보기
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -686,7 +957,7 @@ function DesktopApartmentSummary({
     apartment.priceChangeType === 'up'
       ? 'text-[#FF4B4B]'
       : apartment.priceChangeType === 'down'
-        ? 'text-[#00C896]'
+        ? 'text-[#3B82F6]'
         : 'text-[#8B95A1]';
 
   return (
@@ -716,7 +987,7 @@ function DesktopApartmentSummary({
           <p className="text-xs font-bold text-[#191F28] mt-0.5 truncate">{apartment.builder}</p>
         </div>
       </div>
-      <Button fullWidth className="mt-3" onClick={onDetailClick}>
+      <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={onDetailClick}>
         상세보기
       </Button>
     </div>
@@ -744,7 +1015,7 @@ function ApartmentSummary({
     apartment.priceChangeType === 'up'
       ? 'text-[#FF4B4B]'
       : apartment.priceChangeType === 'down'
-        ? 'text-[#00C896]'
+        ? 'text-[#3B82F6]'
         : 'text-[#8B95A1]';
 
   return (
@@ -784,7 +1055,7 @@ function ApartmentSummary({
         </div>
       </div>
 
-      <Button fullWidth className="mt-5" onClick={onDetailClick}>
+      <Button variant="solid" color="primary" fullWidth className="mt-5" onClick={onDetailClick}>
         상세보기
       </Button>
     </div>
@@ -829,14 +1100,8 @@ function MockMapBackground({
       </div>
       {apartments.slice(0, 8).map((apt, i) => {
         const eok = apt.price / 10000;
-        const markerBg =
-          eok >= 20
-            ? 'bg-[#D63031]'
-            : eok >= 10
-            ? 'bg-[#FF4B4B]'
-            : eok >= 5
-            ? 'bg-[#FF9500]'
-            : 'bg-[#8B95A1]';
+        const markerBgColor =
+          eok >= 20 ? '#D63031' : eok >= 10 ? '#FF4B4B' : eok >= 5 ? '#FF9500' : '#8B95A1';
         const positions = [
           { top: '20%', left: '25%' },
           { top: '35%', left: '60%' },
@@ -850,8 +1115,20 @@ function MockMapBackground({
         return (
           <button
             key={apt.id}
-            className={`absolute ${markerBg} text-white text-xs font-bold px-2.5 py-1.5 rounded-full shadow-md border-2 border-white cursor-pointer hover:scale-110 transition-transform`}
-            style={positions[i]}
+            style={{
+              position: 'absolute',
+              backgroundColor: markerBgColor,
+              color: '#FFFFFF',
+              fontSize: '12px',
+              fontWeight: 700,
+              padding: '4px 10px',
+              borderRadius: '999px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.20)',
+              border: '2px solid #FFFFFF',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+              ...positions[i],
+            }}
             onClick={() => onMarkerClick(apt)}
           >
             {formatPriceShort(apt.price)}
@@ -866,6 +1143,15 @@ function MockMapBackground({
 // 상수 정의
 // ────────────────────────────────────────────────────────────
 
+// 평형대 칩 옵션 (20/30/40/50평대 — 60~85/85~115/115~135/135㎡+ 범위)
+const PYEONG_FILTER_OPTIONS = [
+  { value: 'all', label: '전체' },
+  { value: '20s', label: '20평대' },
+  { value: '30s', label: '30평대' },
+  { value: '40s', label: '40평대' },
+  { value: '50plus', label: '50평대+' },
+];
+
 const PRICE_FILTERS = [
   { value: 'all', label: '전체' },
   { value: 'under5', label: '5억 이하' },
@@ -878,4 +1164,20 @@ const AREA_FILTERS = [
   { value: '74', label: '74㎡' },
   { value: '84', label: '84㎡' },
   { value: '109plus', label: '109㎡+' },
+];
+
+const UNIT_COUNT_OPTIONS = [
+  { value: 'all' as UnitCountFilter, label: '전체' },
+  { value: '500plus' as UnitCountFilter, label: '500세대+' },
+  { value: '1000plus' as UnitCountFilter, label: '1000세대+' },
+  { value: '2000plus' as UnitCountFilter, label: '2000세대+' },
+];
+
+const COMPLEX_FEATURE_OPTIONS: { value: ComplexFeature; label: string }[] = [
+  { value: 'brand', label: '브랜드' },
+  { value: 'station', label: '역세권' },
+  { value: 'large', label: '대단지' },
+  { value: 'new', label: '신축' },
+  { value: 'flat', label: '평지' },
+  { value: 'school', label: '초품아' },
 ];

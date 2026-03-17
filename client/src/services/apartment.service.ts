@@ -1,5 +1,5 @@
 import api from './api';
-import type { Apartment, TradeHistory, MapApartment, MarkerType } from '../types';
+import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex } from '../types';
 import { getSubscriptions } from './subscription.service';
 import {
   MOCK_APARTMENTS,
@@ -7,8 +7,11 @@ import {
   MOCK_MAP_APARTMENTS,
 } from '../mocks/apartments.mock';
 
-// 개발 환경에서 Mock 데이터 사용 여부
-const USE_MOCK = import.meta.env.VITE_KAKAO_MAP_KEY === 'demo_key_replace_with_real_key';
+// 개발 환경에서 Mock 데이터 사용 여부 (VITE_USE_MOCK=true, demo key, 또는 API URL 없는 경우)
+const USE_MOCK =
+  import.meta.env.VITE_USE_MOCK === 'true' ||
+  import.meta.env.VITE_KAKAO_MAP_KEY === 'demo_key_replace_with_real_key' ||
+  !import.meta.env.VITE_API_BASE_URL; // API URL 없으면 자동 Mock
 
 // 뷰포트 내 아파트 마커 조회 (지도용) — 청약 데이터 병합 포함
 export async function getApartmentsByBounds(
@@ -51,14 +54,10 @@ export async function getApartmentsByBounds(
     return [...data, ...subInBounds];
   }
 
-  // MAJOR-05: FE 문자열 필터 → BE 숫자(만원 상한값)로 변환
-  const priceMax = convertPriceFilter(priceFilter);
-
-  // 버그 2 수정: BE map API 응답에 markerType 필드가 없으므로
-  // hot 목록을 병렬 조회하여 FE에서 markerType을 직접 결정
+  // BE는 priceFilter 문자열('under5'|'5to10'|'over10') 그대로 수신
   const [mapResponse, hotResponse, subApts] = await Promise.all([
     api.get<{ success: true; data: ApartmentMapMarker[] }>('/apartments/map', {
-      params: { swLat, swLng, neLat, neLng, ...(priceMax !== undefined && { priceMax }) },
+      params: { swLat, swLng, neLat, neLng, ...(priceFilter && priceFilter !== 'all' && { priceFilter }) },
     }),
     api.get<{ success: true; data: RawHotApartment[] }>('/apartments/hot', {
       params: { limit: 20 },
@@ -66,7 +65,7 @@ export async function getApartmentsByBounds(
     getSubscriptionMapApartments(),
   ]);
 
-  // aptCode 기준으로 hot 여부 및 신고가 여부를 빠르게 조회
+  // aptCode 기준으로 hot 여부 및 최고가 경신 여부를 빠르게 조회
   const hotMap = new Map(hotResponse.data.data.map((h) => [h.aptCode, h]));
 
   const markers: MapApartment[] = mapResponse.data.data.map((raw) => {
@@ -74,6 +73,16 @@ export async function getApartmentsByBounds(
     let markerType: MarkerType = 'price';
     if (hotData?.isRecordHigh) markerType = 'allTimeHigh';
     else if (hotData?.hotRank != null) markerType = 'hot';
+
+    // BE 불리언 특성 필드 → FE ComplexFeature[] 변환
+    const features: ComplexFeature[] = [];
+    if (raw.isBrand) features.push('brand');
+    if (raw.isWalkSubway) features.push('station');
+    if (raw.isLargeComplex) features.push('large');
+    if (raw.isNewBuild) features.push('new');
+    if (raw.isFlat) features.push('flat');
+    if (raw.hasElementarySchool) features.push('school');
+
     return {
       id: raw.id,
       name: raw.name,
@@ -83,6 +92,8 @@ export async function getApartmentsByBounds(
       area: raw.area,
       priceChangeType: raw.priceChangeType,
       markerType,
+      totalUnits: raw.unitCount,
+      features: features.length > 0 ? features : undefined,
     };
   });
 
@@ -148,15 +159,6 @@ async function getSubscriptionMapApartments(): Promise<MapApartment[]> {
   }
 }
 
-// FE priceFilter 문자열을 BE 숫자(만원 상한값)로 변환
-// 'all' → undefined, 'under5' → 50000, '5to10' → 100000, 'over10' → undefined
-function convertPriceFilter(priceFilter?: string): number | undefined {
-  if (!priceFilter || priceFilter === 'all') return undefined;
-  if (priceFilter === 'under5') return 50000;   // 5억 = 50000만원
-  if (priceFilter === '5to10') return 100000;   // 10억 = 100000만원
-  if (priceFilter === 'over10') return undefined; // 상한 없음
-  return undefined;
-}
 
 // BE /apartments/map 응답 단건 타입 (markerType 없음)
 interface ApartmentMapMarker {
@@ -167,6 +169,14 @@ interface ApartmentMapMarker {
   price: number;
   area: string;
   priceChangeType: 'up' | 'down' | 'flat';
+  /** BE ApartmentMapMarker.unitCount → FE MapApartment.totalUnits */
+  unitCount?: number;
+  isBrand?: boolean;
+  isWalkSubway?: boolean;
+  isLargeComplex?: boolean;
+  isNewBuild?: boolean;
+  isFlat?: boolean;
+  hasElementarySchool?: boolean;
 }
 
 // BE HotApartment 타입 → FE Apartment 타입 변환 어댑터 (TASK 8)
@@ -209,6 +219,8 @@ function adaptHotApartment(raw: RawHotApartment, index: number): Apartment {
     // BE 추가 필드 매핑
     isRecordHigh: raw.isRecordHigh ?? false,
     hotRank: raw.hotRank ?? raw.rank ?? index + 1,
+    hotTags: [],  // BE에서 태그 미제공 시 빈 배열
+    rankChange: 0,
   };
 }
 
@@ -240,8 +252,9 @@ export async function getApartmentDetail(id: string): Promise<Apartment | null> 
     return MOCK_APARTMENTS.find((apt) => apt.id === id) ?? null;
   }
 
-  const response = await api.get<Apartment>(`/apartments/${id}`);
-  return response.data;
+  // BE 응답은 { success: true, data: Apartment } 래퍼 구조
+  const response = await api.get<{ success: true; data: Apartment }>(`/apartments/${id}`);
+  return response.data.data;
 }
 
 // 아파트 실거래가 히스토리 조회
@@ -296,10 +309,202 @@ export async function searchApartments(keyword: string): Promise<Apartment[]> {
     ).slice(0, 10);
   }
 
-  const response = await api.get<Apartment[]>('/apartments/search', {
+  // BE 응답은 { success: true, data: Apartment[] } 래퍼 구조
+  const response = await api.get<{ success: true; data: Apartment[] }>('/apartments/search', {
     params: { q: keyword },
   });
-  return response.data;
+  return response.data.data;
+}
+
+// 뷰포트 기준 아파트 단지 목록 조회 (호갱노노 스타일 - 좌표 없음, Geocoder 필요)
+// BE: GET /api/apartments/complexes?swLat=&swLng=&neLat=&neLng=&zoom=
+export async function getComplexesByBounds(params: {
+  swLat: number;
+  swLng: number;
+  neLat: number;
+  neLng: number;
+  zoom: number;
+}): Promise<ApartmentComplex[]> {
+  if (USE_MOCK) {
+    await delay(300);
+    // Mock: 서울 강남구 일대 샘플 단지 데이터
+    return MOCK_APARTMENT_COMPLEXES;
+  }
+
+  const response = await api.get<{ success: true; data: ApartmentComplex[] }>(
+    '/apartments/complexes',
+    { params }
+  );
+  return response.data.data;
+}
+
+// Mock 단지 데이터 (좌표 없음 - Geocoder가 채워줌)
+const MOCK_APARTMENT_COMPLEXES: ApartmentComplex[] = [
+  {
+    id: 'c001',
+    name: '래미안 대치팰리스',
+    address: '서울 강남구 대치동 316',
+    lawdCd: '1168010200',
+    umdNm: '대치동',
+    latestPrice: 290000,
+    latestDealDate: '2024-02-15',
+    tradeCount: 12,
+    area: 84,
+    buildYear: 2015,
+  },
+  {
+    id: 'c002',
+    name: '은마아파트',
+    address: '서울 강남구 대치동 316-1',
+    lawdCd: '1168010200',
+    umdNm: '대치동',
+    latestPrice: 195000,
+    latestDealDate: '2024-02-10',
+    tradeCount: 8,
+    area: 76,
+    buildYear: 1979,
+  },
+  {
+    id: 'c003',
+    name: '도곡렉슬',
+    address: '서울 강남구 도곡동 467',
+    lawdCd: '1168010700',
+    umdNm: '도곡동',
+    latestPrice: 260000,
+    latestDealDate: '2024-02-08',
+    tradeCount: 5,
+    area: 84,
+    buildYear: 2002,
+  },
+  {
+    id: 'c004',
+    name: '개포주공1단지',
+    address: '서울 강남구 개포동 주공1단지',
+    lawdCd: '1168010100',
+    umdNm: '개포동',
+    latestPrice: 175000,
+    latestDealDate: '2024-02-05',
+    tradeCount: 3,
+    area: 59,
+    buildYear: 1982,
+  },
+  {
+    id: 'c005',
+    name: '타워팰리스',
+    address: '서울 강남구 도곡동 467-15',
+    lawdCd: '1168010700',
+    umdNm: '도곡동',
+    latestPrice: 400000,
+    latestDealDate: '2024-01-30',
+    tradeCount: 2,
+    area: 164,
+    buildYear: 2002,
+  },
+  {
+    id: 'c006',
+    name: '압구정현대아파트',
+    address: '서울 강남구 압구정동 현대아파트',
+    lawdCd: '1168010300',
+    umdNm: '압구정동',
+    latestPrice: 520000,
+    latestDealDate: '2024-01-25',
+    tradeCount: 4,
+    area: 176,
+    buildYear: 1976,
+  },
+  {
+    id: 'c007',
+    name: '삼성래미안',
+    address: '서울 강남구 삼성동 140',
+    lawdCd: '1168010500',
+    umdNm: '삼성동',
+    latestPrice: 210000,
+    latestDealDate: '2024-02-12',
+    tradeCount: 6,
+    area: 84,
+    buildYear: 1998,
+  },
+  {
+    id: 'c008',
+    name: '청담자이',
+    address: '서울 강남구 청담동 청담자이',
+    lawdCd: '1168010600',
+    umdNm: '청담동',
+    latestPrice: 340000,
+    latestDealDate: '2024-02-01',
+    tradeCount: 3,
+    area: 114,
+    buildYear: 2010,
+  },
+  {
+    id: 'c009',
+    name: '반포자이',
+    address: '서울 서초구 반포동 반포자이',
+    lawdCd: '1165010100',
+    umdNm: '반포동',
+    latestPrice: 380000,
+    latestDealDate: '2024-02-14',
+    tradeCount: 9,
+    area: 84,
+    buildYear: 2009,
+  },
+  {
+    id: 'c010',
+    name: '아크로리버파크',
+    address: '서울 서초구 반포동 아크로리버파크',
+    lawdCd: '1165010100',
+    umdNm: '반포동',
+    latestPrice: 460000,
+    latestDealDate: '2024-02-13',
+    tradeCount: 7,
+    area: 84,
+    buildYear: 2016,
+  },
+];
+
+// 입주 물량 예정 데이터 조회
+export async function getSupplyData(
+  region = '전국',
+  months = 12
+): Promise<SupplyDataPoint[]> {
+  if (USE_MOCK) {
+    await delay(200);
+    return generateMockSupply(region, months);
+  }
+  const response = await api.get<{ success: true; data: SupplyDataPoint[] }>(
+    '/trends/supply',
+    { params: { region, months } }
+  );
+  return response.data.data;
+}
+
+export interface SupplyDataPoint {
+  month: string;
+  units: number;
+  year: number;
+  monthNum: number;
+}
+
+function generateMockSupply(region: string, months: number): SupplyDataPoint[] {
+  const multiplier: Record<string, number> = {
+    '서울': 0.6, '경기': 1.8, '인천': 0.9, '부산': 0.7, '전국': 3.0,
+  };
+  const mult = multiplier[region] ?? 1.0;
+  const seasonal = [2200, 1800, 3100, 3600, 3900, 2400, 2100, 2000, 3500, 3800, 3300, 2600];
+  const now = new Date();
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const year = d.getFullYear();
+    const month = d.getMonth() + 1;
+    const base = seasonal[(month - 1) % 12];
+    const variance = Math.floor((Math.sin(i * 1.7) * 0.2) * base);
+    return {
+      month: `${year}.${String(month).padStart(2, '0')}`,
+      units: Math.max(500, Math.round((base + variance) * mult)),
+      year,
+      monthNum: month,
+    };
+  });
 }
 
 // Mock 딜레이 헬퍼

@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import type { TradeHistory } from '../../types';
 import { formatYearMonth } from '../../utils/formatNumber';
-import LoadingSpinner from '../ui/LoadingSpinner';
+import { Box, FlexBox, Typography, Loading } from '@wanteddev/wds';
 
 interface PriceChartProps {
   data: TradeHistory[];
@@ -33,14 +33,12 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
       return new Date(year, month - 1, 1) >= cutoff;
     });
 
-    // 월별 그룹핑 및 평균 계산
     const byMonth: Record<string, number[]> = {};
     filtered.forEach((t) => {
       if (!byMonth[t.date]) byMonth[t.date] = [];
       byMonth[t.date].push(t.price);
     });
 
-    // 연속된 월 배열 생성 (데이터 없는 달도 포함)
     const result = [];
     for (let i = dateRange - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -61,56 +59,63 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
 
   if (isLoading) {
     return (
-      <div className="h-64 flex items-center justify-center">
-        <LoadingSpinner message="차트 데이터 로딩중..." />
-      </div>
+      <FlexBox alignItems="center" justifyContent="center" style={{ height: '256px' }}>
+        <Loading size="32px" />
+      </FlexBox>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="h-64 flex flex-col items-center justify-center gap-2">
-        <svg className="w-12 h-12 text-[#E5E8EB]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <FlexBox flexDirection="column" alignItems="center" justifyContent="center" gap="8px" style={{ height: '256px' }}>
+        <svg width="48" height="48" fill="none" stroke="var(--semantic-line-normal)" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
-        <p className="text-sm text-[#8B95A1]">거래 데이터가 없습니다</p>
-      </div>
+        <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+          거래 데이터가 없습니다
+        </Typography>
+      </FlexBox>
     );
   }
 
   return (
-    <div>
+    <Box>
       {/* 날짜 범위 토글 */}
-      <div className="flex gap-2 mb-4">
+      <FlexBox gap="8px" style={{ marginBottom: '16px' }}>
         {([6, 12, 24] as DateRange[]).map((range) => (
           <button
             key={range}
             onClick={() => setDateRange(range)}
-            className={[
-              'px-3 py-1 rounded-full text-xs font-semibold transition-colors',
-              dateRange === range
-                ? 'bg-[#1B64DA] text-white'
-                : 'bg-[#F5F6F8] text-[#8B95A1] hover:bg-gray-200',
-            ].join(' ')}
+            style={{
+              padding: '4px 12px',
+              borderRadius: '9999px',
+              fontSize: '12px',
+              fontWeight: 600,
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background-color 150ms, color 150ms',
+              backgroundColor: dateRange === range ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-alternative)',
+              color: dateRange === range ? 'white' : 'var(--semantic-label-assistive)',
+            }}
           >
             {range}개월
           </button>
         ))}
-      </div>
+      </FlexBox>
 
-      {/* 차트 */}
+      {/* 차트 — Recharts 그대로 유지 */}
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E8EB" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid, #E5E8EB)" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 10, fill: '#8B95A1' }}
+            tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }}
             tickLine={false}
             axisLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fontSize: 10, fill: '#8B95A1' }}
+            tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }}
             tickLine={false}
             axisLine={false}
             tickFormatter={(value) => `${(value / 10000).toFixed(0)}억`}
@@ -120,16 +125,15 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#1B64DA"
+            stroke="var(--color-chart-line, #0066FF)"
             strokeWidth={2}
-            dot={{ r: 3, fill: '#1B64DA', strokeWidth: 0 }}
-            activeDot={{ r: 5, fill: '#1B64DA' }}
+            dot={{ r: 3, fill: 'var(--color-chart-line, #0066FF)', strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: 'var(--color-chart-line, #0066FF)' }}
             connectNulls={false}
-            strokeDasharray="0"
           />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Box>
   );
 });
 
@@ -150,10 +154,10 @@ function CustomTooltip({ active, payload }: {
   const priceText = rest > 0 ? `${eok}억 ${rest.toLocaleString()}만` : `${eok}억`;
 
   return (
-    <div className="bg-[#191F28] text-white px-3 py-2 rounded-lg text-xs shadow-lg">
-      <p className="text-[#8B95A1]">{formatYearMonth(data.date)}</p>
-      <p className="font-bold text-sm">{priceText}</p>
-      <p className="text-[#8B95A1]">거래 {data.count}건</p>
+    <div style={{ backgroundColor: '#191F28', color: 'white', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+      <p style={{ color: '#8B95A1', marginBottom: '2px' }}>{formatYearMonth(data.date)}</p>
+      <p style={{ fontWeight: 700, fontSize: '14px' }}>{priceText}</p>
+      <p style={{ color: '#8B95A1' }}>거래 {data.count}건</p>
     </div>
   );
 }
@@ -161,7 +165,6 @@ function CustomTooltip({ active, payload }: {
 // X축 레이블 포맷
 function formatLabel(yearMonth: string, range: number): string {
   const [year, month] = yearMonth.split('-');
-  if (range <= 6) return `${month}월`;
   if (range <= 12) return `${month}월`;
   return parseInt(month) === 1 ? `${year.slice(2)}년` : `${month}월`;
 }

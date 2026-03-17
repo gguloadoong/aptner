@@ -8,3 +8,4 @@ client/.env
 server/.env
 *.local
 .DS_Store
+client/.npmrc

@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
+import { Button } from '@wanteddev/wds';
 
 interface Props {
   children: ReactNode;
@@ -60,13 +61,16 @@ export default class ErrorBoundary extends Component<Props, State> {
               예상치 못한 오류가 발생했습니다. 새로고침하면 대부분 해결됩니다.
             </p>
 
-            {/* 새로고침 버튼 */}
-            <button
+            {/* 새로고침 버튼 - WDS Button */}
+            <Button
               onClick={this.handleReset}
-              className="w-full bg-[#1B64DA] text-white font-bold py-3 rounded-xl hover:bg-[#1554C0] transition-colors"
+              variant="solid"
+              color="primary"
+              fullWidth
+              size="medium"
             >
               새로고침
-            </button>
+            </Button>
           </div>
         </div>
       );
