@@ -14,7 +14,7 @@ export function useBreakpoint(query: string): boolean {
     const mq = window.matchMedia(query);
     const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
     mq.addEventListener('change', handler);
-    setMatches(mq.matches);
+    // 초기값은 useState initializer에서 처리하므로 동기 setState 불필요
     return () => mq.removeEventListener('change', handler);
   }, [query]);
 
