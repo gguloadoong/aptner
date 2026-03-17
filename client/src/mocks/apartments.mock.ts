@@ -1016,48 +1016,74 @@ function generateTradeHistory(aptId: string, basePrice: number, area: string): T
   return history;
 }
 
-// Mock 실거래 데이터
+// 면적별 기준가 비율 — 84㎡ 기준 배율
+// 작은 면적은 저렴하고, 큰 면적은 비쌈 (비선형 비율)
+const AREA_PRICE_RATIO: Record<string, number> = {
+  '49': 0.58, '54': 0.63, '59': 0.72, '67': 0.80, '74': 0.88,
+  '76': 0.90, '82': 0.97, '84': 1.00, '101': 1.18, '109': 1.28,
+  '112': 1.31, '114': 1.35, '115': 1.37, '119': 1.40, '144': 1.68, '145': 1.70,
+  '164': 1.93, '176': 2.06, '206': 2.40, '235': 2.73, '244': 2.83,
+};
+
+// 면적 기준 가격 계산 헬퍼
+function getPriceByArea(basePrice84: number, area: string): number {
+  const ratio = AREA_PRICE_RATIO[area] ?? 1.0;
+  return Math.round((basePrice84 * ratio) / 100) * 100;
+}
+
+// 아파트별 모든 면적 거래 데이터 생성 헬퍼
+function generateAllAreasHistory(
+  aptId: string,
+  basePrice84: number,
+  areas: string[]
+): TradeHistory[] {
+  return areas.flatMap((area) =>
+    generateTradeHistory(aptId, getPriceByArea(basePrice84, area), area)
+  );
+}
+
+// Mock 실거래 데이터 — 각 아파트의 모든 면적에 대한 거래 내역 생성
 export const MOCK_TRADE_HISTORIES: Record<string, TradeHistory[]> = {
-  'apt-001': generateTradeHistory('apt-001', 350000, '84'),
-  'apt-002': generateTradeHistory('apt-002', 430000, '84'),
-  'apt-003': generateTradeHistory('apt-003', 270000, '84'),
-  'apt-004': generateTradeHistory('apt-004', 185000, '84'),
-  'apt-005': generateTradeHistory('apt-005', 135000, '84'),
-  'apt-006': generateTradeHistory('apt-006', 230000, '84'),
-  'apt-007': generateTradeHistory('apt-007', 150000, '84'),
-  'apt-008': generateTradeHistory('apt-008', 175000, '84'),
-  'apt-009': generateTradeHistory('apt-009', 145000, '84'),
-  'apt-010': generateTradeHistory('apt-010', 82000, '84'),
-  'apt-011': generateTradeHistory('apt-011', 520000, '84'),
-  'apt-012': generateTradeHistory('apt-012', 155000, '84'),
-  'apt-013': generateTradeHistory('apt-013', 290000, '84'),
-  'apt-014': generateTradeHistory('apt-014', 230000, '84'),
-  'apt-015': generateTradeHistory('apt-015', 300000, '82'),
-  'apt-016': generateTradeHistory('apt-016', 265000, '84'),
-  'apt-017': generateTradeHistory('apt-017', 195000, '84'),
-  'apt-018': generateTradeHistory('apt-018', 265000, '84'),
-  'apt-019': generateTradeHistory('apt-019', 118000, '84'),
-  'apt-020': generateTradeHistory('apt-020', 1200000, '206'),
-  'APT021': generateTradeHistory('APT021', 80000, '84'),
-  'APT022': generateTradeHistory('APT022', 72000, '84'),
-  'APT023': generateTradeHistory('APT023', 185000, '84'),
-  'APT024': generateTradeHistory('APT024', 95000, '84'),
-  'APT025': generateTradeHistory('APT025', 290000, '84'),
-  'APT026': generateTradeHistory('APT026', 145000, '84'),
-  'APT027': generateTradeHistory('APT027', 58000, '84'),
-  'APT028': generateTradeHistory('APT028', 89000, '84'),
-  'APT029': generateTradeHistory('APT029', 128000, '84'),
-  'APT030': generateTradeHistory('APT030', 92000, '84'),
-  'APT031': generateTradeHistory('APT031', 162000, '84'),
-  'APT032': generateTradeHistory('APT032', 115000, '84'),
-  'APT033': generateTradeHistory('APT033', 78000, '84'),
-  'APT034': generateTradeHistory('APT034', 52000, '84'),
-  'APT035': generateTradeHistory('APT035', 65000, '84'),
-  'APT036': generateTradeHistory('APT036', 175000, '84'),
-  'APT037': generateTradeHistory('APT037', 135000, '84'),
-  'APT038': generateTradeHistory('APT038', 98000, '84'),
-  'APT039': generateTradeHistory('APT039', 56000, '84'),
-  'APT040': generateTradeHistory('APT040', 48000, '84'),
+  'apt-001': generateAllAreasHistory('apt-001', 350000, ['59', '84', '114', '164']),
+  'apt-002': generateAllAreasHistory('apt-002', 430000, ['59', '84', '112']),
+  'apt-003': generateAllAreasHistory('apt-003', 270000, ['76', '84']),
+  'apt-004': generateAllAreasHistory('apt-004', 185000, ['59', '74', '84']),
+  'apt-005': generateAllAreasHistory('apt-005', 135000, ['59', '84', '114']),
+  'apt-006': generateAllAreasHistory('apt-006', 230000, ['59', '84', '119']),
+  'apt-007': generateAllAreasHistory('apt-007', 150000, ['54', '67', '84']),
+  'apt-008': generateAllAreasHistory('apt-008', 175000, ['59', '84', '109']),
+  'apt-009': generateAllAreasHistory('apt-009', 145000, ['84', '114', '144']),
+  'apt-010': generateAllAreasHistory('apt-010', 82000, ['59', '84', '101']),
+  'apt-011': generateAllAreasHistory('apt-011', 520000, ['59', '84', '115']),
+  'apt-012': generateAllAreasHistory('apt-012', 155000, ['49', '59', '74', '84']),
+  'apt-013': generateAllAreasHistory('apt-013', 290000, ['84', '114', '145']),
+  'apt-014': generateAllAreasHistory('apt-014', 230000, ['59', '84', '114', '145']),
+  'apt-015': generateAllAreasHistory('apt-015', 300000, ['82']),
+  'apt-016': generateAllAreasHistory('apt-016', 265000, ['59', '84', '114']),
+  'apt-017': generateAllAreasHistory('apt-017', 195000, ['59', '84', '119']),
+  'apt-018': generateAllAreasHistory('apt-018', 265000, ['59', '84', '114']),
+  'apt-019': generateAllAreasHistory('apt-019', 118000, ['59', '84', '109']),
+  'apt-020': generateAllAreasHistory('apt-020', 1200000, ['206', '235', '244']),
+  'APT021': generateAllAreasHistory('APT021', 80000, ['59', '84']),
+  'APT022': generateAllAreasHistory('APT022', 72000, ['59', '84']),
+  'APT023': generateAllAreasHistory('APT023', 185000, ['59', '84', '114']),
+  'APT024': generateAllAreasHistory('APT024', 95000, ['59', '84']),
+  'APT025': generateAllAreasHistory('APT025', 290000, ['59', '84', '109']),
+  'APT026': generateAllAreasHistory('APT026', 145000, ['84', '114', '144']),
+  'APT027': generateAllAreasHistory('APT027', 58000, ['59', '84', '109']),
+  'APT028': generateAllAreasHistory('APT028', 89000, ['59', '84', '109']),
+  'APT029': generateAllAreasHistory('APT029', 128000, ['59', '84', '109']),
+  'APT030': generateAllAreasHistory('APT030', 92000, ['59', '84', '109']),
+  'APT031': generateAllAreasHistory('APT031', 162000, ['59', '84', '109']),
+  'APT032': generateAllAreasHistory('APT032', 115000, ['59', '74', '84']),
+  'APT033': generateAllAreasHistory('APT033', 78000, ['59', '84', '109']),
+  'APT034': generateAllAreasHistory('APT034', 52000, ['59', '84', '109']),
+  'APT035': generateAllAreasHistory('APT035', 65000, ['59', '84']),
+  'APT036': generateAllAreasHistory('APT036', 175000, ['59', '84', '109']),
+  'APT037': generateAllAreasHistory('APT037', 135000, ['59', '84', '109']),
+  'APT038': generateAllAreasHistory('APT038', 98000, ['59', '84', '109']),
+  'APT039': generateAllAreasHistory('APT039', 56000, ['59', '84', '109']),
+  'APT040': generateAllAreasHistory('APT040', 48000, ['59', '84']),
 };
 
 // markerType 결정 헬퍼: MOCK_APARTMENTS의 isRecordHigh/hotRank 기준

@@ -442,18 +442,8 @@ router.get(
       const { aptCode } = req.params;
       const { lawdCd, months, area } = req.query as Partial<Record<string, string>>;
 
-      if (!lawdCd) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'MISSING_PARAMS',
-            message: 'lawdCd(지역코드)는 필수 파라미터입니다.',
-          },
-        });
-        return;
-      }
-
-      if (!/^\d{5}$/.test(lawdCd)) {
+      // lawdCd는 선택 파라미터: 없으면 Mock 데이터 반환, 있으면 형식 검증 후 실 API 시도
+      if (lawdCd && !/^\d{5}$/.test(lawdCd)) {
         res.status(400).json({
           success: false,
           error: {
@@ -467,7 +457,8 @@ router.get(
       const monthsNum = months ? Math.min(36, Math.max(1, parseInt(String(months), 10))) : 24;
       const areaNum = area ? parseFloat(String(area)) : undefined;
 
-      const data = await getApartmentHistory(String(aptCode), String(lawdCd), monthsNum, areaNum);
+      // lawdCd 미전달 시 빈 문자열로 전달 → 서비스 레이어에서 Mock 전용 처리
+      const data = await getApartmentHistory(String(aptCode), lawdCd ?? '', monthsNum, areaNum);
 
       // 데이터 없을 경우 경고 로그 (빈 배열 조용히 반환 방지)
       if (data.length === 0) {

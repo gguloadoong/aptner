@@ -6,7 +6,7 @@ import { useApartmentDetail } from '../hooks/useApartment';
 import { useGeocoder } from '../hooks/useGeocoder';
 import BottomSheet from '../components/ui/BottomSheet';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Button, IconButton, useToast } from '@wanteddev/wds';
+import { Button, Chip, IconButton, useToast } from '@wanteddev/wds';
 import { IconChevronLeft, IconArrowRight } from '@wanteddev/wds-icon';
 import { formatPriceShort, formatChange, formatUnits } from '../utils/formatNumber';
 import type { MapApartment, PriceFilter, AreaFilter, UnitCountFilter, ComplexFeature, ApartmentComplex } from '../types';
@@ -93,6 +93,55 @@ export default function MapPage() {
     });
   }, [setSelectedApartment]);
 
+  // 뷰포트 변경 핸들러
+  // 1) 기존 MapApartment 마커 갱신 (청약 포함)
+  // 2) 호갱노노 스타일 단지 데이터 갱신 + Geocoder 변환
+  const handleBoundsChange = useCallback(
+    async (swLat: number, swLng: number, neLat: number, neLng: number, zoom: number) => {
+      // 줌 레벨 상태 업데이트 (구 단위 오버레이 표시 여부 판단)
+      setCurrentZoom(zoom);
+
+      // 병렬 처리: 기존 마커 데이터 + 단지 데이터 동시 요청
+      try {
+        // 기존 마커 데이터 갱신
+        const merged = await getApartmentsByBounds(swLat, swLng, neLat, neLng);
+        setMapApartments(merged);
+      } catch (err) {
+        console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err);
+      }
+
+      // 호갱노노 스타일 단지 데이터 갱신 (zoom 10~14 범위에서만 — 개별 단지 표시)
+      if (zoom >= 10 && zoom <= 14) {
+        setIsComplexLoading(true);
+        try {
+          const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
+          // Geocoder로 주소 → 좌표 변환 (로딩 중 기존 마커 유지)
+          const geocoded = await batchGeocode(rawComplexes);
+          setComplexes(geocoded);
+        } catch (err) {
+          console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err);
+        } finally {
+          setIsComplexLoading(false);
+        }
+      } else {
+        // 줌아웃 시 단지 마커 초기화
+        setComplexes([]);
+      }
+    },
+    [batchGeocode]
+  );
+
+  const { isLoaded, isError, updateMarkers, updateComplexMarkers, moveToLocation, updateHeatmapOverlays, clearHeatmapOverlays, updateDistrictOverlays, clearDistrictOverlays } = useKakaoMap(
+    mapContainerRef,
+    {
+      initialLat: 37.5665,
+      initialLng: 126.978,
+      initialLevel: 7,
+      onMarkerClick: handleMarkerClick,
+      onBoundsChange: handleBoundsChange,
+    }
+  );
+
   // 카카오맵 로드 실패 또는 미로드 시 서울 전역 기본 데이터 로드 (목록 패널 빈 화면 방지)
   useEffect(() => {
     // 지도가 정상 로드된 경우에는 handleBoundsChange가 데이터를 채우므로 스킵
@@ -110,50 +159,8 @@ export default function MapPage() {
         setMapApartments((prev) => (prev.length > 0 ? prev : data));
       })
       .catch((err) => console.warn('[MapPage] 기본 데이터 로드 실패:', err));
-  }, [isLoaded, getApartmentsByBounds, setMapApartments]);
-
-  // 뷰포트 변경 핸들러
-  // 1) 기존 MapApartment 마커 갱신 (청약 포함)
-  // 2) 호갱노노 스타일 단지 데이터 갱신 + Geocoder 변환
-  const handleBoundsChange = useCallback(
-    async (swLat: number, swLng: number, neLat: number, neLng: number, zoom: number) => {
-      // 병렬 처리: 기존 마커 데이터 + 단지 데이터 동시 요청
-      try {
-        // 기존 마커 데이터 갱신
-        const merged = await getApartmentsByBounds(swLat, swLng, neLat, neLng);
-        setMapApartments(merged);
-      } catch (err) {
-        console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err);
-      }
-
-      // 호갱노노 스타일 단지 데이터 갱신 (level 6~12 범위에서만)
-      if (zoom >= 6 && zoom <= 12) {
-        setIsComplexLoading(true);
-        try {
-          const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
-          // Geocoder로 주소 → 좌표 변환 (로딩 중 기존 마커 유지)
-          const geocoded = await batchGeocode(rawComplexes);
-          setComplexes(geocoded);
-        } catch (err) {
-          console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err);
-        } finally {
-          setIsComplexLoading(false);
-        }
-      }
-    },
-    [batchGeocode]
-  );
-
-  const { isLoaded, isError, updateMarkers, updateComplexMarkers, moveToLocation, updateHeatmapOverlays, clearHeatmapOverlays } = useKakaoMap(
-    mapContainerRef,
-    {
-      initialLat: 37.5665,
-      initialLng: 126.978,
-      initialLevel: 7,
-      onMarkerClick: handleMarkerClick,
-      onBoundsChange: handleBoundsChange,
-    }
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
 
   // queryString ?search= 파라미터가 있을 때 지도 로드 후 Geocoder 자동 실행
   useEffect(() => {
@@ -173,27 +180,31 @@ export default function MapPage() {
 
   // 마커 뷰 / 히트맵 뷰 토글 상태
   const [viewMode, setViewMode] = useState<'marker' | 'heatmap'>('marker');
+  // 현재 줌 레벨 상태 (구 단위 오버레이 표시 여부 판단용)
+  const [currentZoom, setCurrentZoom] = useState<number>(7);
 
-  // 기존 마커 업데이트 — 히트맵 모드일 때는 마커 숨김
+  // 기존 마커 업데이트 — 히트맵 모드 또는 광역 줌(<=9)일 때 마커 숨김
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker') {
+    // 마커 모드이고 줌 레벨이 10 이상일 때만 개별 마커 표시
+    if (viewMode === 'marker' && currentZoom >= 10) {
       updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
-      // 히트맵 모드: 기존 마커 전부 제거 (빈 배열 전달)
+      // 히트맵 모드 또는 줌아웃 시: 개별 마커 전부 제거 (구 단위 오버레이가 대신 표시)
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     }
-  }, [isLoaded, viewMode, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures]);
+  }, [isLoaded, viewMode, currentZoom, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures]);
 
-  // 호갱노노 스타일 단지 마커 업데이트 (히트맵 모드에서는 숨김)
+  // 호갱노노 스타일 단지 마커 업데이트 (히트맵 모드 또는 광역 줌 시 숨김)
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker') {
+    // 마커 모드이고 줌 레벨이 10 이상일 때만 단지 마커 표시
+    if (viewMode === 'marker' && currentZoom >= 10) {
       updateComplexMarkers(complexes, handleComplexClick);
     } else {
       updateComplexMarkers([], handleComplexClick);
     }
-  }, [isLoaded, viewMode, complexes, updateComplexMarkers, handleComplexClick]);
+  }, [isLoaded, viewMode, currentZoom, complexes, updateComplexMarkers, handleComplexClick]);
 
   // 히트맵 오버레이 업데이트 — 히트맵 모드 진입/데이터 변경 시
   useEffect(() => {
@@ -204,6 +215,18 @@ export default function MapPage() {
       clearHeatmapOverlays();
     }
   }, [isLoaded, viewMode, mapApartments, updateHeatmapOverlays, clearHeatmapOverlays]);
+
+  // 구 단위 평균가 오버레이 업데이트 — 줌 레벨 <= 9 이고 마커 모드일 때
+  // zoom <= 9: 광역 뷰 → 구 단위 레이블 표시
+  // zoom >= 10: 개별 단지 뷰 → 구 오버레이 제거
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (viewMode === 'marker' && currentZoom <= 9) {
+      updateDistrictOverlays(mapApartments);
+    } else {
+      clearDistrictOverlays();
+    }
+  }, [isLoaded, viewMode, currentZoom, mapApartments, updateDistrictOverlays, clearDistrictOverlays]);
 
   // 평형대(㎡) 범위 기준: 20평대=60~85㎡, 30평대=85~115㎡, 40평대=115~135㎡, 50평대+=135㎡+
   // apt.area는 string("84" 등)이므로 parseFloat으로 수치 변환 후 비교
@@ -251,11 +274,23 @@ export default function MapPage() {
     : null;
 
   return (
-    <div className="relative w-full bg-gray-200 flex" style={{ height: '100svh' }}>
+    <div
+      className="relative w-full flex"
+      style={{ height: '100svh', backgroundColor: 'var(--semantic-background-alternative)' }}
+    >
       {/* ─── 데스크탑 좌측 사이드 패널 ─── */}
-      <aside className="hidden md:flex flex-col w-[380px] flex-shrink-0 bg-white border-r border-[#E5E8EB] z-20 h-full overflow-hidden">
+      <aside
+        className="hidden md:flex flex-col w-[380px] flex-shrink-0 z-20 h-full overflow-hidden"
+        style={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRight: '1px solid var(--semantic-line-normal)',
+        }}
+      >
         {/* 패널 헤더 */}
-        <div className="px-4 py-4 border-b border-[#E5E8EB] flex-shrink-0">
+        <div
+          className="px-4 py-4 flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--semantic-line-normal)' }}
+        >
           <div className="flex items-center gap-2 mb-3">
             <IconButton
               variant="normal"
@@ -266,13 +301,27 @@ export default function MapPage() {
             </IconButton>
             <div className="flex items-center gap-1.5">
               <img src="/favicon.svg" alt="봄집" width={24} height={24} className="rounded-md" />
-              <span className="text-base font-black text-[#191F28]">봄집 지도</span>
+              <span
+                className="text-base font-black"
+                style={{ color: 'var(--semantic-label-normal)' }}
+              >
+                봄집 지도
+              </span>
             </div>
           </div>
 
           {/* 검색바 */}
-          <div className="flex items-center gap-2 bg-[#F7FAF8] rounded-xl px-3 py-2.5">
-            <svg className="w-4 h-4 text-[#8B95A1] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div
+            className="flex items-center gap-2 rounded-xl px-3 py-2.5"
+            style={{ backgroundColor: 'var(--semantic-background-alternative)' }}
+          >
+            <svg
+              className="w-4 h-4 flex-shrink-0"
+              style={{ color: 'var(--semantic-label-assistive)' }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -280,177 +329,165 @@ export default function MapPage() {
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               placeholder="단지명 검색"
-              className="flex-1 text-sm bg-transparent outline-none text-[#191F28] placeholder-[#8B95A1]"
+              className="flex-1 text-sm bg-transparent outline-none"
+              style={{ color: 'var(--semantic-label-normal)' }}
             />
           </div>
 
           {/* ── 필터 그룹 1: 가격대 ── */}
-          <FilterGroupLabel label="가격대" className="mt-3" />
-          <div className="flex gap-2 mt-1.5 flex-wrap">
+          <LnbSectionLabel label="가격대" className="mt-3" />
+          <div className="flex gap-1.5 mt-1.5 flex-wrap">
             {PRICE_FILTERS.map((filter) => (
-              <FilterChip
+              <Chip
                 key={filter.value}
-                label={filter.label}
+                size="small"
+                variant="outlined"
                 active={priceFilter === filter.value}
                 onClick={() => setPriceFilter(filter.value as PriceFilter)}
-              />
+              >
+                {filter.label}
+              </Chip>
             ))}
           </div>
 
           {/* ── 필터 그룹 2: 레이어 ── */}
           <div className="flex items-center gap-2 mt-3">
-            <FilterGroupLabel label="레이어" />
+            <LnbSectionLabel label="레이어" />
             {activeLayerCount > 0 && (
               <span
-                className="inline-flex items-center px-1.5 rounded-full text-white text-[10px] font-bold"
-                style={{ background: '#0066FF', height: '16px' }}
+                className="inline-flex items-center px-1.5 rounded-full text-[10px] font-bold"
+                style={{ background: 'var(--semantic-primary-normal)', color: 'var(--semantic-static-white)', height: '16px' }}
               >
                 {activeLayerCount} 활성
               </span>
             )}
           </div>
-          <div className="flex gap-2 mt-1.5 flex-wrap">
-            <FilterChip
-              label="HOT"
+          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+            <Chip
+              size="small"
+              variant="outlined"
               active={layerFilters.hot}
-              activeColor="#FF4136"
               onClick={() => setLayerFilter('hot', !layerFilters.hot)}
-            />
-            <FilterChip
-              label="최고가"
+            >
+              HOT
+            </Chip>
+            <Chip
+              size="small"
+              variant="outlined"
               active={layerFilters.allTimeHigh}
-              activeColor="#F39C12"
               onClick={() => setLayerFilter('allTimeHigh', !layerFilters.allTimeHigh)}
-            />
-            <FilterChip
-              label="청약"
+            >
+              최고가
+            </Chip>
+            <Chip
+              size="small"
+              variant="outlined"
               active={layerFilters.subscription}
-              activeColor="#0066FF"
               onClick={() => setLayerFilter('subscription', !layerFilters.subscription)}
-            />
+            >
+              청약
+            </Chip>
           </div>
 
           {/* ── 필터 그룹 3: 평형대 칩 (20/30/40/50평대) ── */}
-          <FilterGroupLabel label="평형대" className="mt-3" />
-          <div className="flex gap-2 mt-1.5 flex-wrap">
+          <LnbSectionLabel label="평형대" className="mt-3" />
+          <div className="flex gap-1.5 mt-1.5 flex-wrap">
             {PYEONG_FILTER_OPTIONS.map((opt) => (
-              <button
+              <Chip
                 key={opt.value}
+                size="small"
+                variant="outlined"
+                active={pyeongFilter === opt.value}
                 onClick={() => setPyeongFilter(opt.value as typeof pyeongFilter)}
-                style={{
-                  height: '28px',
-                  padding: '0 10px',
-                  borderRadius: '14px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  border: pyeongFilter === opt.value ? '1px solid #0066FF' : '1px solid #E5E8EB',
-                  background: pyeongFilter === opt.value ? '#0066FF' : '#FFFFFF',
-                  color: pyeongFilter === opt.value ? '#FFFFFF' : '#4E5968',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap',
-                }}
               >
                 {opt.label}
-              </button>
+              </Chip>
             ))}
           </div>
 
           {/* ── 필터 그룹 4: 세부 평형 (59/74/84/109㎡) ── */}
-          <FilterGroupLabel label="평형(㎡)" className="mt-3" />
-          <div className="flex gap-2 mt-1.5 flex-wrap">
+          <LnbSectionLabel label="평형(㎡)" className="mt-3" />
+          <div className="flex gap-1.5 mt-1.5 flex-wrap">
             {AREA_FILTERS.map((filter) => (
-              <FilterChip
+              <Chip
                 key={filter.value}
-                label={filter.label}
+                size="small"
+                variant="outlined"
                 active={areaFilter === filter.value}
                 onClick={() =>
                   setAreaFilter(areaFilter === filter.value ? 'all' : (filter.value as AreaFilter))
                 }
-              />
+              >
+                {filter.label}
+              </Chip>
             ))}
           </div>
 
-          {/* ── 필터 그룹 4: 세대수 ── */}
-          <div className="mt-4">
-            <p className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wide mb-2">세대수</p>
-            <div className="flex flex-wrap gap-1.5">
-              {UNIT_COUNT_OPTIONS.map((opt) => {
-                const isActive = unitCountFilter === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => setUnitCountFilter(opt.value)}
-                    style={{
-                      height: '32px',
-                      padding: '0 12px',
-                      borderRadius: '999px',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      border: isActive ? 'none' : '1px solid var(--semantic-line-normal)',
-                      backgroundColor: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
-                      color: isActive ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
+          {/* ── 필터 그룹 5: 세대수 ── */}
+          <LnbSectionLabel label="세대수" className="mt-3" />
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {UNIT_COUNT_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                size="small"
+                variant="outlined"
+                active={unitCountFilter === opt.value}
+                onClick={() => setUnitCountFilter(opt.value)}
+              >
+                {opt.label}
+              </Chip>
+            ))}
           </div>
 
-          {/* ── 필터 그룹 5: 단지특성 ── */}
-          <div className="mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <p className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wide">단지특성</p>
+          {/* ── 필터 그룹 6: 단지특성 ── */}
+          <div className="mt-3">
+            <div className="flex items-center gap-2">
+              <LnbSectionLabel label="단지특성" />
               {complexFeatures.size > 0 && (
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#0066FF] text-white text-[9px] font-bold">
+                <span
+                  className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold"
+                  style={{ backgroundColor: 'var(--semantic-primary-normal)', color: 'var(--semantic-static-white)' }}
+                >
                   {complexFeatures.size}
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {COMPLEX_FEATURE_OPTIONS.map((opt) => {
-                const isActive = complexFeatures.has(opt.value);
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => toggleComplexFeature(opt.value)}
-                    style={{
-                      height: '32px',
-                      padding: '0 12px',
-                      borderRadius: '999px',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      border: isActive ? '1px solid var(--semantic-primary-normal)' : '1px solid var(--semantic-line-normal)',
-                      backgroundColor: isActive ? 'var(--semantic-primary-weak)' : 'var(--semantic-background-normal-normal)',
-                      color: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-label-alternative)',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {COMPLEX_FEATURE_OPTIONS.map((opt) => (
+                <Chip
+                  key={opt.value}
+                  size="small"
+                  variant="outlined"
+                  active={complexFeatures.has(opt.value)}
+                  onClick={() => toggleComplexFeature(opt.value)}
+                >
+                  {opt.label}
+                </Chip>
+              ))}
             </div>
           </div>
         </div>
 
         {/* 아파트 목록 */}
         <div className="flex-1 overflow-y-auto">
-          <div className="px-4 py-2.5 border-b border-[#E5E8EB]">
-            <p className="text-xs text-[#8B95A1]">총 {filteredList.length}개 단지</p>
+          <div
+            className="px-4 py-2.5"
+            style={{ borderBottom: '1px solid var(--semantic-line-normal)' }}
+          >
+            <p
+              className="text-xs"
+              style={{ color: 'var(--semantic-label-assistive)' }}
+            >
+              총 {filteredList.length}개 단지
+            </p>
           </div>
 
           {filteredList.length === 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: '8px' }}>
-              <svg width="40" height="40" style={{ color: '#E5E8EB' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg width="40" height="40" style={{ color: 'var(--semantic-line-normal)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              <p style={{ fontSize: '14px', color: '#8B95A1' }}>검색 결과가 없습니다</p>
+              <p style={{ fontSize: '14px', color: 'var(--semantic-label-assistive)' }}>검색 결과가 없습니다</p>
             </div>
           ) : (
             <ul>
@@ -471,17 +508,16 @@ export default function MapPage() {
                         gap: '12px',
                         padding: '14px 16px',
                         textAlign: 'left',
-                        borderBottom: '1px solid #E5E8EB',
-                        background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                        background: isSelected ? 'var(--semantic-primary-weak)' : 'var(--semantic-background-normal-normal)',
                         cursor: 'pointer',
                         transition: 'background-color 0.15s',
                         border: 'none',
                         borderBottomWidth: '1px',
                         borderBottomStyle: 'solid',
-                        borderBottomColor: '#E5E8EB',
+                        borderBottomColor: 'var(--semantic-line-normal)',
                       }}
-                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#F7FAF8'; }}
-                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFFFFF'; }}
+                      onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-alternative)'; }}
+                      onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-normal-normal)'; }}
                     >
                       <div style={{
                         flexShrink: 0,
@@ -497,11 +533,11 @@ export default function MapPage() {
                         {formatPriceShort(apt.price)}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '14px', fontWeight: 700, color: '#191F28', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.name}</p>
-                        <p style={{ fontSize: '12px', color: '#8B95A1', marginTop: '2px' }}>{apt.area}㎡ 기준</p>
+                        <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--semantic-label-normal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.name}</p>
+                        <p style={{ fontSize: '12px', color: 'var(--semantic-label-assistive)', marginTop: '2px' }}>{apt.area}㎡ 기준</p>
                       </div>
                       {isSelected && (
-                        <svg width="16" height="16" style={{ color: '#2563EB', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg width="16" height="16" style={{ color: 'var(--semantic-primary-normal)', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                         </svg>
                       )}
@@ -515,7 +551,13 @@ export default function MapPage() {
 
         {/* 선택된 아파트 상세 (데스크탑 패널 하단) */}
         {selectedApartment && (
-          <div className="flex-shrink-0 border-t border-[#E5E8EB] bg-white p-4">
+          <div
+            className="flex-shrink-0 p-4"
+            style={{
+              borderTop: '1px solid var(--semantic-line-normal)',
+              backgroundColor: 'var(--semantic-background-normal-normal)',
+            }}
+          >
             {/* 청약 정보 섹션 (청약 마커 선택 시) */}
             {selectedMapApt && (selectedMapApt.markerType === 'subOngoing' || selectedMapApt.markerType === 'subUpcoming') && (
               <SubscriptionInfoSection apt={selectedMapApt} navigate={navigate} />
@@ -527,8 +569,8 @@ export default function MapPage() {
               />
             ) : (
               <div>
-                <h3 className="font-bold text-[#191F28] text-base">{selectedApartment.name}</h3>
-                <p className="text-xl font-black text-[#191F28] mt-1">
+                <h3 className="font-bold text-base" style={{ color: 'var(--semantic-label-normal)' }}>{selectedApartment.name}</h3>
+                <p className="text-xl font-black mt-1" style={{ color: 'var(--semantic-label-normal)' }}>
                   {formatPriceShort(selectedApartment.recentPrice)}
                 </p>
                 {/* 상세 데이터 로딩 중 스피너 표시 */}
@@ -557,11 +599,11 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* ── 모바일 상단 오버레이 (검색바 + 3행 필터) ── */}
+        {/* ── 모바일 상단 오버레이 (검색바 + 필터 행) ── */}
         <div className="md:hidden absolute top-0 left-0 right-0 z-20 p-4 pt-safe">
           {/* 검색바 + 뒤로가기 */}
           <div className="flex items-center gap-2">
-            <div className="bg-white rounded-xl shadow-md flex-shrink-0">
+            <div className="rounded-xl shadow-md flex-shrink-0" style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}>
               <IconButton
                 variant="normal"
                 onClick={() => navigate(-1)}
@@ -570,8 +612,17 @@ export default function MapPage() {
                 <IconChevronLeft />
               </IconButton>
             </div>
-            <div className="flex-1 bg-white rounded-xl shadow-md flex items-center gap-2 px-4 py-3">
-              <svg className="w-4 h-4 text-[#8B95A1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div
+              className="flex-1 rounded-xl shadow-md flex items-center gap-2 px-4 py-3"
+              style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}
+            >
+              <svg
+                className="w-4 h-4"
+                style={{ color: 'var(--semantic-label-assistive)' }}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -579,209 +630,229 @@ export default function MapPage() {
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder="주소, 단지명 검색"
-                className="flex-1 text-sm outline-none text-[#191F28] placeholder-[#8B95A1]"
+                className="flex-1 text-sm outline-none bg-transparent"
+                style={{ color: 'var(--semantic-label-normal)' }}
               />
             </div>
           </div>
 
           {/* 행 1: 가격대 필터 (가로 스크롤) */}
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {PRICE_FILTERS.map((filter) => (
-              <MobileFilterChip
+              <Chip
                 key={filter.value}
-                label={filter.label}
+                size="small"
+                variant="outlined"
                 active={priceFilter === filter.value}
                 onClick={() => setPriceFilter(filter.value as PriceFilter)}
-              />
+                sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {filter.label}
+              </Chip>
             ))}
           </div>
 
           {/* 행 2: 레이어 필터 (가로 스크롤) */}
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            <MobileFilterChip
-              label="HOT"
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <Chip
+              size="small"
+              variant="outlined"
               active={layerFilters.hot}
-              activeColor="#FF4136"
               onClick={() => setLayerFilter('hot', !layerFilters.hot)}
-            />
-            <MobileFilterChip
-              label="최고가"
+              sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+            >
+              HOT
+            </Chip>
+            <Chip
+              size="small"
+              variant="outlined"
               active={layerFilters.allTimeHigh}
-              activeColor="#F39C12"
               onClick={() => setLayerFilter('allTimeHigh', !layerFilters.allTimeHigh)}
-            />
-            <MobileFilterChip
-              label="청약"
+              sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+            >
+              최고가
+            </Chip>
+            <Chip
+              size="small"
+              variant="outlined"
               active={layerFilters.subscription}
-              activeColor="#0066FF"
               onClick={() => setLayerFilter('subscription', !layerFilters.subscription)}
-            />
+              sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+            >
+              청약
+            </Chip>
             {activeLayerCount > 0 && (
               <span
-                className="flex-shrink-0 flex items-center px-2 rounded-full text-white text-[10px] font-bold shadow-sm"
-                style={{ background: '#0066FF', height: '32px' }}
+                className="flex-shrink-0 flex items-center px-2 rounded-full text-[10px] font-bold shadow-sm"
+                style={{
+                  backgroundColor: 'var(--semantic-primary-normal)',
+                  color: 'var(--semantic-static-white)',
+                  height: '32px',
+                }}
               >
                 {activeLayerCount} 활성
               </span>
             )}
           </div>
 
-          {/* 행 3: 평형대 필터 칩 (20/30/40/50평대 — 지도 상단 오버레이) */}
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          {/* 행 3: 평형대 필터 칩 (20/30/40/50평대) */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {PYEONG_FILTER_OPTIONS.map((opt) => (
-              <button
+              <Chip
                 key={opt.value}
+                size="small"
+                variant="outlined"
+                active={pyeongFilter === opt.value}
                 onClick={() => setPyeongFilter(opt.value as typeof pyeongFilter)}
-                className={[
-                  'flex-shrink-0 px-3 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap transition-all',
-                  pyeongFilter === opt.value
-                    ? 'bg-[#0066FF] text-white'
-                    : 'bg-white text-[#4E5968] border border-[#E5E8EB]',
-                ].join(' ')}
-                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+                sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
               >
                 {opt.label}
-              </button>
+              </Chip>
             ))}
           </div>
 
-          {/* 행 4(구 행 3): 세부 평형 필터 (59/74/84/109㎡ — 가로 스크롤) */}
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          {/* 행 4: 세부 평형 필터 (59/74/84/109㎡) */}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
             {AREA_FILTERS.map((filter) => (
-              <MobileFilterChip
+              <Chip
                 key={filter.value}
-                label={filter.label}
+                size="small"
+                variant="outlined"
                 active={areaFilter === filter.value}
                 onClick={() =>
                   setAreaFilter(areaFilter === filter.value ? 'all' : (filter.value as AreaFilter))
                 }
-              />
+                sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {filter.label}
+              </Chip>
             ))}
           </div>
 
           {/* 행 5: 세대수 필터 (가로 스크롤) */}
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {UNIT_COUNT_OPTIONS.map((opt) => {
-              const isActive = unitCountFilter === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => setUnitCountFilter(opt.value)}
-                  style={{
-                    flexShrink: 0,
-                    height: '32px',
-                    padding: '0 12px',
-                    borderRadius: '999px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
-                    border: isActive ? 'none' : '1px solid var(--semantic-line-normal)',
-                    backgroundColor: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
-                    color: isActive ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {UNIT_COUNT_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                size="small"
+                variant="outlined"
+                active={unitCountFilter === opt.value}
+                onClick={() => setUnitCountFilter(opt.value)}
+                sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {opt.label}
+              </Chip>
+            ))}
           </div>
 
           {/* 행 6: 단지특성 필터 (가로 스크롤) */}
-          <div className="flex gap-2 mt-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {COMPLEX_FEATURE_OPTIONS.map((opt) => {
-              const isActive = complexFeatures.has(opt.value);
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => toggleComplexFeature(opt.value)}
-                  style={{
-                    flexShrink: 0,
-                    height: '32px',
-                    padding: '0 12px',
-                    borderRadius: '999px',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    whiteSpace: 'nowrap',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
-                    border: isActive ? '1px solid var(--semantic-primary-normal)' : '1px solid var(--semantic-line-normal)',
-                    backgroundColor: isActive ? 'var(--semantic-primary-weak)' : 'var(--semantic-background-normal-normal)',
-                    color: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-label-alternative)',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+          <div className="flex gap-1.5 mt-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {COMPLEX_FEATURE_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.value}
+                size="small"
+                variant="outlined"
+                active={complexFeatures.has(opt.value)}
+                onClick={() => toggleComplexFeature(opt.value)}
+                sx={{ flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
+              >
+                {opt.label}
+              </Chip>
+            ))}
           </div>
         </div>
 
         {/* ── 마커/히트맵 뷰 토글 버튼 (지도 우상단) ── */}
         <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
           {/* 토글 버튼 */}
-          <div className="flex rounded-lg overflow-hidden shadow-md border border-[#E5E8EB]">
+          <div
+            className="flex rounded-lg overflow-hidden shadow-md"
+            style={{ border: '1px solid var(--semantic-line-normal)' }}
+          >
             <button
               onClick={() => setViewMode('marker')}
-              className={`px-3 py-2 text-[13px] font-medium transition-colors ${
-                viewMode === 'marker' ? 'bg-[#0066FF] text-white' : 'bg-white text-[#4E5968] hover:bg-[#F7FAF8]'
-              }`}
+              className="px-3 py-2 text-[13px] font-medium transition-colors"
+              style={{
+                backgroundColor: viewMode === 'marker' ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
+                color: viewMode === 'marker' ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
+              }}
               aria-label="마커 뷰"
             >
               마커
             </button>
             <button
               onClick={() => setViewMode('heatmap')}
-              className={`px-3 py-2 text-[13px] font-medium transition-colors ${
-                viewMode === 'heatmap' ? 'bg-[#0066FF] text-white' : 'bg-white text-[#4E5968] hover:bg-[#F7FAF8]'
-              }`}
+              className="px-3 py-2 text-[13px] font-medium transition-colors"
+              style={{
+                backgroundColor: viewMode === 'heatmap' ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
+                color: viewMode === 'heatmap' ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
+              }}
               aria-label="히트맵 뷰"
             >
               히트맵
             </button>
           </div>
 
-          {/* 마커 모드 범례 */}
+          {/* 마커 모드 가격 범례 */}
           {viewMode === 'marker' && (
-            <div className="hidden md:flex bg-white rounded-xl shadow-md px-3 py-2 gap-3 items-center">
-              <span className="text-xs text-[#8B95A1] font-semibold">가격 범례</span>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#8B95A1]" />
-                <span className="text-[11px] text-[#8B95A1]">5억 미만</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#FF9500]" />
-                <span className="text-[11px] text-[#8B95A1]">5~10억</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#FF4B4B]" />
-                <span className="text-[11px] text-[#8B95A1]">10~20억</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-[#D63031]" />
-                <span className="text-[11px] text-[#8B95A1]">20억+</span>
-              </div>
+            <div
+              className="hidden md:flex rounded-xl px-3 py-2 gap-3 items-center"
+              style={{
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                border: '1px solid var(--semantic-line-normal)',
+              }}
+            >
+              <span
+                className="text-xs font-semibold"
+                style={{ color: 'var(--semantic-label-assistive)' }}
+              >
+                가격 범례
+              </span>
+              {PRICE_LEGEND_ITEMS.map((item) => (
+                <div key={item.label} className="flex items-center gap-1">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span
+                    className="text-[11px]"
+                    style={{ color: 'var(--semantic-label-assistive)' }}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* 히트맵 모드 범례 */}
+          {/* 히트맵 모드 거래량 범례 */}
           {viewMode === 'heatmap' && (
-            <div className="hidden md:flex bg-white rounded-xl shadow-md px-3 py-2 gap-3 items-center">
-              <span className="text-xs text-[#8B95A1] font-semibold">거래량</span>
+            <div
+              className="hidden md:flex rounded-xl px-3 py-2 gap-3 items-center"
+              style={{
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
+                border: '1px solid var(--semantic-line-normal)',
+              }}
+            >
+              <span
+                className="text-xs font-semibold"
+                style={{ color: 'var(--semantic-label-assistive)' }}
+              >
+                거래량
+              </span>
               <div className="flex items-center gap-1">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(209,213,219,0.6)' }} />
-                <span className="text-[11px] text-[#8B95A1]">적음</span>
+                <span className="text-[11px]" style={{ color: 'var(--semantic-label-assistive)' }}>적음</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(251,191,36,0.7)' }} />
-                <span className="text-[11px] text-[#8B95A1]">보통</span>
+                <span className="text-[11px]" style={{ color: 'var(--semantic-label-assistive)' }}>보통</span>
               </div>
               <div className="flex items-center gap-1">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(249,115,22,0.8)' }} />
-                <span className="text-[11px] text-[#8B95A1]">많음</span>
+                <span className="text-[11px]" style={{ color: 'var(--semantic-label-assistive)' }}>많음</span>
               </div>
             </div>
           )}
@@ -790,10 +861,17 @@ export default function MapPage() {
         {/* 현재 위치 버튼 */}
         <button
           onClick={handleCurrentLocation}
-          className="absolute right-4 bottom-32 md:bottom-8 z-20 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors"
+          className="absolute right-4 bottom-32 md:bottom-8 z-20 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-colors"
+          style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}
           aria-label="현재 위치"
         >
-          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            className="w-5 h-5"
+            style={{ color: 'var(--semantic-primary-normal)' }}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
@@ -827,8 +905,8 @@ export default function MapPage() {
               {selectedMapApt && (selectedMapApt.markerType === 'subOngoing' || selectedMapApt.markerType === 'subUpcoming') && (
                 <SubscriptionInfoSection apt={selectedMapApt} navigate={navigate} />
               )}
-              <h3 className="font-bold text-[#191F28] text-lg">{selectedApartment.name}</h3>
-              <p className="text-2xl font-black text-[#191F28] mt-2">
+              <h3 className="font-bold text-lg" style={{ color: 'var(--semantic-label-normal)' }}>{selectedApartment.name}</h3>
+              <p className="text-2xl font-black mt-2" style={{ color: 'var(--semantic-label-normal)' }}>
                 {formatPriceShort(selectedApartment.recentPrice)}
               </p>
               {/* 상세 데이터 로딩 중 스피너 표시 */}
@@ -858,85 +936,15 @@ export default function MapPage() {
 // 필터 UI 공통 컴포넌트
 // ────────────────────────────────────────────────────────────
 
-// 그룹 라벨 (데스크탑 사이드패널 전용)
-function FilterGroupLabel({ label, className = '' }: { label: string; className?: string }) {
+// LNB 섹션 라벨 (데스크탑 사이드패널 전용)
+function LnbSectionLabel({ label, className = '' }: { label: string; className?: string }) {
   return (
     <p
       className={className}
-      style={{ fontSize: '11px', fontWeight: 600, color: '#8B95A1' }}
+      style={{ fontSize: '11px', fontWeight: 600, color: 'var(--semantic-label-assistive)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
     >
       {label}
     </p>
-  );
-}
-
-// 데스크탑 필터 칩 (height 28px)
-function FilterChip({
-  label,
-  active,
-  activeColor = '#0066FF',
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  activeColor?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        height: '28px',
-        padding: '0 10px',
-        borderRadius: '14px',
-        fontSize: '12px',
-        fontWeight: 600,
-        border: `1px solid ${active ? activeColor : '#E5E8EB'}`,
-        background: active ? activeColor : '#FFFFFF',
-        color: active ? '#FFFFFF' : '#8B95A1',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-// 모바일 필터 칩 (height 32px, 터치 타겟 확보)
-function MobileFilterChip({
-  label,
-  active,
-  activeColor = '#0066FF',
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  activeColor?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        height: '32px',
-        padding: '0 12px',
-        borderRadius: '16px',
-        fontSize: '12px',
-        fontWeight: 600,
-        border: `1px solid ${active ? activeColor : 'transparent'}`,
-        background: active ? activeColor : '#FFFFFF',
-        color: active ? '#FFFFFF' : '#8B95A1',
-        cursor: 'pointer',
-        transition: 'all 0.15s ease',
-        whiteSpace: 'nowrap',
-        flexShrink: 0,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
-      }}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -982,7 +990,7 @@ function SubscriptionInfoSection({
   }
 
   return (
-    <div className="mb-3 pb-3 border-b border-[#E5E8EB]">
+    <div className="mb-3 pb-3" style={{ borderBottom: '1px solid var(--semantic-line-normal)' }}>
       {/* 상태 뱃지 + D-Day */}
       <div className="flex items-center gap-2 mb-2">
         <span
@@ -1009,8 +1017,8 @@ function SubscriptionInfoSection({
 
       {/* 분양가 정보 */}
       <div className="flex items-center gap-2 mt-1.5">
-        <span style={{ fontSize: '12px', color: '#8B95A1', fontWeight: 500 }}>분양가</span>
-        <span style={{ fontSize: '13px', color: '#191F28', fontWeight: 700 }}>
+        <span style={{ fontSize: '12px', color: 'var(--semantic-label-assistive)', fontWeight: 500 }}>분양가</span>
+        <span style={{ fontSize: '13px', color: 'var(--semantic-label-normal)', fontWeight: 700 }}>
           {formatPriceShort(apt.price)}
         </span>
       </div>
@@ -1046,38 +1054,62 @@ function DesktopApartmentSummary({
 }) {
   if (!apartment) return null;
 
-  const priceColor =
+  const priceChangeColor =
     apartment.priceChangeType === 'up'
-      ? 'text-[#FF4B4B]'
+      ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? 'text-[#3B82F6]'
-        : 'text-[#8B95A1]';
+        ? '#3B82F6'
+        : 'var(--semantic-label-assistive)';
 
   return (
     <div>
-      <h3 className="font-black text-[#191F28] text-base leading-snug">{apartment.name}</h3>
-      <p className="text-xs text-[#8B95A1] mt-0.5">{apartment.address || `${apartment.district} ${apartment.dong}`}</p>
+      <h3
+        className="font-black text-base leading-snug"
+        style={{ color: 'var(--semantic-label-normal)' }}
+      >
+        {apartment.name}
+      </h3>
+      <p
+        className="text-xs mt-0.5"
+        style={{ color: 'var(--semantic-label-assistive)' }}
+      >
+        {apartment.address || `${apartment.district} ${apartment.dong}`}
+      </p>
       <div className="flex items-baseline gap-2 mt-2">
-        <span className="text-xl font-black text-[#191F28]">
+        <span
+          className="text-xl font-black"
+          style={{ color: 'var(--semantic-label-normal)' }}
+        >
           {formatPriceShort(apartment.recentPrice)}
         </span>
-        <span className="text-xs text-[#8B95A1]">{apartment.recentPriceArea}㎡</span>
-        <span className={`text-xs font-bold ${priceColor}`}>
+        <span
+          className="text-xs"
+          style={{ color: 'var(--semantic-label-assistive)' }}
+        >
+          {apartment.recentPriceArea}㎡
+        </span>
+        <span
+          className="text-xs font-bold"
+          style={{ color: priceChangeColor }}
+        >
           {formatChange(apartment.priceChange)}
         </span>
       </div>
-      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#E5E8EB] text-center">
+      <div
+        className="grid grid-cols-3 gap-2 mt-3 pt-3 text-center"
+        style={{ borderTop: '1px solid var(--semantic-line-normal)' }}
+      >
         <div>
-          <p className="text-[10px] text-[#8B95A1]">세대수</p>
-          <p className="text-xs font-bold text-[#191F28] mt-0.5">{formatUnits(apartment.totalUnits)}</p>
+          <p className="text-[10px]" style={{ color: 'var(--semantic-label-assistive)' }}>세대수</p>
+          <p className="text-xs font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{formatUnits(apartment.totalUnits)}</p>
         </div>
         <div>
-          <p className="text-[10px] text-[#8B95A1]">준공</p>
-          <p className="text-xs font-bold text-[#191F28] mt-0.5">{apartment.builtYear}년</p>
+          <p className="text-[10px]" style={{ color: 'var(--semantic-label-assistive)' }}>준공</p>
+          <p className="text-xs font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builtYear}년</p>
         </div>
         <div>
-          <p className="text-[10px] text-[#8B95A1]">건설사</p>
-          <p className="text-xs font-bold text-[#191F28] mt-0.5 truncate">{apartment.builder}</p>
+          <p className="text-[10px]" style={{ color: 'var(--semantic-label-assistive)' }}>건설사</p>
+          <p className="text-xs font-bold mt-0.5 truncate" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builder}</p>
         </div>
       </div>
       <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={onDetailClick}>
@@ -1104,17 +1136,27 @@ function ApartmentSummary({
 }) {
   if (!apartment) return null;
 
-  const priceColor =
+  const mobilepriceChangeColor =
     apartment.priceChangeType === 'up'
-      ? 'text-[#FF4B4B]'
+      ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? 'text-[#3B82F6]'
-        : 'text-[#8B95A1]';
+        ? '#3B82F6'
+        : 'var(--semantic-label-assistive)';
 
   return (
     <div className="p-5">
-      <h3 className="font-black text-[#191F28] text-lg leading-snug">{apartment.name}</h3>
-      <p className="text-sm text-[#8B95A1] mt-1">{apartment.address || `${apartment.district} ${apartment.dong}`}</p>
+      <h3
+        className="font-black text-lg leading-snug"
+        style={{ color: 'var(--semantic-label-normal)' }}
+      >
+        {apartment.name}
+      </h3>
+      <p
+        className="text-sm mt-1"
+        style={{ color: 'var(--semantic-label-assistive)' }}
+      >
+        {apartment.address || `${apartment.district} ${apartment.dong}`}
+      </p>
 
       {/* 청약 정보 섹션 (청약 마커인 경우 상단에 표시) */}
       {selectedMapApt && (selectedMapApt.markerType === 'subOngoing' || selectedMapApt.markerType === 'subUpcoming') && (
@@ -1124,27 +1166,41 @@ function ApartmentSummary({
       )}
 
       <div className="flex items-baseline gap-2 mt-3">
-        <span className="text-2xl font-black text-[#191F28]">
+        <span
+          className="text-2xl font-black"
+          style={{ color: 'var(--semantic-label-normal)' }}
+        >
           {formatPriceShort(apartment.recentPrice)}
         </span>
-        <span className="text-sm text-[#8B95A1]">{apartment.recentPriceArea}㎡</span>
-        <span className={`text-sm font-bold ${priceColor}`}>
+        <span
+          className="text-sm"
+          style={{ color: 'var(--semantic-label-assistive)' }}
+        >
+          {apartment.recentPriceArea}㎡
+        </span>
+        <span
+          className="text-sm font-bold"
+          style={{ color: mobilepriceChangeColor }}
+        >
           {formatChange(apartment.priceChange)}
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-[#E5E8EB]">
+      <div
+        className="grid grid-cols-3 gap-3 mt-4 pt-4"
+        style={{ borderTop: '1px solid var(--semantic-line-normal)' }}
+      >
         <div>
-          <p className="text-xs text-[#8B95A1]">세대수</p>
-          <p className="text-sm font-bold text-[#191F28] mt-0.5">{formatUnits(apartment.totalUnits)}</p>
+          <p className="text-xs" style={{ color: 'var(--semantic-label-assistive)' }}>세대수</p>
+          <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{formatUnits(apartment.totalUnits)}</p>
         </div>
         <div>
-          <p className="text-xs text-[#8B95A1]">준공</p>
-          <p className="text-sm font-bold text-[#191F28] mt-0.5">{apartment.builtYear}년</p>
+          <p className="text-xs" style={{ color: 'var(--semantic-label-assistive)' }}>준공</p>
+          <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builtYear}년</p>
         </div>
         <div>
-          <p className="text-xs text-[#8B95A1]">건설사</p>
-          <p className="text-sm font-bold text-[#191F28] mt-0.5 truncate">{apartment.builder}</p>
+          <p className="text-xs" style={{ color: 'var(--semantic-label-assistive)' }}>건설사</p>
+          <p className="text-sm font-bold mt-0.5 truncate" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builder}</p>
         </div>
       </div>
 
@@ -1186,9 +1242,9 @@ function MockMapBackground({
         <div className="absolute bg-white w-2" style={{ left: '70%', top: 0, bottom: 0 }} />
       </div>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-        <div className="bg-white/90 rounded-2xl p-4 shadow-lg">
-          <p className="text-sm font-bold text-[#191F28]">카카오맵 연동 필요</p>
-          <p className="text-xs text-[#8B95A1] mt-1">.env에 VITE_KAKAO_MAP_KEY 설정</p>
+        <div className="rounded-2xl p-4 shadow-lg" style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}>
+          <p className="text-sm font-bold" style={{ color: 'var(--semantic-label-normal)' }}>카카오맵 연동 필요</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--semantic-label-assistive)' }}>.env에 VITE_KAKAO_MAP_KEY 설정</p>
         </div>
       </div>
       {apartments.slice(0, 8).map((apt, i) => {
@@ -1273,4 +1329,12 @@ const COMPLEX_FEATURE_OPTIONS: { value: ComplexFeature; label: string }[] = [
   { value: 'new', label: '신축' },
   { value: 'flat', label: '평지' },
   { value: 'school', label: '초품아' },
+];
+
+// 가격 범례 아이템 (마커 색상과 동일한 4단계 기준)
+const PRICE_LEGEND_ITEMS = [
+  { color: '#8B95A1', label: '5억 미만' },
+  { color: '#FF9500', label: '5~10억' },
+  { color: '#FF4B4B', label: '10~20억' },
+  { color: '#D63031', label: '20억+' },
 ];

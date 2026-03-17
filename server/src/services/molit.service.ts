@@ -1200,17 +1200,18 @@ export async function getApartmentHistory(
   months: number = 24,
   filterArea?: number,
 ): Promise<ApartmentTradeHistory[]> {
-  const cacheKey = `history:${aptCode}:${lawdCd}:${months}:${filterArea ?? 'all'}`;
+  const cacheLookupId = `history:${aptCode}:${lawdCd}:${months}:${filterArea ?? 'all'}`;
 
-  const cached = cacheService.get<ApartmentTradeHistory[]>(cacheKey);
+  const cached = cacheService.get<ApartmentTradeHistory[]>(cacheLookupId);
   if (cached) {
-    console.log(`[Molit] 히스토리 캐시 히트: ${cacheKey}`);
+    console.log(`[Molit] 히스토리 캐시 히트: ${cacheLookupId}`);
     return cached;
   }
 
-  console.log(`[Molit] 히스토리 조회 시작: aptCode=${aptCode}, ${months}개월`);
+  console.log(`[Molit] 히스토리 조회 시작: aptCode=${aptCode}, ${months}개월, lawdCd=${lawdCd || '미제공'}`);
 
   // Mock 데이터에 해당 aptCode가 있으면 Mock 반환
+  // lawdCd가 없는 경우에도 Mock 데이터로 서빙 (FE 단에서 lawdCd 없이 호출하는 케이스 대응)
   const mockData = APT_HISTORY_MOCK[aptCode];
   if (mockData) {
     console.log(`[Molit] Mock 히스토리 반환: aptCode=${aptCode}, ${mockData.length}개월`);
@@ -1224,8 +1225,19 @@ export async function getApartmentHistory(
     }
 
     // 캐시 저장 (6시간)
-    cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
+    cacheService.set(cacheLookupId, result, CACHE_TTL.APARTMENT_TRADE);
     return result;
+  }
+
+  // lawdCd 없으면 실 API 호출 불가 → 동적 Mock 생성
+  if (!lawdCd) {
+    console.warn(`[Molit] lawdCd 미제공이고 Mock 데이터도 없음: aptCode=${aptCode} → 동적 Mock 생성`);
+    // APT_BASE_DATA에서 aptCode에 근접한 단지 찾아 basePrice 추출 후 동적 생성
+    const baseApt = APT_BASE_DATA.find((a) => a.aptCode === aptCode);
+    const basePrice = baseApt?.basePrice ?? 100000;
+    const dynamicHistory = generateHistory(basePrice, months);
+    cacheService.set(cacheLookupId, dynamicHistory, CACHE_TTL.APARTMENT_TRADE);
+    return dynamicHistory;
   }
 
   // Mock에 없으면 실 API 시도
@@ -1650,6 +1662,11 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
     { area: 109, recentPrice: Math.round(found.basePrice * 1.28) },
   ];
 
+  // 해당 단지의 24개월 시계열 히스토리 포함 (차트 초기 렌더용)
+  // APT_HISTORY_MOCK에 있으면 사용, 없으면 basePrice 기반으로 동적 생성
+  const rawHistory = APT_HISTORY_MOCK[found.aptCode] ?? generateHistory(found.basePrice, 24);
+  const tradeHistory = rawHistory.slice(-24);
+
   const result: HotApartment = {
     rank: 0,
     aptCode: found.aptCode,
@@ -1669,6 +1686,7 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
     buildYear: found.builtYear,
     builder: found.builder,
     areas,
+    tradeHistory,
     // lawdNm에서 법정동 코드(lawdCd) 매핑은 미지원 → 필드 생략
   };
 

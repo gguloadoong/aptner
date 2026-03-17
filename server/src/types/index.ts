@@ -97,6 +97,8 @@ export interface HotApartment {
   builder?: string;
   /** 면적별 대표 거래 히스토리 */
   areas?: ApartmentAreaSummary[];
+  /** 최근 24개월 실거래가 시계열 데이터 (상세 조회 시 포함) */
+  tradeHistory?: ApartmentTradeHistory[];
 }
 
 /** 단지 내 면적 유형별 요약 */
