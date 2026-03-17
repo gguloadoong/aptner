@@ -19,7 +19,12 @@ import {
   Button,
   TextButton,
   IconButton,
+  Box,
+  FlexBox,
+  Typography,
+  Skeleton,
 } from '@wanteddev/wds';
+import { useIsPC } from '../hooks/useBreakpoint';
 import {
   IconHome,
   IconHomeFill,
@@ -31,12 +36,9 @@ import {
 } from '@wanteddev/wds-icon';
 import type { Apartment } from '../types';
 
-// ─────────────────────────────────────────────────────────
-// 홈 페이지 — 상업용 수준 UI 개편
-// 토스증권/호갱노노 스타일 미니멀리즘 적용
-// ─────────────────────────────────────────────────────────
 export default function HomePage() {
   const navigate = useNavigate();
+  const isMobile = !useIsPC();
 
   // 찜 개수 (헤더 배지용)
   const bookmarkCount = useBookmarkStore((s) => s.bookmarkCount);
@@ -64,30 +66,48 @@ export default function HomePage() {
     });
   }, [subData]);
 
-  // 1위 히어로 / 2~10위 컴팩트
   const topApt = hotApartments[0] ?? null;
   const restApts = hotApartments.slice(1, 8);
 
   return (
-    <div className="min-h-screen bg-[#F7FAF8]">
-      {/* ───────── 모바일 헤더 (lg에서 사이드바가 대체) — div로 래핑해야 WDS header CSS 충돌 방지 ───────── */}
-      <div className="lg:hidden">
-        <div className="bg-white sticky top-0 z-30 border-b border-[#E5E8EB] shadow-[0_1px_6px_rgba(0,0,0,0.05)]">
-          <div className="px-5 pt-4 pb-3">
+    <div style={{ minHeight: '100svh', backgroundColor: 'var(--semantic-background-normal-alternative)' }}>
+
+      {/* 모바일 헤더 — useMediaQuery로 조건부 렌더링 */}
+      {isMobile && (
+        <Box
+          sx={{
+            backgroundColor: 'var(--semantic-background-normal-normal)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            borderBottom: '1px solid var(--semantic-line-normal)',
+            boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+          }}
+        >
+          <Box sx={{ padding: '16px 20px 12px 20px' }}>
             {/* 로고 + 찜 배지 행 */}
-            <div className="flex items-center justify-between mb-3">
+            <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '12px' }}>
               <BomzipLogo size="md" showText={true} />
-              <div className="flex items-center gap-1.5">
+              <FlexBox alignItems="center" gap="6px">
                 {bookmarkCount > 0 && (
                   <button
                     onClick={() => navigate('/bookmarks')}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFF3F3] transition-colors"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 10px',
+                      borderRadius: '9999px',
+                      backgroundColor: '#FFF3F3',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
                     aria-label="찜 목록"
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="#FF4B4B" stroke="none">
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                     </svg>
-                    <span className="text-[12px] font-bold text-[#FF4B4B]">{bookmarkCount}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF4B4B' }}>{bookmarkCount}</span>
                   </button>
                 )}
                 <IconButton
@@ -97,55 +117,86 @@ export default function HomePage() {
                 >
                   <IconSearch />
                 </IconButton>
-              </div>
-            </div>
+              </FlexBox>
+            </FlexBox>
 
             {/* 검색바 */}
             <SearchBar placeholder="아파트 단지명 또는 지역 검색" />
-          </div>
-        </div>
-      </div>
+          </Box>
+        </Box>
+      )}
 
-      {/* ───────── PC 전용 콘텐츠 헤더 (lg에서만 표시) ───────── */}
-      <div className="hidden lg:block sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b border-[#E5E8EB]">
-        <div className="max-w-[1200px] mx-auto px-8 py-4">
-          <SearchBar placeholder="아파트 단지명 또는 지역 검색" />
-        </div>
-      </div>
+      {/* PC 전용 콘텐츠 헤더 */}
+      {!isMobile && (
+        <Box
+          sx={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            backdropFilter: 'blur(8px)',
+            borderBottom: '1px solid var(--semantic-line-normal)',
+          }}
+        >
+          <Box sx={{ maxWidth: '1200px', margin: '0 auto', padding: '16px 32px' }}>
+            <SearchBar placeholder="아파트 단지명 또는 지역 검색" />
+          </Box>
+        </Box>
+      )}
 
-      {/* ───────── 메인 콘텐츠 ───────── */}
-      <main className="pb-24 lg:pb-10">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-6 lg:px-8">
+      {/* 메인 콘텐츠 */}
+      <Box
+        as="main"
+        sx={{ paddingBottom: isMobile ? '96px' : '40px' }}
+      >
+        <Box sx={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
 
           {/* 모바일 슬로건 */}
-          <p className="lg:hidden text-[12px] text-[#8B95A1] font-medium pt-4 pb-1">
-            봄처럼 따뜻하게, 집처럼 포근하게
-          </p>
+          {isMobile && (
+            <Typography
+              variant="caption1"
+              weight="medium"
+              sx={{ color: 'var(--semantic-label-assistive)', display: 'block', paddingTop: '16px', paddingBottom: '4px' }}
+            >
+              봄처럼 따뜻하게, 집처럼 포근하게
+            </Typography>
+          )}
 
-          {/* ─── 데스크탑 2열 레이아웃 ─── */}
-          <div className="lg:grid lg:grid-cols-[1fr_360px] lg:gap-10 lg:pt-8">
+          {/* 데스크탑 2열 레이아웃 */}
+          <div
+            style={{
+              display: isMobile ? 'block' : 'grid',
+              gridTemplateColumns: isMobile ? undefined : '1fr 360px',
+              gap: isMobile ? undefined : '40px',
+              paddingTop: isMobile ? undefined : '32px',
+            }}
+          >
 
-            {/* ── 좌측: HOT 랭킹 ── */}
+            {/* 좌측: HOT 랭킹 */}
             <div>
-              <section className="pt-5 lg:pt-0">
+              <Box as="section" sx={{ paddingTop: isMobile ? '20px' : '0' }}>
                 {/* 섹션 헤더 */}
-                <div className="flex items-end justify-between mb-4">
+                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '16px' }}>
                   <div>
-                    <h2 className="text-[20px] lg:text-[22px] font-black tracking-[-0.03em] text-[#191F28]">
+                    <Typography
+                      variant={isMobile ? 'title3' : 'title2'}
+                      weight="bold"
+                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
+                    >
                       이번 주 HOT
-                    </h2>
-                    <p className="text-[12px] text-[#8B95A1] mt-0.5 font-medium">
+                    </Typography>
+                    <Typography
+                      variant="caption1"
+                      weight="medium"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                    >
                       조회 · 거래량 기준 주간 랭킹
-                    </p>
+                    </Typography>
                   </div>
-                  <TextButton
-                    size="small"
-                    color="primary"
-                    onClick={() => navigate('/trend')}
-                  >
+                  <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
                     전체 보기
                   </TextButton>
-                </div>
+                </FlexBox>
 
                 {/* 1위 히어로 카드 */}
                 {isAptLoading ? (
@@ -158,7 +209,16 @@ export default function HomePage() {
 
                 {/* 2~8위 컴팩트 리스트 */}
                 {!isAptLoading && restApts.length > 0 && (
-                  <div className="mt-2 bg-white rounded-2xl border border-[#E5E8EB] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+                  <Box
+                    sx={{
+                      marginTop: '8px',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                      overflow: 'hidden',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                    }}
+                  >
                     {restApts.map((apt, i) => (
                       <CompactApartmentRow
                         key={apt.id}
@@ -167,25 +227,35 @@ export default function HomePage() {
                         isLast={i === restApts.length - 1}
                       />
                     ))}
-                  </div>
+                  </Box>
                 )}
 
                 {/* 스켈레톤 리스트 (로딩 중) */}
                 {isAptLoading && (
-                  <div className="mt-2 bg-white rounded-2xl border border-[#E5E8EB] overflow-hidden">
+                  <Box
+                    sx={{
+                      marginTop: '8px',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {[2, 3, 4, 5, 6].map((rank) => (
-                      <div
+                      <FlexBox
                         key={rank}
-                        className="h-14 border-b border-[#F2F4F6] last:border-0 flex items-center gap-3 px-4"
+                        alignItems="center"
+                        gap="12px"
+                        style={{ padding: '12px 16px', borderBottom: '1px solid var(--semantic-background-normal-alternative)' }}
                       >
-                        <div className="skeleton-shimmer w-6 h-6 rounded-full flex-shrink-0" />
-                        <div className="flex-1 flex justify-between gap-3">
-                          <div className="skeleton-shimmer rounded h-[13px] w-[55%]" />
-                          <div className="skeleton-shimmer rounded h-[13px] w-[18%]" />
-                        </div>
-                      </div>
+                        <Skeleton variant="circle" width="24px" height="24px" />
+                        <FlexBox flex="1" justifyContent="space-between" gap="12px">
+                          <Skeleton variant="text" width="55%" height="13px" />
+                          <Skeleton variant="text" width="18%" height="13px" />
+                        </FlexBox>
+                      </FlexBox>
                     ))}
-                  </div>
+                  </Box>
                 )}
 
                 {/* TOP 10 전체 보기 버튼 */}
@@ -194,172 +264,218 @@ export default function HomePage() {
                   color="primary"
                   fullWidth
                   onClick={() => navigate('/trend')}
-                  className="mt-3"
+                  style={{ marginTop: '12px' }}
                 >
                   TOP 10 전체 보기
                 </Button>
-              </section>
+              </Box>
 
               {/* 지도 바로가기 배너 (모바일에서만 이쪽에 위치) */}
-              <div className="mt-5 lg:hidden">
-                <MapBanner />
-              </div>
+              {isMobile && (
+                <Box sx={{ marginTop: '20px' }}>
+                  <MapBanner />
+                </Box>
+              )}
             </div>
 
-            {/* ── 우측: 청약 + 지역 시세 ── */}
-            <div className="space-y-6 lg:space-y-7">
+            {/* 우측: 청약 + 지역 시세 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '24px' : '28px' }}>
 
               {/* Section 2: 마감 임박 청약 */}
-              <section className="pt-5 lg:pt-0">
-                <div className="flex items-end justify-between mb-4">
+              <Box as="section" sx={{ paddingTop: isMobile ? '20px' : '0' }}>
+                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '16px' }}>
                   <div>
-                    <h2 className="text-[17px] font-bold tracking-[-0.02em] text-[#191F28]">
+                    <Typography
+                      variant="heading1"
+                      weight="bold"
+                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
+                    >
                       마감 임박 청약
-                    </h2>
-                    <p className="text-[12px] text-[#8B95A1] mt-0.5">D-14 이내 마감 예정</p>
+                    </Typography>
+                    <Typography
+                      variant="caption1"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                    >
+                      D-14 이내 마감 예정
+                    </Typography>
                   </div>
-                  <TextButton
-                    size="small"
-                    color="primary"
-                    onClick={() => navigate('/subscription')}
-                  >
+                  <TextButton size="small" color="primary" onClick={() => navigate('/subscription')}>
                     전체 보기
                   </TextButton>
-                </div>
+                </FlexBox>
 
                 {isSubLoading ? (
-                  /* 로딩 스켈레톤 */
-                  <div className="space-y-2">
+                  <FlexBox flexDirection="column" gap="8px">
                     {[1, 2, 3].map((i) => (
-                      <div
+                      <Box
                         key={i}
-                        className="h-[68px] bg-white rounded-xl border border-[#E5E8EB] flex items-center gap-3 px-4"
+                        sx={{
+                          height: '68px',
+                          backgroundColor: 'var(--semantic-background-normal-normal)',
+                          borderRadius: '12px',
+                          border: '1px solid var(--semantic-line-normal)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '0 16px',
+                        }}
                       >
-                        <div className="skeleton-shimmer w-11 h-7 rounded-lg flex-shrink-0" />
-                        <div className="flex-1 space-y-1.5">
-                          <div className="skeleton-shimmer rounded h-[13px] w-[65%]" />
-                          <div className="skeleton-shimmer rounded h-[11px] w-[40%]" />
+                        <Skeleton variant="rectangle" width="44px" height="28px" />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          <Skeleton variant="text" width="65%" height="13px" />
+                          <Skeleton variant="text" width="40%" height="11px" />
                         </div>
-                        <div className="flex-shrink-0 space-y-1.5 items-end flex flex-col">
-                          <div className="skeleton-shimmer rounded h-[13px] w-[52px]" />
-                          <div className="skeleton-shimmer rounded h-[11px] w-[38px]" />
-                        </div>
-                      </div>
+                      </Box>
                     ))}
-                  </div>
+                  </FlexBox>
                 ) : urgentSubscriptions.length === 0 ? (
-                  /* 빈 상태 */
-                  <div className="py-7 text-center bg-white rounded-2xl border border-[#E5E8EB]">
-                    <p className="text-[13px] font-semibold text-[#8B95A1]">
+                  <Box
+                    sx={{
+                      padding: '28px 16px',
+                      textAlign: 'center',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                    }}
+                  >
+                    <Typography variant="body2" weight="medium" sx={{ color: 'var(--semantic-label-assistive)' }}>
                       현재 마감 임박 청약이 없습니다
-                    </p>
-                    <TextButton
-                      size="small"
-                      color="primary"
-                      onClick={() => navigate('/subscription')}
-                      trailingContent={<IconChevronRight />}
-                      className="mt-3"
-                    >
-                      진행 중 청약 보기
-                    </TextButton>
-                  </div>
+                    </Typography>
+                    <Box sx={{ marginTop: '12px' }}>
+                      <TextButton
+                        size="small"
+                        color="primary"
+                        onClick={() => navigate('/subscription')}
+                        trailingContent={<IconChevronRight />}
+                      >
+                        진행 중 청약 보기
+                      </TextButton>
+                    </Box>
+                  </Box>
                 ) : (
-                  <div className="space-y-2">
+                  <FlexBox flexDirection="column" gap="8px">
                     {urgentSubscriptions.slice(0, 4).map((sub) => (
                       <UrgentSubscriptionCard key={sub.id} subscription={sub} />
                     ))}
-                  </div>
+                  </FlexBox>
                 )}
-              </section>
+              </Box>
 
               {/* Section 3: 지역 시세 */}
-              <section>
-                <div className="flex items-end justify-between mb-3">
+              <Box as="section">
+                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
                   <div>
-                    <h2 className="text-[17px] font-bold tracking-[-0.02em] text-[#191F28]">
+                    <Typography
+                      variant="heading1"
+                      weight="bold"
+                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
+                    >
                       지역 시세
-                    </h2>
-                    <p className="text-[12px] text-[#8B95A1] mt-0.5">주간 평균 실거래가</p>
+                    </Typography>
+                    <Typography
+                      variant="caption1"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                    >
+                      주간 평균 실거래가
+                    </Typography>
                   </div>
-                  <TextButton
-                    size="small"
-                    color="primary"
-                    onClick={() => navigate('/trend')}
-                  >
+                  <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
                     더보기
                   </TextButton>
-                </div>
+                </FlexBox>
 
                 {/* 가로 스크롤 pill 칩 */}
                 <div
-                  className={[
-                    'flex gap-2 overflow-x-auto -mx-5 px-5 lg:mx-0 lg:px-0',
-                    'lg:flex-wrap',
-                    '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
-                  ].join(' ')}
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    flexWrap: isMobile ? undefined : 'wrap',
+                  } as React.CSSProperties}
                 >
                   {MOCK_REGION_TRENDS.map((trend) => (
                     <RegionChip key={trend.region} trend={trend} />
                   ))}
                 </div>
-              </section>
+              </Box>
 
               {/* 지도 바로가기 배너 (데스크탑에서만 우측 하단에 위치) */}
-              <section className="hidden lg:block">
-                <MapBanner />
-              </section>
+              {!isMobile && (
+                <Box as="section">
+                  <MapBanner />
+                </Box>
+              )}
             </div>
           </div>
-        </div>
-      </main>
+        </Box>
+      </Box>
 
-      {/* 모바일 하단 내비게이션 — lg 이상은 사이드바가 대체 */}
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
+      {/* 모바일 하단 내비게이션 */}
+      {isMobile && <BottomNav />}
 
-      {/* 단지 비교 바 — 선택 0개면 자동 숨김 */}
+      {/* 단지 비교 바 */}
       <CompareBar />
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────
 // MapBanner — 지도 바로가기 배너
-// ─────────────────────────────────────────────────────────
 function MapBanner() {
   const navigate = useNavigate();
 
   return (
     <button
       onClick={() => navigate('/map')}
-      className="w-full bg-gradient-to-r from-[#0066FF] to-[#3B82F6] rounded-2xl p-5 text-left hover:opacity-95 active:scale-[0.99] transition-all duration-150"
+      style={{
+        width: '100%',
+        background: 'linear-gradient(135deg, #0066FF 0%, #3B82F6 100%)',
+        borderRadius: '16px',
+        padding: '20px',
+        textAlign: 'left',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'opacity 150ms ease',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.95'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
     >
-      <div className="flex items-center justify-between">
+      <FlexBox alignItems="center" justifyContent="space-between">
         <div>
-          <h3 className="text-[16px] font-black text-white leading-tight">
+          <Typography variant="body1" weight="bold" sx={{ color: 'white', display: 'block', lineHeight: 1.3 }}>
             지도로 아파트 찾기
-          </h3>
-          <p className="text-[12px] text-white/75 mt-1">
+          </Typography>
+          <Typography variant="caption1" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block', marginTop: '4px' }}>
             서울 주요 아파트 실거래가를 지도에서 확인
-          </p>
+          </Typography>
         </div>
-        <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            marginLeft: '12px',
+          }}
+        >
+          <svg width="20" height="20" fill="none" stroke="white" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2}
               d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2}
               d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
         </div>
-      </div>
+      </FlexBox>
     </button>
   );
 }
 
-// ─────────────────────────────────────────────────────────
 // CompactApartmentRow — 2~8위 컴팩트 행
-// ─────────────────────────────────────────────────────────
 interface CompactApartmentRowProps {
   apartment: Apartment;
   rank: number;
@@ -371,39 +487,43 @@ function CompactApartmentRow({ apartment, rank, isLast }: CompactApartmentRowPro
 
   const isUp = apartment.priceChangeType === 'up';
   const isDown = apartment.priceChangeType === 'down';
-  const priceColor = isUp ? 'text-[#FF4B4B]' : isDown ? 'text-[#3B82F6]' : 'text-[#8B95A1]';
+  const priceColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
   const changeArrow = isUp ? '▲' : isDown ? '▼' : '';
 
   const hasHotTags = apartment.hotTags && apartment.hotTags.length > 0;
 
-  // 순위 번호 스타일 결정
   const renderRankBadge = () => {
+    const badgeBase: React.CSSProperties = {
+      width: '24px',
+      height: '24px',
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '11px',
+      fontWeight: 900,
+      color: 'white',
+    };
+
     if (rank === 2) {
       return (
-        <div className="flex flex-col items-center flex-shrink-0 w-7">
-          <span className="w-6 h-6 rounded-full bg-[#C0C0C0] text-white text-[11px] font-black flex items-center justify-center shadow-[0_2px_4px_rgba(192,192,192,0.5)]">
-            2
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
+          <span style={{ ...badgeBase, backgroundColor: '#C0C0C0', boxShadow: '0 2px 4px rgba(192,192,192,0.5)' }}>2</span>
           <RankChange change={apartment.rankChange} />
         </div>
       );
     }
     if (rank === 3) {
       return (
-        <div className="flex flex-col items-center flex-shrink-0 w-7">
-          <span className="w-6 h-6 rounded-full bg-[#CD7F32] text-white text-[11px] font-black flex items-center justify-center shadow-[0_2px_4px_rgba(205,127,50,0.5)]">
-            3
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
+          <span style={{ ...badgeBase, backgroundColor: '#CD7F32', boxShadow: '0 2px 4px rgba(205,127,50,0.5)' }}>3</span>
           <RankChange change={apartment.rankChange} />
         </div>
       );
     }
-    // 4~8위: 일반 숫자 텍스트
     return (
-      <div className="flex flex-col items-center flex-shrink-0 w-7">
-        <span className="text-[14px] font-black text-[#C9D1D9] text-center leading-tight">
-          {rank}
-        </span>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
+        <span style={{ fontSize: '14px', fontWeight: 900, color: '#C9D1D9', textAlign: 'center', lineHeight: 1.3 }}>{rank}</span>
         <RankChange change={apartment.rankChange} />
       </div>
     );
@@ -411,30 +531,43 @@ function CompactApartmentRow({ apartment, rank, isLast }: CompactApartmentRowPro
 
   return (
     <div
-      className={[
-        'min-h-[54px] flex items-center gap-3 px-4 py-2.5 cursor-pointer',
-        'transition-colors duration-100 hover:bg-[#F7FAF8] active:bg-blue-50',
-        isLast ? '' : 'border-b border-[#F5F6F8]',
-      ].join(' ')}
+      style={{
+        minHeight: '54px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '10px 16px',
+        cursor: 'pointer',
+        transition: 'background-color 100ms',
+        borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
+      }}
       onClick={() => navigate(`/apartment/${apartment.id}`)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && navigate(`/apartment/${apartment.id}`)}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
     >
       {/* 순위 뱃지 */}
       {renderRankBadge()}
 
       {/* 단지명 + 위치 + HOT 태그 */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-semibold text-[#191F28] truncate leading-tight">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant="body2"
+          weight="medium"
+          sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}
+        >
           {apartment.name}
-        </p>
-        <p className="text-[11px] text-[#8B95A1] truncate mt-0.5">
+        </Typography>
+        <Typography
+          variant="caption2"
+          sx={{ color: 'var(--semantic-label-assistive)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}
+        >
           {apartment.district} · {apartment.dong}
-        </p>
-        {/* HOT 이유 태그 (최대 2개) */}
+        </Typography>
         {hasHotTags && (
-          <div className="flex gap-1 mt-1 flex-wrap">
+          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
             {apartment.hotTags!.slice(0, 2).map((tag) => (
               <HotTag key={tag} tag={tag} />
             ))}
@@ -443,89 +576,111 @@ function CompactApartmentRow({ apartment, rank, isLast }: CompactApartmentRowPro
       </div>
 
       {/* 가격 + 변동률 */}
-      <div className="flex-shrink-0 text-right">
-        <p className="text-[14px] font-bold text-[#191F28]"
-          style={{ fontFamily: 'var(--font-jetbrains, monospace)' }}>
+      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+        <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)' }}>
           {formatPriceShort(apartment.recentPrice)}
-        </p>
-        <p className={`text-[11px] font-semibold ${priceColor} mt-0.5`}>
+        </span>
+        <Typography
+          variant="caption2"
+          weight="medium"
+          sx={{ color: priceColor, display: 'block', marginTop: '2px' }}
+        >
           {changeArrow} {formatChange(apartment.priceChange)}
-        </p>
+        </Typography>
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// HotApartmentSkeleton — 히어로 or 컴팩트 로딩 shimmer
-// ─────────────────────────────────────────────────────────
+// HotApartmentSkeleton
 function HotApartmentSkeleton({ isHero = false }: { isHero?: boolean }) {
   if (isHero) {
     return (
-      <div className="bg-white rounded-2xl p-5 border-l-4 border-[#E5E8EB] shadow-[0_4px_20px_rgba(0,0,0,0.06)]">
-        <div className="flex justify-between items-center">
-          <div className="skeleton-shimmer rounded-md w-9 h-5" />
-          <div className="skeleton-shimmer rounded w-7 h-4" />
-        </div>
-        <div className="skeleton-shimmer rounded mt-3 w-[58%] h-6" />
-        <div className="skeleton-shimmer rounded mt-2 w-[38%] h-3.5" />
-        <div className="flex items-end mt-5 gap-2">
-          <div className="skeleton-shimmer rounded w-28 h-8" />
-          <div className="skeleton-shimmer rounded w-14 h-4 mb-1" />
-        </div>
-        <div className="skeleton-shimmer rounded mt-2 w-20 h-3" />
-      </div>
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '16px',
+          padding: '20px',
+          borderLeft: '4px solid var(--semantic-line-normal)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+        }}
+      >
+        <FlexBox justifyContent="space-between" alignItems="center">
+          <Skeleton variant="rectangle" width="36px" height="20px" />
+          <Skeleton variant="text" width="28px" height="16px" />
+        </FlexBox>
+        <Skeleton variant="text" width="58%" height="24px" style={{ marginTop: '12px' }} />
+        <Skeleton variant="text" width="38%" height="14px" style={{ marginTop: '8px' }} />
+        <FlexBox alignItems="flex-end" gap="8px" style={{ marginTop: '20px' }}>
+          <Skeleton variant="text" width="112px" height="32px" />
+          <Skeleton variant="text" width="56px" height="16px" style={{ marginBottom: '4px' }} />
+        </FlexBox>
+        <Skeleton variant="text" width="80px" height="12px" style={{ marginTop: '8px' }} />
+      </Box>
     );
   }
   return (
-    <div className="bg-white rounded-xl border border-[#E5E8EB] px-4 py-3.5 h-[70px]">
-      <div className="flex items-center gap-3">
-        <div className="skeleton-shimmer rounded-full w-6 h-6 flex-shrink-0" />
-        <div className="flex-1 flex items-center justify-between gap-3">
-          <div className="skeleton-shimmer rounded w-[60%] h-[13px]" />
-          <div className="skeleton-shimmer rounded flex-shrink-0 w-[22%] h-[13px]" />
-        </div>
-      </div>
-    </div>
+    <Box sx={{ backgroundColor: 'var(--semantic-background-normal-normal)', borderRadius: '12px', border: '1px solid var(--semantic-line-normal)', padding: '14px 16px', height: '70px' }}>
+      <FlexBox alignItems="center" gap="12px">
+        <Skeleton variant="circle" width="24px" height="24px" />
+        <FlexBox flex="1" alignItems="center" justifyContent="space-between" gap="12px">
+          <Skeleton variant="text" width="60%" height="13px" />
+          <Skeleton variant="text" width="22%" height="13px" />
+        </FlexBox>
+      </FlexBox>
+    </Box>
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// HotApartmentEmpty — 핫 아파트 빈 상태 UI
-// ─────────────────────────────────────────────────────────
+// HotApartmentEmpty
 function HotApartmentEmpty() {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E5E8EB] flex flex-col items-center justify-center text-center py-10 px-4">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <Box
+      sx={{
+        backgroundColor: 'var(--semantic-background-normal-normal)',
+        borderRadius: '16px',
+        border: '1px solid var(--semantic-line-normal)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: '40px 16px',
+      }}
+    >
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--semantic-line-normal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
-      <p className="mt-3 text-[13px] font-bold text-[#8B95A1]">이번 주 핫한 아파트를 불러오는 중</p>
-      <p className="mt-1 text-[11px] text-[#8B95A1]">잠시 후 다시 확인해 주세요</p>
-      <Button
-        variant="outlined"
-        color="primary"
-        size="small"
-        onClick={() => navigate('/map')}
-        trailingContent={<IconChevronRight />}
-        className="mt-4"
-      >
-        지도에서 직접 찾기
-      </Button>
-    </div>
+      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '12px', display: 'block' }}>
+        이번 주 핫한 아파트를 불러오는 중
+      </Typography>
+      <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '4px', display: 'block' }}>
+        잠시 후 다시 확인해 주세요
+      </Typography>
+      <Box sx={{ marginTop: '16px' }}>
+        <Button
+          variant="outlined"
+          color="primary"
+          size="small"
+          onClick={() => navigate('/map')}
+          trailingContent={<IconChevronRight />}
+        >
+          지도에서 직접 찾기
+        </Button>
+      </Box>
+    </Box>
   );
 }
 
-// ─────────────────────────────────────────────────────────
 // BottomNav — WDS BottomNavigation 적용 (모바일 전용)
-// ─────────────────────────────────────────────────────────
 export function BottomNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30">
+    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30 }}>
       <BottomNavigation
         value={pathname}
         onValueChange={(value) => navigate(value)}

@@ -3,59 +3,106 @@ import { useNavigate } from 'react-router-dom';
 import { useBookmarkStore } from '../stores/bookmarkStore';
 import { useApartmentDetail } from '../hooks/useApartment';
 import { formatPriceShort, formatChange } from '../utils/formatNumber';
-import { IconButton } from '@wanteddev/wds';
+import {
+  Box, FlexBox, Typography, Skeleton,
+  TopNavigation, TopNavigationButton,
+} from '@wanteddev/wds';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
 
-// 단일 찜 단지 카드 — useApartmentDetail로 데이터 개별 조회
+// 단일 찜 단지 카드
 function BookmarkCard({ id }: { id: string }) {
   const navigate = useNavigate();
   const { data: apartment, isLoading, isError } = useApartmentDetail(id);
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-[#E5E8EB] p-4 animate-pulse h-20" />
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '12px',
+          border: '1px solid var(--semantic-line-normal)',
+          padding: '16px',
+        }}
+      >
+        <Skeleton variant="rectangle" width="100%" height="48px" />
+      </Box>
     );
   }
 
   if (isError || !apartment) {
-    // 조회 실패 시 ID만 표시
     return (
-      <div className="bg-white rounded-xl border border-[#E5E8EB] p-4">
-        <p className="text-sm text-[#8B95A1]">{id}</p>
-      </div>
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '12px',
+          border: '1px solid var(--semantic-line-normal)',
+          padding: '16px',
+        }}
+      >
+        <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>{id}</Typography>
+      </Box>
     );
   }
 
   const priceColor =
     apartment.priceChangeType === 'up'
-      ? 'text-[#FF4B4B]'
+      ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? 'text-[#3B82F6]'
-        : 'text-[#8B95A1]';
+        ? '#3B82F6'
+        : 'var(--semantic-label-assistive)';
   const priceArrow =
     apartment.priceChangeType === 'up' ? '▲' : apartment.priceChangeType === 'down' ? '▼' : '';
 
   return (
     <button
       onClick={() => navigate(`/apartment/${apartment.id}`)}
-      className="w-full bg-white rounded-xl border border-[#E5E8EB] p-4 text-left transition-all hover:shadow-md hover:border-blue-200"
+      style={{
+        width: '100%',
+        backgroundColor: 'var(--semantic-background-normal-normal)',
+        borderRadius: '12px',
+        border: '1px solid var(--semantic-line-normal)',
+        padding: '16px',
+        textAlign: 'left',
+        cursor: 'pointer',
+        transition: 'box-shadow 200ms ease, border-color 200ms ease',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLButtonElement;
+        el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+        el.style.borderColor = 'rgba(0,102,255,0.3)';
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLButtonElement;
+        el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
+        el.style.borderColor = 'var(--semantic-line-normal)';
+      }}
     >
-      <div className="flex items-center justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-[#191F28] truncate">{apartment.name}</p>
-          <p className="text-xs text-[#8B95A1] mt-0.5 truncate">
+      <FlexBox alignItems="center" justifyContent="space-between">
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Typography
+            variant="body2"
+            weight="bold"
+            sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {apartment.name}
+          </Typography>
+          <Typography
+            variant="caption1"
+            sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
             {apartment.address || `${apartment.district} ${apartment.dong}`}
-          </p>
+          </Typography>
         </div>
-        <div className="text-right flex-shrink-0 pl-4">
-          <p className="text-base font-black text-[#191F28]">
+        <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: '16px' }}>
+          <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block' }}>
             {formatPriceShort(apartment.recentPrice)}
-          </p>
-          <p className={`text-xs font-semibold mt-0.5 ${priceColor}`}>
+          </Typography>
+          <Typography variant="caption1" weight="medium" sx={{ color: priceColor, display: 'block', marginTop: '2px' }}>
             {priceArrow} {formatChange(apartment.priceChange)}
-          </p>
+          </Typography>
         </div>
-      </div>
+      </FlexBox>
     </button>
   );
 }
@@ -67,40 +114,46 @@ export default function BookmarksPage() {
   const bookmarkIds = Array.from(bookmarks);
 
   return (
-    <div className="min-h-screen bg-[#F7FAF8]">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4">
-        <div className="max-w-screen-xl mx-auto flex items-center gap-3">
-          <IconButton
-            variant="normal"
-            onClick={() => navigate(-1)}
-            aria-label="뒤로가기"
-          >
+    <div style={{ minHeight: '100svh', backgroundColor: 'var(--semantic-background-normal-alternative)' }}>
+      {/* 헤더 — WDS TopNavigation */}
+      <TopNavigation
+        leadingContent={
+          <TopNavigationButton onClick={() => navigate(-1)} aria-label="뒤로가기">
             <IconChevronLeft />
-          </IconButton>
-          <h1 className="text-base font-bold text-[#191F28] flex-1">찜한 단지</h1>
-          {bookmarkIds.length > 0 && (
-            <span className="text-sm text-[#8B95A1]">{bookmarkIds.length}개</span>
-          )}
-        </div>
-      </header>
+          </TopNavigationButton>
+        }
+        trailingContent={
+          bookmarkIds.length > 0 ? (
+            <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+              {bookmarkIds.length}개
+            </Typography>
+          ) : undefined
+        }
+      >
+        찜한 단지
+      </TopNavigation>
 
-      <main className="max-w-screen-xl mx-auto px-4 py-6">
+      <Box as="main" sx={{ maxWidth: '1280px', margin: '0 auto', padding: '24px 16px' }}>
         {bookmarkIds.length === 0 ? (
-          /* 빈 상태 */
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="text-5xl">🤍</div>
-            <p className="text-base font-semibold text-[#8B95A1]">찜한 단지가 없습니다</p>
-            <p className="text-sm text-[#C4C9CF]">관심 있는 단지에 하트를 눌러 저장하세요</p>
-          </div>
+          <FlexBox flexDirection="column" alignItems="center" justifyContent="center" gap="16px" style={{ padding: '96px 0' }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--semantic-line-normal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+            </svg>
+            <Typography variant="body1" weight="medium" sx={{ color: 'var(--semantic-label-assistive)' }}>
+              찜한 단지가 없습니다
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+              관심 있는 단지에 하트를 눌러 저장하세요
+            </Typography>
+          </FlexBox>
         ) : (
-          <div className="flex flex-col gap-3">
+          <FlexBox flexDirection="column" gap="12px">
             {bookmarkIds.map((id) => (
               <BookmarkCard key={id} id={id} />
             ))}
-          </div>
+          </FlexBox>
         )}
-      </main>
+      </Box>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import BomzipLogo from '../ui/BomzipLogo';
+import { FlexBox, Box, Typography, Divider } from '@wanteddev/wds';
+import { useIsPC } from '../../hooks/useBreakpoint';
 import {
   IconHome,
   IconHomeFill,
@@ -51,86 +53,152 @@ interface AppLayoutProps {
 export default function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const isPC = useIsPC();
 
   return (
-    <div className="flex min-h-screen">
+    <FlexBox style={{ minHeight: '100svh' }}>
       {/* PC 사이드바 — lg 브레이크포인트에서만 표시 */}
-      <aside
-        className="hidden lg:flex flex-col w-[220px] h-screen sticky top-0 bg-white border-r border-[#E5E8EB] z-20 flex-shrink-0"
-        style={{ boxShadow: '2px 0 8px rgba(0,0,0,0.05)' }}
-      >
-        {/* 봄집 로고 */}
-        <div
-          className="flex items-center gap-2 px-5 py-5 cursor-pointer hover:opacity-80 transition-opacity duration-150"
-          onClick={() => navigate('/')}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-          aria-label="홈으로 이동"
+      {isPC && (
+        <Box
+          as="aside"
+          sx={{
+            width: '220px',
+            height: '100vh',
+            position: 'sticky',
+            top: 0,
+            backgroundColor: 'var(--semantic-background-normal-normal)',
+            borderRight: '1px solid var(--semantic-line-normal)',
+            display: 'flex',
+            flexDirection: 'column',
+            flexShrink: 0,
+            boxShadow: '2px 0 8px rgba(0,0,0,0.05)',
+            zIndex: 20,
+          }}
         >
-          <BomzipLogo size="md" showText={true} />
-        </div>
-
-        {/* 구분선 */}
-        <div className="h-px bg-[#E5E8EB] mx-4" />
-
-        {/* 네비 아이템 */}
-        <nav className="flex flex-col gap-0.5 px-3 py-4 flex-1">
-          {NAV_ITEMS.map(({ label, path, icon, exact }) => {
-            const isActive = exact ? pathname === path : pathname.startsWith(path);
-            return (
-              <button
-                key={path}
-                onClick={() => navigate(path)}
-                className={[
-                  'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[14px] font-medium',
-                  'transition-all duration-150 text-left',
-                  'hover:translate-x-0.5',
-                  isActive
-                    ? 'bg-blue-50 text-blue-600 font-semibold'
-                    : 'text-[#4E5968] hover:bg-gray-50 hover:text-blue-600',
-                ].join(' ')}
-              >
-                {/* 아이콘 */}
-                <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-                  {icon(isActive)}
-                </span>
-                {label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* 하단: 검색 버튼 + 데이터 출처 */}
-        <div className="px-3 pb-5">
-          <div className="h-px bg-[#E5E8EB] mb-3" />
-          <button
-            onClick={() => navigate('/search')}
-            className={[
-              'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[14px] font-medium',
-              'transition-all duration-150 hover:translate-x-0.5',
-              pathname === '/search'
-                ? 'bg-blue-50 text-blue-600 font-semibold'
-                : 'text-[#4E5968] hover:bg-gray-50 hover:text-blue-600',
-            ].join(' ')}
+          {/* 봄집 로고 */}
+          <Box
+            sx={{ padding: '20px', cursor: 'pointer' }}
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate('/')}
+            onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && navigate('/')}
+            aria-label="홈으로 이동"
           >
-            <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
-              <IconSearch />
-            </span>
-            검색
-          </button>
+            <BomzipLogo size="md" showText={true} />
+          </Box>
 
-          {/* 데이터 출처 표시 */}
-          <p className="text-[11px] text-[#8B95A1] mt-4 px-1 leading-relaxed">
-            데이터 출처: 국토교통부
-          </p>
-        </div>
-      </aside>
+          {/* 구분선 */}
+          <Box sx={{ paddingLeft: '16px', paddingRight: '16px' }}>
+            <Divider />
+          </Box>
+
+          {/* 네비 아이템 */}
+          <Box
+            as="nav"
+            sx={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '2px' }}
+          >
+            {NAV_ITEMS.map(({ label, path, icon, exact }) => {
+              const isActive = exact ? pathname === path : pathname.startsWith(path);
+              return (
+                <button
+                  key={path}
+                  onClick={() => navigate(path)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    fontSize: '14px',
+                    fontWeight: isActive ? 600 : 500,
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'background-color 150ms ease, color 150ms ease',
+                    backgroundColor: isActive ? 'rgba(0,102,255,0.08)' : 'transparent',
+                    color: isActive
+                      ? 'var(--semantic-primary-normal)'
+                      : 'var(--semantic-label-alternative)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                    }
+                  }}
+                >
+                  {/* 아이콘 */}
+                  <span style={{ flexShrink: 0, width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {icon(isActive)}
+                  </span>
+                  {label}
+                </button>
+              );
+            })}
+          </Box>
+
+          {/* 하단: 검색 버튼 + 데이터 출처 */}
+          <Box sx={{ padding: '0 12px 20px 12px' }}>
+            <Divider />
+            <Box sx={{ marginTop: '12px' }}>
+              <button
+                onClick={() => navigate('/search')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  fontSize: '14px',
+                  fontWeight: pathname === '/search' ? 600 : 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background-color 150ms ease, color 150ms ease',
+                  backgroundColor: pathname === '/search' ? 'rgba(0,102,255,0.08)' : 'transparent',
+                  color: pathname === '/search'
+                    ? 'var(--semantic-primary-normal)'
+                    : 'var(--semantic-label-alternative)',
+                }}
+                onMouseEnter={(e) => {
+                  if (pathname !== '/search') {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (pathname !== '/search') {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                  }
+                }}
+              >
+                <span style={{ flexShrink: 0, width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconSearch />
+                </span>
+                검색
+              </button>
+            </Box>
+
+            {/* 데이터 출처 표시 */}
+            <Typography
+              variant="caption2"
+              sx={{ color: 'var(--semantic-label-assistive)', marginTop: '16px', paddingLeft: '4px', lineHeight: 1.6 }}
+            >
+              데이터 출처: 국토교통부
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* 메인 콘텐츠 영역 */}
-      <div className="flex-1 min-w-0">
+      <Box sx={{ flex: 1, minWidth: 0 }}>
         {children}
-      </div>
-    </div>
+      </Box>
+    </FlexBox>
   );
 }

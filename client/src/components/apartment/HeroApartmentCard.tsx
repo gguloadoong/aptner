@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Apartment } from '../../types';
 import { formatPriceShort, formatChange, formatArea } from '../../utils/formatNumber';
+import { Box, FlexBox, Typography } from '@wanteddev/wds';
 
 interface HeroApartmentCardProps {
   apartment: Apartment;
@@ -13,87 +14,101 @@ const HeroApartmentCard = React.memo<HeroApartmentCardProps>(({ apartment }) => 
 
   const isUp = apartment.priceChangeType === 'up';
   const isDown = apartment.priceChangeType === 'down';
-  const priceColor = isUp ? 'text-[#FF4B4B]' : isDown ? 'text-[#3B82F6]' : 'text-[#8B95A1]';
+  const priceColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
   const changeArrow = isUp ? '▲' : isDown ? '▼' : '';
 
-  // 순위 변동 뱃지 (weeklyRankChange)
+  // 순위 변동 뱃지
   const renderRankChange = () => {
     const change = apartment.weeklyRankChange;
     if (change === undefined || change === null) return null;
     if (change === 'new') {
       return (
-        <span className="text-[11px] font-bold bg-[#0066FF] text-white px-1.5 py-0.5 rounded-full">
+        <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--semantic-primary-normal)', color: 'white', padding: '3px 8px', borderRadius: '9999px' }}>
           NEW
         </span>
       );
     }
     if (typeof change === 'number' && change > 0) {
-      return (
-        <span className="text-[12px] font-bold text-[#FF4B4B]">▲{change}</span>
-      );
+      return <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
     }
     if (typeof change === 'number' && change < 0) {
-      return (
-        <span className="text-[12px] font-bold text-[#3B82F6]">▼{Math.abs(change)}</span>
-      );
+      return <span style={{ fontSize: '12px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
     }
-    return <span className="text-[12px] font-bold text-[#8B95A1]">-</span>;
+    return <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--semantic-label-assistive)' }}>-</span>;
   };
 
   return (
-    <div
-      className={[
-        'bg-gradient-to-br from-blue-50 to-white rounded-2xl p-5 cursor-pointer',
-        'shadow-[0_4px_20px_rgba(0,0,0,0.10)]',
-        'border-l-4 border-[#0066FF]',
-        'transition-all duration-200 hover:shadow-[0_8px_32px_rgba(0,0,0,0.14)] active:scale-[0.99]',
-        'animate-fadeInUp',
-      ].join(' ')}
+    <Box
+      sx={{
+        background: 'linear-gradient(135deg, rgba(0,102,255,0.06) 0%, var(--semantic-background-normal-normal) 100%)',
+        borderRadius: '16px',
+        padding: '20px',
+        cursor: 'pointer',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.10)',
+        borderLeft: '4px solid var(--semantic-primary-normal)',
+        transition: 'box-shadow 200ms ease',
+      }}
       onClick={() => navigate(`/apartment/${apartment.id}`)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && navigate(`/apartment/${apartment.id}`)}
+      onKeyDown={(e: React.KeyboardEvent) => e.key === 'Enter' && navigate(`/apartment/${apartment.id}`)}
+      onMouseEnter={(e: React.MouseEvent) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.14)';
+      }}
+      onMouseLeave={(e: React.MouseEvent) => {
+        (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.10)';
+      }}
     >
       {/* 상단 행: 1위 뱃지 + 순위 변동 */}
-      <div className="flex items-center justify-between">
-        <span className="bg-[#FFD700] text-white text-sm font-black px-3 py-1 rounded-lg shadow-sm">
+      <FlexBox alignItems="center" justifyContent="space-between">
+        <span style={{ backgroundColor: '#FFD700', color: 'white', fontSize: '14px', fontWeight: 900, padding: '4px 12px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(255,215,0,0.5)' }}>
           1위
         </span>
         {renderRankChange()}
-      </div>
+      </FlexBox>
 
       {/* 단지명 + 최고가 경신 뱃지 */}
-      <div className="flex items-center gap-2 mt-2 flex-wrap">
-        <h3 className="text-[24px] font-black text-[#191F28] leading-tight">
+      <FlexBox alignItems="center" gap="8px" style={{ marginTop: '8px', flexWrap: 'wrap' }}>
+        <Typography
+          variant="title2"
+          weight="bold"
+          sx={{ color: 'var(--semantic-label-normal)', lineHeight: 1.2 }}
+        >
           {apartment.name}
-        </h3>
+        </Typography>
         {apartment.isRecordHigh && (
-          <span className="inline-flex items-center gap-1 h-5 px-2 text-[11px] font-bold rounded-full bg-[#FFEBEE] text-[#C62828] border border-[#EF9A9A]/30">
-            🔥 최고가 경신
+          <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#FFEBEE', color: '#C62828', border: '1px solid rgba(239,154,154,0.3)', padding: '2px 8px', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+            최고가 경신
           </span>
         )}
-      </div>
+      </FlexBox>
 
       {/* 위치 */}
-      <p className="text-[13px] text-[#8B95A1] mt-1">
+      <Typography
+        variant="body2"
+        sx={{ color: 'var(--semantic-label-assistive)', marginTop: '4px', display: 'block' }}
+      >
         {apartment.district} · {apartment.dong}
-      </p>
+      </Typography>
 
       {/* 가격 + 변동률 행 */}
-      <div className="flex items-end mt-4">
-        <span className="text-[32px] font-black text-[#191F28] font-mono leading-none" style={{ fontFamily: 'var(--font-jetbrains)' }}>
+      <FlexBox alignItems="flex-end" style={{ marginTop: '16px' }}>
+        <span style={{ fontSize: '32px', fontWeight: 900, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)', lineHeight: 1 }}>
           {formatPriceShort(apartment.recentPrice)}
         </span>
-        <span className={`text-[13px] ml-2 mb-1 font-bold ${priceColor}`}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: priceColor, marginLeft: '8px', marginBottom: '2px' }}>
           {changeArrow} {formatChange(apartment.priceChange)}
         </span>
-      </div>
+      </FlexBox>
 
       {/* 면적 */}
-      <p className="text-[11px] text-[#8B95A1] mt-1">
+      <Typography
+        variant="caption1"
+        sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '4px' }}
+      >
         기준 {formatArea(apartment.recentPriceArea)}
-      </p>
-    </div>
+      </Typography>
+    </Box>
   );
 });
 

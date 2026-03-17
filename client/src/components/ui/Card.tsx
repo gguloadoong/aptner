@@ -1,40 +1,53 @@
 import React from 'react';
+import { Box } from '@wanteddev/wds';
 
 interface CardProps {
   children: React.ReactNode;
-  className?: string;
   onClick?: () => void;
   hoverable?: boolean;
   padding?: 'none' | 'sm' | 'md' | 'lg';
+  sx?: Record<string, string | number>;
 }
 
-// 공통 카드 컴포넌트
+// 공통 카드 컴포넌트 — WDS Box 기반
 const Card = React.memo<CardProps>(
-  ({ children, className = '', onClick, hoverable = false, padding = 'md' }) => {
-    const paddingStyles = {
-      none: '',
-      sm: 'p-3',
-      md: 'p-4',
-      lg: 'p-6',
+  ({ children, onClick, hoverable = false, padding = 'md', sx }) => {
+    const paddingMap = {
+      none: '0',
+      sm: '12px',
+      md: '16px',
+      lg: '24px',
     };
 
     return (
-      <div
-        className={[
-          'bg-white rounded-xl border border-[#E5E8EB] shadow-sm',
-          paddingStyles[padding],
-          hoverable
-            ? 'cursor-pointer transition-all duration-200 hover:shadow-md hover:border-blue-200 active:scale-[0.99]'
-            : '',
-          className,
-        ].join(' ')}
+      <Box
+        sx={{
+          backgroundColor: 'var(--semantic-background-normal-normal)',
+          borderRadius: '12px',
+          border: '1px solid var(--semantic-line-normal)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+          padding: paddingMap[padding],
+          cursor: onClick ? 'pointer' : undefined,
+          transition: hoverable ? 'box-shadow 200ms ease, border-color 200ms ease' : undefined,
+          ...sx,
+        }}
         onClick={onClick}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
-        onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
+        onKeyDown={onClick ? (e: React.KeyboardEvent) => e.key === 'Enter' && onClick() : undefined}
+        onMouseEnter={hoverable && onClick ? (e: React.MouseEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+          el.style.borderColor = 'rgba(0,102,255,0.3)';
+        } : undefined}
+        onMouseLeave={hoverable && onClick ? (e: React.MouseEvent) => {
+          const el = e.currentTarget as HTMLElement;
+          el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
+          el.style.borderColor = 'var(--semantic-line-normal)';
+        } : undefined}
       >
         {children}
-      </div>
+      </Box>
     );
   }
 );

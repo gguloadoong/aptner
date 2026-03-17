@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Apartment } from '../../types';
 import { formatPriceShort, formatChange, formatUnits } from '../../utils/formatNumber';
-import { ActionArea } from '@wanteddev/wds';
+import { Box, FlexBox, Typography } from '@wanteddev/wds';
 import HotTag from './HotTag';
 import { useCompareStore } from '../../stores/compareStore';
 
@@ -19,12 +19,11 @@ function CompareAddButton({ id, name }: { id: string; name: string }) {
   const inCompare = isInCompare(id);
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // 카드 클릭 이벤트 전파 차단
+    e.stopPropagation();
     if (inCompare) {
       removeCompare(id);
     } else {
-      if (compareList.length >= 3) return; // 최대 3개 초과 시 무시
-      // name을 함께 저장하여 CompareBar에서 실데이터 모드에서도 단지명 표시 가능
+      if (compareList.length >= 3) return;
       addCompare({ id, name });
     }
   };
@@ -32,14 +31,26 @@ function CompareAddButton({ id, name }: { id: string; name: string }) {
   return (
     <button
       onClick={handleClick}
-      className={[
-        'absolute bottom-3 right-3 w-6 h-6 rounded-full flex items-center justify-center',
-        'text-[12px] font-bold transition-all duration-150 shadow-sm border',
-        inCompare
-          ? 'bg-[#0066FF] border-[#0066FF] text-white'
-          : 'bg-white border-[#C4C9CF] text-[#8B95A1] hover:border-[#0066FF] hover:text-[#0066FF]',
-        compareList.length >= 3 && !inCompare ? 'opacity-30 cursor-not-allowed' : '',
-      ].join(' ')}
+      style={{
+        position: 'absolute',
+        bottom: '12px',
+        right: '12px',
+        width: '24px',
+        height: '24px',
+        borderRadius: '50%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '12px',
+        fontWeight: 700,
+        transition: 'all 150ms',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+        border: inCompare ? '1px solid var(--semantic-primary-normal)' : '1px solid #C4C9CF',
+        backgroundColor: inCompare ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
+        color: inCompare ? 'white' : 'var(--semantic-label-assistive)',
+        cursor: compareList.length >= 3 && !inCompare ? 'not-allowed' : 'pointer',
+        opacity: compareList.length >= 3 && !inCompare ? 0.3 : 1,
+      }}
       aria-label={inCompare ? `${name} 비교 제거` : `${name} 비교 추가`}
       title={inCompare ? '비교 제거' : '비교 추가'}
     >
@@ -59,10 +70,10 @@ const ApartmentCard = React.memo<ApartmentCardProps>(
 
     const priceColor =
       apartment.priceChangeType === 'up'
-        ? 'text-[#FF4B4B]'
+        ? '#FF4B4B'
         : apartment.priceChangeType === 'down'
-          ? 'text-[#3B82F6]'
-          : 'text-[#8B95A1]';
+          ? '#3B82F6'
+          : 'var(--semantic-label-assistive)';
 
     const priceArrow =
       apartment.priceChangeType === 'up'
@@ -71,89 +82,149 @@ const ApartmentCard = React.memo<ApartmentCardProps>(
           ? '▼'
           : '';
 
+    const cardBaseStyle: React.CSSProperties = {
+      position: 'relative',
+      backgroundColor: 'var(--semantic-background-normal-normal)',
+      borderRadius: '12px',
+      border: '1px solid var(--semantic-line-normal)',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      cursor: 'pointer',
+      transition: 'box-shadow 200ms ease, border-color 200ms ease',
+      width: '100%',
+    };
+
+    const handleMouseEnter = (e: React.MouseEvent) => {
+      const el = e.currentTarget as HTMLElement;
+      el.style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)';
+      el.style.borderColor = 'rgba(0,102,255,0.3)';
+    };
+
+    const handleMouseLeave = (e: React.MouseEvent) => {
+      const el = e.currentTarget as HTMLElement;
+      el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
+      el.style.borderColor = 'var(--semantic-line-normal)';
+    };
+
     if (compact) {
       return (
-        <ActionArea
+        <div
+          style={{ ...cardBaseStyle, padding: '12px' }}
           onClick={handleClick}
-          className="w-full bg-white rounded-xl border border-[#E5E8EB] shadow-sm p-3 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:border-blue-200 relative"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
-          {rank && (
-            <span className="text-xs font-bold text-[#8B95A1] w-5 text-center flex-shrink-0">
-              {rank}
-            </span>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#191F28] truncate">{apartment.name}</p>
-            <p className="text-xs text-[#8B95A1] truncate">{apartment.district}</p>
-          </div>
-          <div className="text-right flex-shrink-0 pr-7">
-            <p className="text-sm font-bold text-[#191F28]">
-              {formatPriceShort(apartment.recentPrice)}
-            </p>
-            <p className={`text-xs font-medium ${priceColor}`}>
-              {priceArrow} {formatChange(apartment.priceChange)}
-            </p>
-          </div>
-          {/* 비교 추가 버튼 */}
+          <FlexBox alignItems="center" gap="12px">
+            {rank && (
+              <Typography
+                variant="caption1"
+                weight="bold"
+                sx={{ color: 'var(--semantic-label-assistive)', width: '20px', textAlign: 'center', flexShrink: 0 }}
+              >
+                {rank}
+              </Typography>
+            )}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                weight="bold"
+                sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {apartment.name}
+              </Typography>
+              <Typography
+                variant="caption1"
+                sx={{ color: 'var(--semantic-label-assistive)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {apartment.district}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right', flexShrink: 0, paddingRight: '28px' }}>
+              <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+                {formatPriceShort(apartment.recentPrice)}
+              </Typography>
+              <Typography variant="caption1" weight="medium" sx={{ color: priceColor }}>
+                {priceArrow} {formatChange(apartment.priceChange)}
+              </Typography>
+            </Box>
+          </FlexBox>
           <CompareAddButton id={apartment.id} name={apartment.name} />
-        </ActionArea>
+        </div>
       );
     }
 
     return (
-      <ActionArea
+      <div
+        style={{ ...cardBaseStyle, padding: '16px' }}
         onClick={handleClick}
-        className="w-full bg-white rounded-xl border border-[#E5E8EB] shadow-sm p-4 transition-all duration-200 hover:shadow-md hover:border-blue-200 relative"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && handleClick()}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        <div className="flex items-start gap-3">
+        <FlexBox alignItems="flex-start" gap="12px">
           {/* 순위 표시 */}
           {rank && (
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              <span
-                className={`text-xl font-black ${rank <= 3 ? 'text-blue-600' : 'text-[#8B95A1]'}`}
+            <FlexBox flexDirection="column" alignItems="center" gap="4px" style={{ flexShrink: 0 }}>
+              <Typography
+                variant="heading1"
+                weight="bold"
+                sx={{ color: rank <= 3 ? 'var(--semantic-primary-normal)' : 'var(--semantic-label-assistive)' }}
               >
                 {rank}
-              </span>
+              </Typography>
               {showRankChange && apartment.weeklyRankChange !== undefined && (
                 <RankChangeBadge change={apartment.weeklyRankChange} />
               )}
-            </div>
+            </FlexBox>
           )}
 
           {/* 단지 정보 */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-[#191F28] text-base leading-tight truncate">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body1"
+              weight="bold"
+              sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
               {apartment.name}
-            </h3>
+            </Typography>
             {apartment.hotTags && apartment.hotTags.length > 0 && (
-              <div className="flex gap-1 mt-1 flex-wrap">
+              <FlexBox gap="4px" style={{ marginTop: '4px', flexWrap: 'wrap' }}>
                 {apartment.hotTags.slice(0, 2).map(tag => <HotTag key={tag} tag={tag} />)}
-              </div>
+              </FlexBox>
             )}
-            <p className="text-xs text-[#8B95A1] mt-0.5 truncate">
+            <Typography
+              variant="caption1"
+              sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
               {apartment.district} · {apartment.dong}
-            </p>
-            <p className="text-xs text-[#8B95A1] mt-0.5">
+            </Typography>
+            <Typography
+              variant="caption1"
+              sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
+            >
               {formatUnits(apartment.totalUnits)} · {apartment.builtYear}년
-            </p>
-          </div>
+            </Typography>
+          </Box>
 
           {/* 가격 정보 */}
-          <div className="text-right flex-shrink-0 pr-1 pb-5">
-            <p className="text-lg font-black text-[#191F28]">
+          <Box sx={{ textAlign: 'right', flexShrink: 0, paddingRight: '4px', paddingBottom: '20px' }}>
+            <Typography variant="heading2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
               {formatPriceShort(apartment.recentPrice)}
-            </p>
-            <p className="text-xs text-[#8B95A1] mt-0.5">
+            </Typography>
+            <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}>
               {apartment.recentPriceArea}㎡
-            </p>
-            <p className={`text-sm font-bold mt-1 ${priceColor}`}>
+            </Typography>
+            <Typography variant="body2" weight="bold" sx={{ color: priceColor, display: 'block', marginTop: '4px' }}>
               {priceArrow} {formatChange(apartment.priceChange)}
-            </p>
-          </div>
-        </div>
-        {/* 비교 추가 버튼 */}
+            </Typography>
+          </Box>
+        </FlexBox>
         <CompareAddButton id={apartment.id} name={apartment.name} />
-      </ActionArea>
+      </div>
     );
   }
 );
@@ -165,24 +236,16 @@ export default ApartmentCard;
 function RankChangeBadge({ change }: { change: number | 'new' }) {
   if (change === 'new') {
     return (
-      <span className="text-[10px] font-bold bg-[#0066FF] text-white px-1.5 py-0.5 rounded-full">
+      <span style={{ fontSize: '10px', fontWeight: 700, backgroundColor: 'var(--semantic-primary-normal)', color: 'white', padding: '2px 6px', borderRadius: '9999px' }}>
         NEW
       </span>
     );
   }
   if (change > 0) {
-    return (
-      <span className="text-[10px] font-bold text-[#FF4B4B]">
-        ▲{change}
-      </span>
-    );
+    return <span style={{ fontSize: '10px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
   }
   if (change < 0) {
-    return (
-      <span className="text-[10px] font-bold text-[#3B82F6]">
-        ▼{Math.abs(change)}
-      </span>
-    );
+    return <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change as number)}</span>;
   }
-  return <span className="text-[10px] font-bold text-[#8B95A1]">-</span>;
+  return <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--semantic-label-assistive)' }}>-</span>;
 }

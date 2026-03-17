@@ -16,21 +16,22 @@ import { MOCK_WEEKLY_RANKING, MOCK_REGION_TRENDS, MOCK_SURGE_ALERTS } from '../m
 import { formatPriceShort, formatChange } from '../utils/formatNumber';
 import { useHotApartments, useSupplyData } from '../hooks/useApartment';
 import type { SupplyDataPoint } from '../services/apartment.service';
-import { Chip } from '@wanteddev/wds';
+import { Chip, Box, FlexBox, Typography, TopNavigation, TopNavigationButton } from '@wanteddev/wds';
+import { useIsPC } from '../hooks/useBreakpoint';
+import { IconChevronLeft } from '@wanteddev/wds-icon';
 
 const REGIONS = ['전국', '서울', '경기', '인천', '부산'];
 
-// 트렌드 페이지 - 데스크탑: 2컬럼 (랭킹 | 차트 + 급등)
+// 트렌드 페이지 — Tailwind 제거, WDS Box/FlexBox/Typography 사용
 export default function TrendPage() {
   const navigate = useNavigate();
+  const isMobile = !useIsPC();
   const [selectedRegion, setSelectedRegion] = useState('전국');
   const [supplyRegion, setSupplyRegion] = useState('전국');
 
-  // MAJOR-04: useHotApartments로 실 데이터 페칭 (selectedRegion 파라미터 전달)
   const hotRegionParam = selectedRegion === '전국' ? undefined : selectedRegion;
   const { data: hotApartments, isLoading: isHotLoading } = useHotApartments(hotRegionParam, 20);
 
-  // 로딩 중에는 MOCK 데이터를 폴백으로 사용하여 빈 화면 방지
   const rankingSource = hotApartments ?? MOCK_WEEKLY_RANKING;
   const filteredRanking = isHotLoading
     ? selectedRegion === '전국'
@@ -38,59 +39,99 @@ export default function TrendPage() {
       : MOCK_WEEKLY_RANKING.filter((apt) => apt.address.includes(selectedRegion))
     : rankingSource;
 
-  // 입주 물량 예정 데이터
   const { data: supplyData = [] } = useSupplyData(supplyRegion, 12);
 
-  // 지역별 가격 변동 차트 데이터 (MOCK_REGION_TRENDS는 BE API 미제공으로 유지)
   const chartData = MOCK_REGION_TRENDS.map((t) => ({
     region: t.region,
     change: t.priceChange,
-    avg: Math.round(t.avgPrice / 10000), // 억 단위
+    avg: Math.round(t.avgPrice / 10000),
   }));
 
   return (
-    <div className="min-h-screen bg-[#F7FAF8]">
-      {/* 헤더 — 통일된 py-4, text-base font-bold */}
-      <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30">
-        <div className="max-w-screen-xl mx-auto px-5 lg:px-8 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-base font-bold text-[#191F28]">트렌드</h1>
-            <p className="text-[11px] text-[#8B95A1] mt-0.5">
-              {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} 기준
-            </p>
-          </div>
-          {/* 홈으로 (PC) */}
-          <button
-            onClick={() => navigate('/')}
-            className="hidden lg:flex items-center gap-1.5 text-[13px] text-[#8B95A1] hover:text-blue-600 transition-colors duration-150"
-          >
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            홈으로
-          </button>
-        </div>
-      </header>
+    <div style={{ minHeight: '100svh', backgroundColor: 'var(--semantic-background-normal-alternative)' }}>
 
-      <main className="pb-28 md:pb-8">
-        <div className="max-w-screen-xl mx-auto md:px-6">
+      {/* 헤더 — 모바일: TopNavigation / PC: 인라인 헤더 */}
+      {isMobile ? (
+        <TopNavigation
+          leadingContent={
+            <TopNavigationButton onClick={() => navigate(-1)}>
+              <IconChevronLeft />
+            </TopNavigationButton>
+          }
+        >
+          트렌드
+        </TopNavigation>
+      ) : (
+        <Box
+          as="header"
+          sx={{
+            backgroundColor: 'var(--semantic-background-normal-normal)',
+            borderBottom: '1px solid var(--semantic-line-normal)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+          }}
+        >
+          <Box sx={{ maxWidth: '1280px', margin: '0 auto', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block' }}>
+                트렌드
+              </Typography>
+              <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}>
+                {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} 기준
+              </Typography>
+            </div>
+          </Box>
+        </Box>
+      )}
+
+      <Box as="main" sx={{ paddingBottom: isMobile ? '112px' : '32px' }}>
+        <Box sx={{ maxWidth: '1280px', margin: '0 auto', padding: isMobile ? '0' : '0 24px' }}>
 
           {/* 데스크탑 2컬럼 레이아웃 */}
-          <div className="md:grid md:grid-cols-[1fr_420px] md:gap-6 md:pt-6">
+          <div
+            style={{
+              display: isMobile ? 'block' : 'grid',
+              gridTemplateColumns: isMobile ? undefined : '1fr 420px',
+              gap: isMobile ? undefined : '24px',
+              paddingTop: isMobile ? undefined : '24px',
+            }}
+          >
 
             {/* 좌측 컬럼: 주간 HOT 랭킹 */}
             <div>
-              {/* 주간 핫 아파트 TOP 20 */}
-              <section className="px-5 py-5 md:px-0 md:py-0 md:bg-white md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
-                <div className="flex items-center justify-between mb-4">
+              <Box
+                as="section"
+                sx={{
+                  padding: isMobile ? '20px' : '24px',
+                  backgroundColor: 'var(--semantic-background-normal-normal)',
+                  borderRadius: isMobile ? '0' : '16px',
+                  border: isMobile ? 'none' : '1px solid var(--semantic-line-normal)',
+                  marginBottom: isMobile ? '12px' : '0',
+                }}
+              >
+                <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '16px' }}>
                   <div>
-                    <h2 className="text-base font-bold text-[#191F28]">주간 HOT 아파트</h2>
-                    <p className="text-xs text-[#8B95A1] mt-0.5">조회수 + 거래량 기준</p>
+                    <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block' }}>
+                      주간 HOT 아파트
+                    </Typography>
+                    <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}>
+                      조회수 + 거래량 기준
+                    </Typography>
                   </div>
-                </div>
+                </FlexBox>
 
-                {/* 지역 필터 - WDS Chip */}
-                <div className="flex gap-2 overflow-x-auto pb-3 -mx-5 px-5 md:mx-0 md:px-0 md:overflow-visible md:flex-wrap">
+                {/* 지역 필터 — WDS Chip */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    paddingBottom: '12px',
+                    scrollbarWidth: 'none',
+                    flexWrap: isMobile ? undefined : 'wrap',
+                  } as React.CSSProperties}
+                >
                   {REGIONS.map((region) => (
                     <Chip
                       key={region}
@@ -98,18 +139,20 @@ export default function TrendPage() {
                       variant="outlined"
                       active={selectedRegion === region}
                       onClick={() => setSelectedRegion(region)}
-                      className="flex-shrink-0"
+                      style={{ flexShrink: 0 }}
                     >
                       {region}
                     </Chip>
                   ))}
                 </div>
 
-                <div className="flex flex-col gap-3 mt-3">
+                <FlexBox flexDirection="column" gap="12px" style={{ marginTop: '12px' }}>
                   {filteredRanking.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <p className="text-sm text-[#8B95A1]">{selectedRegion} 지역 데이터가 없습니다</p>
-                    </div>
+                    <Box sx={{ padding: '32px 0', textAlign: 'center' }}>
+                      <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                        {selectedRegion} 지역 데이터가 없습니다
+                      </Typography>
+                    </Box>
                   ) : (
                     filteredRanking.slice(0, 20).map((apt, index) => (
                       <ApartmentCard
@@ -120,70 +163,83 @@ export default function TrendPage() {
                       />
                     ))
                   )}
-                </div>
-              </section>
+                </FlexBox>
+              </Box>
             </div>
 
             {/* 우측 컬럼: 차트 + 급등 알림 */}
-            <div className="space-y-4 md:space-y-4">
+            <FlexBox flexDirection="column" gap="16px">
+
               {/* 지역별 가격 변동 차트 */}
-              <section className="bg-white px-5 py-5 mb-3 md:mb-0 md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
-                <h2 className="text-base font-bold text-[#191F28] mb-4">지역별 가격 변동률</h2>
+              <Box
+                as="section"
+                sx={{
+                  padding: isMobile ? '20px' : '24px',
+                  backgroundColor: 'var(--semantic-background-normal-normal)',
+                  borderRadius: isMobile ? '0' : '16px',
+                  border: isMobile ? 'none' : '1px solid var(--semantic-line-normal)',
+                  marginBottom: isMobile ? '12px' : '0',
+                }}
+              >
+                <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '16px' }}>
+                  지역별 가격 변동률
+                </Typography>
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E8EB" vertical={false} />
-                    <XAxis
-                      dataKey="region"
-                      tick={{ fontSize: 12, fill: '#8B95A1' }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: '#8B95A1' }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v) => `${v}%`}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid, #E5E8EB)" vertical={false} />
+                    <XAxis dataKey="region" tick={{ fontSize: 12, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
                     <Tooltip
                       formatter={(value) => [`${value}%`, '변동률']}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: 'none',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                        fontSize: 12,
-                      }}
+                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: 12 }}
                     />
-                    <Bar
-                      dataKey="change"
-                      fill="#0066FF"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={40}
-                    />
+                    <Bar dataKey="change" fill="var(--color-chart-line, #0066FF)" radius={[4, 4, 0, 0]} maxBarSize={40} />
                   </BarChart>
                 </ResponsiveContainer>
 
                 {/* 지역 요약 카드 */}
-                <div className="grid grid-cols-3 gap-3 mt-4">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
                   {MOCK_REGION_TRENDS.map((trend) => (
                     <RegionCard key={trend.region} trend={trend} />
                   ))}
                 </div>
-              </section>
+              </Box>
 
               {/* 입주 물량 예정 차트 */}
-              <section className="bg-white px-5 py-5 mb-3 md:mb-0 md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
-                <div className="flex items-center justify-between mb-1">
+              <Box
+                as="section"
+                sx={{
+                  padding: isMobile ? '20px' : '24px',
+                  backgroundColor: 'var(--semantic-background-normal-normal)',
+                  borderRadius: isMobile ? '0' : '16px',
+                  border: isMobile ? 'none' : '1px solid var(--semantic-line-normal)',
+                  marginBottom: isMobile ? '12px' : '0',
+                }}
+              >
+                <FlexBox alignItems="flex-start" justifyContent="space-between" style={{ marginBottom: '4px' }}>
                   <div>
-                    <h2 className="text-base font-bold text-[#191F28]">입주 물량 예정</h2>
-                    <p className="text-xs text-[#8B95A1] mt-0.5">
+                    <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block' }}>
+                      입주 물량 예정
+                    </Typography>
+                    <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}>
                       향후 12개월 입주 예정 세대수 (단위: 세대)
-                    </p>
+                    </Typography>
                   </div>
-                </div>
-                {/* 지역 선택 라벨 + 필터 */}
-                <div className="mt-3 mb-4">
-                  <p className="text-[11px] font-semibold text-[#4E5968] mb-2">지역 선택</p>
-                  <div className="flex gap-2 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                </FlexBox>
+
+                {/* 지역 선택 필터 */}
+                <Box sx={{ marginTop: '12px', marginBottom: '16px' }}>
+                  <Typography variant="caption1" weight="medium" sx={{ color: 'var(--semantic-label-alternative)', display: 'block', marginBottom: '8px' }}>
+                    지역 선택
+                  </Typography>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      overflowX: 'auto',
+                      scrollbarWidth: 'none',
+                    } as React.CSSProperties}
+                  >
                     {REGIONS.map((r) => (
                       <Chip
                         key={r}
@@ -191,74 +247,66 @@ export default function TrendPage() {
                         variant="outlined"
                         active={supplyRegion === r}
                         onClick={() => setSupplyRegion(r)}
-                        className="flex-shrink-0"
+                        style={{ flexShrink: 0 }}
                       >
                         {r}
                       </Chip>
                     ))}
                   </div>
-                </div>
+                </Box>
+
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={supplyData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E8EB" vertical={false} />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fontSize: 10, fill: '#8B95A1' }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: string) => v.slice(5)} // MM만 표시
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: '#8B95A1' }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) => v >= 10000 ? `${(v/10000).toFixed(1)}만` : `${v.toLocaleString()}`}
-                    />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid, #E5E8EB)" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v >= 10000 ? `${(v / 10000).toFixed(1)}만` : `${v.toLocaleString()}`} />
                     <Tooltip
                       formatter={(value) => [`${Number(value).toLocaleString()}세대`, '입주 예정']}
                       labelFormatter={(label) => String(label)}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: 'none',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                        fontSize: 12,
-                      }}
+                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: 12 }}
                     />
                     <Bar dataKey="units" radius={[4, 4, 0, 0]} maxBarSize={32}>
                       {supplyData.map((entry: SupplyDataPoint, index) => {
-                        // 현재 달 기준으로 3개월 내는 강조 색상
                         const now = new Date();
                         const entryDate = new Date(entry.year, entry.monthNum - 1);
                         const diffMonths = (entryDate.getFullYear() - now.getFullYear()) * 12 + (entryDate.getMonth() - now.getMonth());
-                        return (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={diffMonths <= 2 ? '#0066FF' : '#BFDBFE'}
-                          />
-                        );
+                        return <Cell key={`cell-${index}`} fill={diffMonths <= 2 ? 'var(--color-chart-line, #0066FF)' : '#BFDBFE'} />;
                       })}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-                <div className="flex items-center gap-4 mt-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-[#0066FF]" />
-                    <span className="text-[11px] text-[#8B95A1]">3개월 내</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-[#BFDBFE]" />
-                    <span className="text-[11px] text-[#8B95A1]">이후 예정</span>
-                  </div>
-                </div>
-              </section>
+
+                {/* 범례 */}
+                <FlexBox alignItems="center" gap="16px" style={{ marginTop: '8px' }}>
+                  <FlexBox alignItems="center" gap="6px">
+                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: 'var(--color-chart-line, #0066FF)' }} />
+                    <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)' }}>3개월 내</Typography>
+                  </FlexBox>
+                  <FlexBox alignItems="center" gap="6px">
+                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: '#BFDBFE' }} />
+                    <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)' }}>이후 예정</Typography>
+                  </FlexBox>
+                </FlexBox>
+              </Box>
 
               {/* 거래량 급등 알림 */}
-              <section className="bg-white px-5 py-5 mb-3 md:mb-0 md:rounded-2xl md:border md:border-[#E5E8EB] md:p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-2 h-2 bg-[#FF4B4B] rounded-full animate-pulse" />
-                  <h2 className="text-base font-bold text-[#191F28]">거래량 급등 단지</h2>
-                </div>
-                <div className="space-y-3">
+              <Box
+                as="section"
+                sx={{
+                  padding: isMobile ? '20px' : '24px',
+                  backgroundColor: 'var(--semantic-background-normal-normal)',
+                  borderRadius: isMobile ? '0' : '16px',
+                  border: isMobile ? 'none' : '1px solid var(--semantic-line-normal)',
+                  marginBottom: isMobile ? '12px' : '0',
+                }}
+              >
+                <FlexBox alignItems="center" gap="8px" style={{ marginBottom: '16px' }}>
+                  <div style={{ width: '8px', height: '8px', backgroundColor: '#FF4B4B', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} />
+                  <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+                    거래량 급등 단지
+                  </Typography>
+                </FlexBox>
+                <FlexBox flexDirection="column" gap="12px">
                   {MOCK_SURGE_ALERTS.map((alert) => (
                     <SurgeAlertCard
                       key={alert.id}
@@ -266,17 +314,15 @@ export default function TrendPage() {
                       onPress={() => navigate(`/apartment/${alert.apartmentId}`)}
                     />
                   ))}
-                </div>
-              </section>
-            </div>
+                </FlexBox>
+              </Box>
+            </FlexBox>
           </div>
-        </div>
-      </main>
+        </Box>
+      </Box>
 
-      {/* 모바일 하단 내비게이션 — lg 이상은 사이드바가 대체 */}
-      <div className="lg:hidden">
-        <BottomNav />
-      </div>
+      {/* 모바일 하단 내비게이션 */}
+      {isMobile && <BottomNav />}
     </div>
   );
 }
@@ -287,21 +333,24 @@ function RegionCard({ trend }: { trend: (typeof MOCK_REGION_TRENDS)[0] }) {
   const isDown = trend.priceChange < 0;
 
   return (
-    <div className="bg-[#F7FAF8] rounded-xl p-3">
-      <p className="text-xs font-bold text-[#191F28] truncate">{trend.region}</p>
-      <p className="text-sm font-black text-[#191F28] mt-1">
+    <Box sx={{ backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '12px', padding: '12px' }}>
+      <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {trend.region}
+      </Typography>
+      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '4px' }}>
         {formatPriceShort(trend.avgPrice)}
-      </p>
-      <p
-        className={[
-          'text-xs font-semibold mt-0.5',
-          isUp ? 'text-[#FF4B4B]' : isDown ? 'text-[#3B82F6]' : 'text-[#8B95A1]',
-        ].join(' ')}
+      </Typography>
+      <Typography
+        variant="caption1"
+        weight="medium"
+        sx={{ color: isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
       >
         {isUp ? '▲' : isDown ? '▼' : ''} {formatChange(trend.priceChange)}
-      </p>
-      <p className="text-[10px] text-[#8B95A1] mt-1">{trend.tradeVolume.toLocaleString()}건</p>
-    </div>
+      </Typography>
+      <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '4px' }}>
+        {trend.tradeVolume.toLocaleString()}건
+      </Typography>
+    </Box>
   );
 }
 
@@ -316,22 +365,41 @@ function SurgeAlertCard({
   return (
     <button
       onClick={onPress}
-      className="w-full flex items-center justify-between p-4 bg-red-50 rounded-xl border border-red-100 hover:bg-red-100 transition-colors"
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '16px',
+        backgroundColor: '#FFF5F5',
+        borderRadius: '12px',
+        border: '1px solid rgba(255,75,75,0.1)',
+        cursor: 'pointer',
+        transition: 'background-color 150ms',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFEBEB'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFF5F5'; }}
     >
-      <div className="text-left">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[#FF4B4B] bg-red-100 px-2 py-0.5 rounded-full">
+      <div style={{ textAlign: 'left' }}>
+        <FlexBox alignItems="center" gap="8px">
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF4B4B', backgroundColor: 'rgba(255,75,75,0.1)', padding: '2px 8px', borderRadius: '9999px' }}>
             급등
           </span>
-          <span className="text-sm font-bold text-[#191F28]">{alert.apartmentName}</span>
-        </div>
-        <p className="text-xs text-[#8B95A1] mt-1">{alert.district} · {alert.date}</p>
+          <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+            {alert.apartmentName}
+          </Typography>
+        </FlexBox>
+        <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '4px' }}>
+          {alert.district} · {alert.date}
+        </Typography>
       </div>
-      <div className="text-right">
-        <p className="text-base font-black text-[#FF4B4B]">+{alert.surgeRate.toFixed(0)}%</p>
-        <p className="text-xs text-[#8B95A1]">
+      <div style={{ textAlign: 'right' }}>
+        <Typography variant="body1" weight="bold" sx={{ color: '#FF4B4B' }}>
+          +{alert.surgeRate.toFixed(0)}%
+        </Typography>
+        <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>
           {alert.previousVolume}건 → {alert.currentVolume}건
-        </p>
+        </Typography>
       </div>
     </button>
   );

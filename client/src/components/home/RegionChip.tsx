@@ -1,6 +1,7 @@
 import React from 'react';
 import type { RegionTrend } from '../../types';
 import { formatPriceShort } from '../../utils/formatNumber';
+import { Typography } from '@wanteddev/wds';
 
 interface RegionChipProps {
   trend: RegionTrend;
@@ -12,36 +13,41 @@ const RegionChip = React.memo<RegionChipProps>(({ trend }) => {
   const isDown = trend.priceChange < 0;
 
   // 등락 방향별 칩 스타일
-  const chipClass = [
-    'inline-flex items-center gap-2 h-[52px] rounded-[26px] px-4 flex-shrink-0',
-    'shadow-sm cursor-pointer transition-all duration-150 active:scale-[0.96]',
-    'scroll-snap-align-start',
-    isUp
-      ? 'bg-[#FFF3F3] border border-[#FF4B4B]/30'
-      : isDown
-        ? 'bg-[#EFF6FF] border border-[rgba(59,130,246,0.25)]'
-        : 'bg-white border border-[#E5E8EB]',
-  ].join(' ');
+  const chipStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    height: '52px',
+    borderRadius: '26px',
+    padding: '0 16px',
+    flexShrink: 0,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+    cursor: 'pointer',
+    transition: 'transform 150ms ease',
+    backgroundColor: isUp ? '#FFF3F3' : isDown ? '#EFF6FF' : 'var(--semantic-background-normal-normal)',
+    border: `1px solid ${isUp ? 'rgba(255,75,75,0.3)' : isDown ? 'rgba(59,130,246,0.25)' : 'var(--semantic-line-normal)'}`,
+  };
 
-  // 변동률 색상
-  const changeColor = isUp
-    ? 'text-[#FF4B4B]'
-    : isDown
-      ? 'text-[#3B82F6]'
-      : 'text-[#8B95A1]';
+  const changeColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
 
   return (
-    <div className={chipClass}>
+    <div
+      style={chipStyle}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)'; }}
+    >
       {/* 지역명 */}
-      <span className="text-[13px] font-semibold text-[#191F28]">{trend.region}</span>
+      <Typography variant="body2" weight="medium" sx={{ color: 'var(--semantic-label-normal)' }}>
+        {trend.region}
+      </Typography>
       {/* 평균가 */}
-      <span className="text-[13px] font-bold text-[#191F28] font-mono">
+      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)' }}>
         {formatPriceShort(trend.avgPrice)}
       </span>
       {/* 변동률 */}
-      <span className={`text-[11px] font-semibold ${changeColor}`}>
+      <Typography variant="caption1" weight="medium" sx={{ color: changeColor }}>
         {isUp ? '▲' : isDown ? '▼' : ''}{Math.abs(trend.priceChange).toFixed(1)}%
-      </span>
+      </Typography>
     </div>
   );
 });

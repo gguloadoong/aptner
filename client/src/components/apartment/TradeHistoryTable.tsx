@@ -1,6 +1,7 @@
 import React from 'react';
 import type { TradeHistory } from '../../types';
 import { formatPrice, formatYearMonth } from '../../utils/formatNumber';
+import { Box, Typography } from '@wanteddev/wds';
 
 interface TradeHistoryTableProps {
   trades: TradeHistory[];
@@ -16,38 +17,66 @@ const TradeHistoryTable = React.memo<TradeHistoryTableProps>(
 
     if (displayTrades.length === 0) {
       return (
-        <div className="py-8 text-center">
-          <p className="text-sm text-[#8B95A1]">거래 내역이 없습니다</p>
-        </div>
+        <Box sx={{ padding: '32px 0', textAlign: 'center' }}>
+          <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+            거래 내역이 없습니다
+          </Typography>
+        </Box>
       );
     }
 
+    const colStyle: React.CSSProperties = {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+    };
+
     return (
-      <div className="overflow-hidden">
+      <div style={{ overflow: 'hidden' }}>
         {/* 테이블 헤더 */}
-        <div className="grid grid-cols-4 px-4 py-2 bg-[#F5F6F8] rounded-lg mb-1">
-          <span className="text-xs font-medium text-[#8B95A1]">거래일</span>
-          <span className="text-xs font-medium text-[#8B95A1] text-center">면적</span>
-          <span className="text-xs font-medium text-[#8B95A1] text-center">층</span>
-          <span className="text-xs font-medium text-[#8B95A1] text-right">거래가</span>
+        <div
+          style={{
+            ...colStyle,
+            padding: '8px 16px',
+            backgroundColor: 'var(--semantic-background-normal-alternative)',
+            borderRadius: '8px',
+            marginBottom: '4px',
+          }}
+        >
+          {['거래일', '면적', '층', '거래가'].map((label, i) => (
+            <Typography
+              key={label}
+              variant="caption1"
+              weight="medium"
+              sx={{ color: 'var(--semantic-label-assistive)', textAlign: i === 3 ? 'right' : i === 1 || i === 2 ? 'center' : 'left' }}
+            >
+              {label}
+            </Typography>
+          ))}
         </div>
 
         {/* 거래 내역 */}
-        <div className="divide-y divide-[#E5E8EB]">
+        <div style={{ borderTop: '1px solid var(--semantic-line-normal)' }}>
           {displayTrades.map((trade) => (
-            <div key={trade.id} className="grid grid-cols-4 px-4 py-3">
-              <span className="text-xs text-[#8B95A1]">
+            <div
+              key={trade.id}
+              style={{
+                ...colStyle,
+                padding: '12px 16px',
+                borderBottom: '1px solid var(--semantic-line-normal)',
+              }}
+            >
+              <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
                 {formatYearMonth(trade.date)}
-              </span>
-              <span className="text-xs text-[#191F28] text-center font-medium">
+              </Typography>
+              <Typography variant="caption1" weight="medium" sx={{ color: 'var(--semantic-label-normal)', textAlign: 'center' }}>
                 {trade.area}㎡
-              </span>
-              <span className="text-xs text-[#191F28] text-center">
+              </Typography>
+              <Typography variant="caption1" sx={{ color: 'var(--semantic-label-normal)', textAlign: 'center' }}>
                 {trade.floor}층
-              </span>
-              <span className="text-xs font-bold text-[#191F28] text-right">
+              </Typography>
+              <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', textAlign: 'right' }}>
                 {formatPrice(trade.price)}
-              </span>
+              </Typography>
             </div>
           ))}
         </div>

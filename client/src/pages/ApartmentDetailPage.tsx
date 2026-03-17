@@ -4,32 +4,35 @@ import { useApartmentDetail, useApartmentHistory } from '../hooks/useApartment';
 import api from '../services/api';
 import PriceChart from '../components/apartment/PriceChart';
 import TradeHistoryTable from '../components/apartment/TradeHistoryTable';
-import { Loading, Chip, IconButton, TextButton, useToast } from '@wanteddev/wds';
-import { IconChevronLeft, IconHeartFill, IconHeart, IconShare, IconArrowRight, IconSquarePlus, IconSquarePlusFill } from '@wanteddev/wds-icon';
+import {
+  Loading, Chip, IconButton, TextButton, useToast,
+  Box, FlexBox, Typography, Grid, GridItem, Skeleton,
+  TopNavigation, TopNavigationButton,
+} from '@wanteddev/wds';
+import {
+  IconChevronLeft, IconHeartFill, IconHeart, IconShare,
+  IconArrowRight, IconSquarePlus, IconSquarePlusFill,
+} from '@wanteddev/wds-icon';
 import { AlertButton } from '../components/apartment/PriceAlertModal';
 import { formatPriceShort, formatChange, formatUnits, formatArea } from '../utils/formatNumber';
 import { MOCK_APARTMENTS } from '../mocks/apartments.mock';
 import { useBookmarkStore } from '../stores/bookmarkStore';
 import { useCompareStore } from '../stores/compareStore';
 
-// 아파트 상세 페이지 - 데스크탑: 2컬럼 (기본정보 | 차트)
+// 아파트 상세 페이지 — WDS 컴포넌트 전면 적용
 export default function ApartmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [selectedArea, setSelectedArea] = useState<string | undefined>(undefined);
 
-  // 찜하기 스토어
   const { isBookmarked, toggleBookmark } = useBookmarkStore();
   const bookmarked = isBookmarked(id ?? '');
 
-  // WDS useToast 훅 (alert 대체) — handleCompareToggle 정의 전에 선언
   const addToast = useToast();
 
-  // 비교 스토어
   const { isInCompare, addCompare, removeCompare } = useCompareStore();
   const inCompare = isInCompare(id ?? '');
 
-  // 비교 토글 핸들러
   const handleCompareToggle = () => {
     if (!id) return;
     if (inCompare) {
@@ -41,7 +44,6 @@ export default function ApartmentDetailPage() {
         addToast({ content: '최대 3개 단지까지 비교할 수 있습니다', variant: 'negative', duration: 'short' });
         return;
       }
-      // name을 함께 저장하여 CompareBar에서 실데이터 모드에서도 단지명 표시 가능
       addCompare({ id, name: apartment?.name ?? id });
       addToast({ content: '비교 목록에 추가되었습니다', variant: 'positive', duration: 'short' });
     }
@@ -49,7 +51,6 @@ export default function ApartmentDetailPage() {
 
   const { data: apartment, isLoading, isError } = useApartmentDetail(id);
 
-  // 전세가율 조회
   const [jeonseRate, setJeonseRate] = useState<number | null>(null);
   useEffect(() => {
     if (!apartment?.id || !apartment?.lawdCd) return;
@@ -58,7 +59,6 @@ export default function ApartmentDetailPage() {
       .catch(() => {});
   }, [apartment?.id, apartment?.lawdCd]);
 
-  // apartment가 바뀔 때마다 첫 번째 면적으로 초기화
   React.useEffect(() => {
     if (apartment) setSelectedArea(apartment.areas[0]);
   }, [apartment]);
@@ -71,49 +71,43 @@ export default function ApartmentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <FlexBox alignItems="center" justifyContent="center" style={{ minHeight: '100svh' }}>
         <Loading size="32px" />
-      </div>
+      </FlexBox>
     );
   }
 
   if (isError || !apartment) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-        <p className="text-[#FF4B4B] font-semibold">단지 정보를 불러올 수 없습니다</p>
+      <FlexBox flexDirection="column" alignItems="center" justifyContent="center" gap="16px" style={{ minHeight: '100svh' }}>
+        <Typography variant="body1" weight="medium" sx={{ color: '#FF4B4B' }}>
+          단지 정보를 불러올 수 없습니다
+        </Typography>
         <TextButton size="small" color="primary" onClick={() => navigate(-1)}>
           돌아가기
         </TextButton>
-      </div>
+      </FlexBox>
     );
   }
 
   const priceColor =
     apartment.priceChangeType === 'up'
-      ? 'text-[#FF4B4B]'
+      ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? 'text-[#3B82F6]'
-        : 'text-[#8B95A1]';
+        ? '#3B82F6'
+        : 'var(--semantic-label-assistive)';
 
   const priceArrow =
     apartment.priceChangeType === 'up' ? '▲' : apartment.priceChangeType === 'down' ? '▼' : '';
 
-  // 거래 통계 계산
   const priceStats = calcStats(tradeHistory.map((t) => t.price));
 
-  // 공유 핸들러 — Web Share API 지원 시 사용, 미지원 시 클립보드 복사
   const handleShare = async () => {
     const url = `${window.location.origin}/apartment/${id}`;
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: apartment.name,
-          text: `봄집 - ${apartment.name} 아파트 정보`,
-          url,
-        });
-      } catch {
-        // 공유 취소 등의 경우 무시
-      }
+        await navigator.share({ title: apartment.name, text: `봄집 - ${apartment.name} 아파트 정보`, url });
+      } catch { /* 공유 취소 무시 */ }
     } else {
       try {
         await navigator.clipboard.writeText(url);
@@ -125,183 +119,222 @@ export default function ApartmentDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F7FAF8]">
-      {/* 헤더 */}
-      <header className="bg-white border-b border-[#E5E8EB] sticky top-0 z-30 px-5 py-4 md:px-6">
-        <div className="max-w-screen-xl mx-auto flex items-center gap-3">
-          <IconButton
-            variant="normal"
-            onClick={() => navigate(-1)}
-            aria-label="뒤로가기"
-          >
+    <div style={{ minHeight: '100svh', backgroundColor: 'var(--semantic-background-normal-alternative)' }}>
+
+      {/* 헤더 — WDS TopNavigation */}
+      <TopNavigation
+        leadingContent={
+          <TopNavigationButton onClick={() => navigate(-1)} aria-label="뒤로가기">
             <IconChevronLeft />
-          </IconButton>
-          <h1 className="text-base font-bold text-[#191F28] truncate flex-1">{apartment.name}</h1>
-          {/* 비교 추가 버튼 - WDS IconButton */}
-          <IconButton
-            variant="normal"
-            onClick={handleCompareToggle}
-            aria-label={inCompare ? '비교 제거' : '비교 추가'}
-          >
-            {inCompare ? (
-              <IconSquarePlusFill style={{ color: '#0066FF' }} />
-            ) : (
-              <IconSquarePlus />
-            )}
-          </IconButton>
-          {/* 찜하기 버튼 - WDS IconButton */}
-          <IconButton
-            variant="normal"
-            onClick={() => toggleBookmark(id ?? '')}
-            aria-label={bookmarked ? '찜 해제' : '찜하기'}
-          >
-            {bookmarked ? (
-              <IconHeartFill style={{ color: '#E53E3E' }} />
-            ) : (
-              <IconHeart />
-            )}
-          </IconButton>
-          {/* 가격 알림 버튼 */}
-          <AlertButton
-            apartmentId={id ?? ''}
-            apartmentName={apartment.name}
-            currentPrice={apartment.recentPrice}
-            area={selectedArea ?? apartment.areas[0] ?? '84'}
-          />
-          {/* 공유 버튼 - WDS IconButton */}
-          <IconButton
-            variant="normal"
-            onClick={handleShare}
-            aria-label="공유"
-          >
-            <IconShare />
-          </IconButton>
-          {/* 카카오맵 길찾기 링크 */}
-          <a
-            href={`https://map.kakao.com/link/search/${encodeURIComponent(apartment.name)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <TextButton
-              size="small"
-              color="primary"
-              trailingContent={<IconArrowRight />}
+          </TopNavigationButton>
+        }
+        trailingContent={
+          <FlexBox alignItems="center" gap="4px">
+            {/* 비교 추가 버튼 */}
+            <IconButton variant="normal" onClick={handleCompareToggle} aria-label={inCompare ? '비교 제거' : '비교 추가'}>
+              {inCompare ? <IconSquarePlusFill style={{ color: 'var(--semantic-primary-normal)' }} /> : <IconSquarePlus />}
+            </IconButton>
+            {/* 찜하기 버튼 */}
+            <IconButton variant="normal" onClick={() => toggleBookmark(id ?? '')} aria-label={bookmarked ? '찜 해제' : '찜하기'}>
+              {bookmarked ? <IconHeartFill style={{ color: '#E53E3E' }} /> : <IconHeart />}
+            </IconButton>
+            {/* 가격 알림 버튼 */}
+            <AlertButton
+              apartmentId={id ?? ''}
+              apartmentName={apartment.name}
+              currentPrice={apartment.recentPrice}
+              area={selectedArea ?? apartment.areas[0] ?? '84'}
+            />
+            {/* 공유 버튼 */}
+            <IconButton variant="normal" onClick={handleShare} aria-label="공유">
+              <IconShare />
+            </IconButton>
+            {/* 카카오맵 길찾기 */}
+            <a
+              href={`https://map.kakao.com/link/search/${encodeURIComponent(apartment.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              길찾기
-            </TextButton>
-          </a>
-        </div>
-      </header>
+              <TextButton size="small" color="primary" trailingContent={<IconArrowRight />}>
+                길찾기
+              </TextButton>
+            </a>
+          </FlexBox>
+        }
+      >
+        <Typography
+          variant="body1"
+          weight="bold"
+          sx={{ color: 'var(--semantic-label-normal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
+          {apartment.name}
+        </Typography>
+      </TopNavigation>
 
-      <main className="pb-8">
-        <div className="max-w-screen-xl mx-auto md:px-6 md:pt-6">
+      <Box as="main" sx={{ paddingBottom: '32px' }}>
+        <Box sx={{ maxWidth: '1280px', margin: '0 auto', padding: '0 0 0 0' }}>
           {/* 데스크탑: 2컬럼 레이아웃 */}
-          <div className="md:grid md:grid-cols-[380px_1fr] md:gap-6">
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '0',
+            }}
+          >
+            {/* 단지 기본 정보 */}
+            <Box
+              sx={{
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                padding: '20px',
+                marginBottom: '12px',
+              }}
+            >
+              <Typography variant="title3" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', lineHeight: 1.3 }}>
+                {apartment.name}
+              </Typography>
+              <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '4px' }}>
+                {apartment.address || `${apartment.district} ${apartment.dong}`}
+              </Typography>
 
-            {/* 좌측: 단지 기본 정보 */}
-            <div>
-              {/* 단지 기본 정보 카드 */}
-              <div className="bg-white px-5 py-5 mb-3 md:rounded-2xl md:border md:border-[#E5E8EB]">
-                <h2 className="text-xl font-black text-[#191F28] leading-snug">{apartment.name}</h2>
-                <p className="text-sm text-[#8B95A1] mt-1">
-                  {apartment.address || `${apartment.district} ${apartment.dong}`}
-                </p>
+              {/* 최근 거래가 */}
+              <FlexBox alignItems="baseline" gap="8px" style={{ marginTop: '16px' }}>
+                <span style={{ fontSize: '30px', fontWeight: 900, color: 'var(--semantic-label-normal)' }}>
+                  {formatPriceShort(apartment.recentPrice)}
+                </span>
+                <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                  {formatArea(apartment.recentPriceArea)}
+                </Typography>
+                <Typography variant="body1" weight="bold" sx={{ color: priceColor }}>
+                  {priceArrow} {formatChange(apartment.priceChange)}
+                </Typography>
+              </FlexBox>
 
-                {/* 최근 거래가 */}
-                <div className="flex items-baseline gap-2 mt-4">
-                  <span className="text-3xl font-black text-[#191F28]">
-                    {formatPriceShort(apartment.recentPrice)}
-                  </span>
-                  <span className="text-sm text-[#8B95A1]">{formatArea(apartment.recentPriceArea)}</span>
-                  <span className={`text-base font-bold ${priceColor}`}>
-                    {priceArrow} {formatChange(apartment.priceChange)}
-                  </span>
-                </div>
+              {/* 전세가율 */}
+              {jeonseRate !== null && (
+                <FlexBox alignItems="center" gap="8px" style={{ marginTop: '12px' }}>
+                  <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>전세가율</Typography>
+                  <Typography
+                    variant="body1"
+                    weight="bold"
+                    sx={{ color: jeonseRate >= 80 ? '#FF4B4B' : jeonseRate >= 60 ? '#F97316' : 'var(--semantic-primary-normal)' }}
+                  >
+                    {jeonseRate}%
+                  </Typography>
+                  <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                    {jeonseRate >= 80 ? '⚠ 갭 주의' : jeonseRate >= 60 ? '보통' : '갭 여유'}
+                  </Typography>
+                </FlexBox>
+              )}
 
-                {/* 전세가율 */}
-                {jeonseRate !== null && (
-                  <div className="flex items-center gap-2 mt-3">
-                    <span className="text-[13px] text-[#8B95A1]">전세가율</span>
-                    <span className={`text-[15px] font-bold ${jeonseRate >= 80 ? 'text-[#FF4B4B]' : jeonseRate >= 60 ? 'text-[#F97316]' : 'text-blue-600'}`}>
-                      {jeonseRate}%
-                    </span>
-                    <span className="text-[11px] text-[#8B95A1]">
-                      {jeonseRate >= 80 ? '⚠ 갭 주의' : jeonseRate >= 60 ? '보통' : '갭 여유'}
-                    </span>
-                  </div>
-                )}
+              {/* 단지 정보 그리드 */}
+              <Box sx={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--semantic-line-normal)' }}>
+                <Grid spacing={4}>
+                  <GridItem columns={4}>
+                    <InfoItem label="세대수" value={formatUnits(apartment.totalUnits)} />
+                  </GridItem>
+                  <GridItem columns={4}>
+                    <InfoItem label="준공년도" value={`${apartment.builtYear}년`} />
+                  </GridItem>
+                  <GridItem columns={4}>
+                    <InfoItem label="건설사" value={apartment.builder} />
+                  </GridItem>
+                </Grid>
+              </Box>
+            </Box>
 
-                {/* 단지 정보 그리드 */}
-                <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-[#E5E8EB]">
-                  <InfoItem label="세대수" value={formatUnits(apartment.totalUnits)} />
-                  <InfoItem label="준공년도" value={`${apartment.builtYear}년`} />
-                  <InfoItem label="건설사" value={apartment.builder} />
-                </div>
+            {/* 주변 단지 */}
+            <Box
+              sx={{
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                padding: '20px',
+                marginBottom: '12px',
+              }}
+            >
+              <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '16px' }}>
+                주변 단지
+              </Typography>
+              <NearbyApartments currentId={apartment.id} district={apartment.district} />
+            </Box>
+
+            {/* 면적 탭 + 가격 차트 */}
+            <Box
+              sx={{
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                padding: '20px',
+                marginBottom: '12px',
+              }}
+            >
+              <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '16px' }}>
+                실거래가 추이
+              </Typography>
+
+              {/* 면적 탭 — WDS Chip */}
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginBottom: '20px',
+                  overflowX: 'auto',
+                  scrollbarWidth: 'none',
+                } as React.CSSProperties}
+              >
+                {apartment.areas.map((area) => (
+                  <Chip
+                    key={area}
+                    size="small"
+                    variant="outlined"
+                    active={selectedArea === area}
+                    onClick={() => setSelectedArea(area)}
+                    style={{ flexShrink: 0 }}
+                  >
+                    {formatArea(area)}
+                  </Chip>
+                ))}
               </div>
 
-              {/* 주변 단지 비교 (데스크탑에서는 좌측 하단) */}
-              <div className="bg-white px-5 py-5 md:rounded-2xl md:border md:border-[#E5E8EB]">
-                <h3 className="text-base font-bold text-[#191F28] mb-4">주변 단지</h3>
-                <NearbyApartments currentId={apartment.id} district={apartment.district} />
-              </div>
-            </div>
+              {/* 가격 요약 */}
+              {!isHistoryLoading && tradeHistory.length > 0 && (
+                <Grid spacing={4} style={{ marginBottom: '20px' }}>
+                  <GridItem columns={4}><PriceSummaryItem label="최저" value={priceStats.min} /></GridItem>
+                  <GridItem columns={4}><PriceSummaryItem label="평균" value={priceStats.avg} /></GridItem>
+                  <GridItem columns={4}><PriceSummaryItem label="최고" value={priceStats.max} /></GridItem>
+                </Grid>
+              )}
 
-            {/* 우측: 차트 + 거래 내역 */}
-            <div>
-              {/* 면적 탭 + 가격 차트 */}
-              <div className="bg-white px-5 py-5 mb-3 md:rounded-2xl md:border md:border-[#E5E8EB]">
-                <h3 className="text-base font-bold text-[#191F28] mb-4">실거래가 추이</h3>
+              {/* 차트 */}
+              <PriceChart data={tradeHistory} isLoading={isHistoryLoading} />
+            </Box>
 
-                {/* 면적 탭 - WDS Chip */}
-                <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-                  {apartment.areas.map((area) => (
-                    <Chip
-                      key={area}
-                      size="small"
-                      variant="outlined"
-                      active={selectedArea === area}
-                      onClick={() => setSelectedArea(area)}
-                      className="flex-shrink-0"
-                    >
-                      {formatArea(area)}
-                    </Chip>
+            {/* 최근 거래 내역 */}
+            <Box
+              sx={{
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                padding: '20px',
+                marginBottom: '12px',
+              }}
+            >
+              <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '16px' }}>
+                <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+                  최근 거래 내역
+                </Typography>
+                <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                  최근 20건
+                </Typography>
+              </FlexBox>
+
+              {isHistoryLoading ? (
+                <FlexBox flexDirection="column" gap="8px">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} variant="rectangle" width="100%" height="40px" />
                   ))}
-                </div>
-
-                {/* 가격 요약 */}
-                {!isHistoryLoading && tradeHistory.length > 0 && (
-                  <div className="grid grid-cols-3 gap-3 mb-5">
-                    <PriceSummaryItem label="최저" value={priceStats.min} />
-                    <PriceSummaryItem label="평균" value={priceStats.avg} />
-                    <PriceSummaryItem label="최고" value={priceStats.max} />
-                  </div>
-                )}
-
-                {/* 차트 */}
-                <PriceChart data={tradeHistory} isLoading={isHistoryLoading} />
-              </div>
-
-              {/* 최근 거래 내역 */}
-              <div className="bg-white px-5 py-5 md:rounded-2xl md:border md:border-[#E5E8EB]">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-bold text-[#191F28]">최근 거래 내역</h3>
-                  <span className="text-xs text-[#8B95A1]">최근 20건</span>
-                </div>
-
-                {isHistoryLoading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />
-                    ))}
-                  </div>
-                ) : (
-                  <TradeHistoryTable trades={tradeHistory} limit={20} />
-                )}
-              </div>
-            </div>
+                </FlexBox>
+              ) : (
+                <TradeHistoryTable trades={tradeHistory} limit={20} />
+              )}
+            </Box>
           </div>
-        </div>
-      </main>
+        </Box>
+      </Box>
     </div>
   );
 }
@@ -310,8 +343,12 @@ export default function ApartmentDetailPage() {
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-[#8B95A1]">{label}</p>
-      <p className="text-sm font-bold text-[#191F28] mt-0.5">{value}</p>
+      <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>
+        {label}
+      </Typography>
+      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '2px' }}>
+        {value}
+      </Typography>
     </div>
   );
 }
@@ -319,10 +356,21 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 // 가격 요약 아이템
 function PriceSummaryItem({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-[#F8FAFC] rounded-xl p-3 text-center">
-      <p className="text-[10px] text-[#8B95A1] mb-1">{label}</p>
-      <p className="text-sm font-bold text-[#191F28]">{formatPriceShort(value)}</p>
-    </div>
+    <Box
+      sx={{
+        backgroundColor: 'var(--semantic-background-normal-alternative)',
+        borderRadius: '12px',
+        padding: '12px',
+        textAlign: 'center',
+      }}
+    >
+      <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginBottom: '4px' }}>
+        {label}
+      </Typography>
+      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+        {formatPriceShort(value)}
+      </Typography>
+    </Box>
   );
 }
 
@@ -344,11 +392,15 @@ function NearbyApartments({ currentId, district }: { currentId: string; district
     .slice(0, 3);
 
   if (nearby.length === 0) {
-    return <p className="text-sm text-[#8B95A1]">주변 단지 정보가 없습니다</p>;
+    return (
+      <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+        주변 단지 정보가 없습니다
+      </Typography>
+    );
   }
 
   return (
-    <div className="space-y-3">
+    <FlexBox flexDirection="column" gap="12px">
       {nearby.map((apt: {
         id: string;
         name: string;
@@ -361,29 +413,47 @@ function NearbyApartments({ currentId, district }: { currentId: string; district
         <button
           key={apt.id}
           onClick={() => navigate(`/apartment/${apt.id}`)}
-          className="w-full flex items-center justify-between p-3 bg-[#F7FAF8] rounded-xl hover:bg-gray-100 transition-colors"
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px',
+            backgroundColor: 'var(--semantic-background-normal-alternative)',
+            borderRadius: '12px',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'background-color 150ms',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-fill-normal, #e5e8eb)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)'; }}
         >
-          <div className="text-left">
-            <p className="text-sm font-bold text-[#191F28]">{apt.name}</p>
-            <p className="text-xs text-[#8B95A1]">{apt.dong}</p>
+          <div>
+            <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block' }}>
+              {apt.name}
+            </Typography>
+            <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>
+              {apt.dong}
+            </Typography>
           </div>
-          <div className="text-right">
-            <p className="text-sm font-bold text-[#191F28]">
+          <div style={{ textAlign: 'right' }}>
+            <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block' }}>
               {formatPriceShort(apt.recentPrice)}
-            </p>
-            <p className={[
-              'text-xs font-semibold',
-              apt.priceChangeType === 'up'
-                ? 'text-[#FF4B4B]'
-                : apt.priceChangeType === 'down'
-                  ? 'text-[#3B82F6]'
-                  : 'text-[#8B95A1]',
-            ].join(' ')}>
+            </Typography>
+            <Typography
+              variant="caption1"
+              weight="medium"
+              sx={{
+                color: apt.priceChangeType === 'up' ? '#FF4B4B' : apt.priceChangeType === 'down' ? '#3B82F6' : 'var(--semantic-label-assistive)',
+                display: 'block',
+              }}
+            >
               {formatChange(apt.priceChange)}
-            </p>
+            </Typography>
           </div>
         </button>
       ))}
-    </div>
+    </FlexBox>
   );
 }
