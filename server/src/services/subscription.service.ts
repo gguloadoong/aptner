@@ -694,6 +694,11 @@ export async function getSubscriptions(
       ]);
       list = rawItems.map((item) => adaptLhItem(item, houseTypeMap));
       console.log(`[Subscription] 실 API 데이터 ${list.length}건 사용 (주택형 그룹 ${houseTypeMap.size}개)`);
+      // 실 API가 0건이면 API deprecated 또는 공고 없음 → Mock fallback
+      if (list.length === 0) {
+        console.warn('[Subscription] 실 API 0건 → Mock fallback 사용');
+        list = buildSubscriptions();
+      }
     } catch (err) {
       console.error('[Subscription] 실 API 실패 → Mock fallback:', err);
       list = buildSubscriptions();
