@@ -1500,11 +1500,94 @@ export async function getHotApartments(
   }
 }
 
+// 뷰포트 범위 안에 있는 구(lawdCd) 목록을 추출하기 위한 배열
+// LAWD_CD_COORDS의 키/값을 순회 가능한 형태로 정리
+const LAWD_CD_LIST = Object.entries(LAWD_CD_COORDS).map(([lawdCd, coords]) => ({
+  lawdCd,
+  lat: coords.lat,
+  lng: coords.lng,
+}));
+
+// 뷰포트당 반환할 마커 최대 수
+const MAP_MARKERS_MAX = 200;
+
+/**
+ * 실거래 ApartmentTrade 배열을 단지별로 집계해 ApartmentMapMarker[] 를 생성합니다.
+ *
+ * 국토부 API는 좌표를 제공하지 않으므로, 구 중심 좌표 + 단지 인덱스 기반 오프셋으로
+ * 마커를 분산 배치합니다. aptCode(아파트 일련번호)를 시드로 사용해 오프셋이
+ * 재실행 시에도 동일하게 유지됩니다.
+ *
+ * @param trades - 실거래 목록
+ * @param lawdCd - 조회 대상 시군구 코드 (좌표 추정에 사용)
+ */
+function tradesToMapMarkers(trades: ApartmentTrade[], lawdCd: string): ApartmentMapMarker[] {
+  const baseCoords = LAWD_CD_COORDS[lawdCd];
+  if (!baseCoords) return [];
+
+  // aptCode(없으면 아파트명+동 조합) 기준으로 단지 집계
+  // key: 단지 식별자, value: 해당 단지의 거래 목록
+  const aptMap = new Map<string, ApartmentTrade[]>();
+
+  for (const trade of trades) {
+    // 단지 식별자: aptCode 있으면 사용, 없으면 아파트명으로 대체
+    const key = trade.aptCode ?? trade.apartmentName;
+    const list = aptMap.get(key) ?? [];
+    list.push(trade);
+    aptMap.set(key, list);
+  }
+
+  const markers: ApartmentMapMarker[] = [];
+  let idx = 0;
+
+  for (const [key, aptTrades] of aptMap) {
+    // 가장 최근 거래 기준으로 대표 가격 결정 (dealDate 내림차순 정렬)
+    const sorted = [...aptTrades].sort((a, b) => b.dealDate.localeCompare(a.dealDate));
+    const latest = sorted[0];
+    const oldest = sorted[sorted.length - 1];
+
+    // 가격 변화 방향 계산 (최신 vs 가장 오래된 거래)
+    const priceDiff = latest.price - oldest.price;
+    const priceChangeType: 'up' | 'down' | 'flat' =
+      priceDiff > 0 ? 'up' : priceDiff < 0 ? 'down' : 'flat';
+
+    // 단지 식별자 문자열을 간단한 해시값으로 변환 (좌표 오프셋 시드)
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+    }
+    // 오프셋 범위: ±0.03도 (약 ±3km) 내에서 분산 배치
+    const latOffset = ((Math.abs(hash) % 60) - 30) * 0.001;
+    const lngOffset = (((Math.abs(hash) >> 4) % 60) - 30) * 0.001;
+
+    markers.push({
+      id: latest.aptCode ? `${lawdCd}-${latest.aptCode}` : `${lawdCd}-${idx}`,
+      name: latest.apartmentName,
+      lat: baseCoords.lat + latOffset,
+      lng: baseCoords.lng + lngOffset,
+      price: latest.price,
+      area: String(Math.round(latest.area)),
+      priceChangeType,
+      // 실 API에서 단지 특성 정보 미제공 → undefined 처리 (FE에서 필터 해제됨)
+    });
+
+    idx++;
+  }
+
+  return markers;
+}
+
 /**
  * 지도 뷰포트 내 아파트 마커를 조회합니다.
- * TODO: 실 API 연동 시 이 함수 교체
- * - Mock: 사전 정의된 40개 아파트에서 뷰포트 및 단지 특성 필터링
- * - 실 API: DB 또는 API에서 좌표 기반 조회
+ *
+ * MOLIT_API_KEY 환경변수가 설정된 경우 실 국토부 API 데이터를 사용하고,
+ * 없거나 API 호출 실패 시 Mock 데이터(40개 고정 단지)로 자동 폴백합니다.
+ *
+ * 실 API 흐름:
+ * 1. 뷰포트 범위 안에 있는 구(lawdCd) 목록 추출 (LAWD_CD_LIST 활용)
+ * 2. 최대 5개 구를 병렬로 실거래 조회 (이번 달 기준)
+ * 3. 거래 데이터를 단지별로 집계해 ApartmentMapMarker 형태로 변환
+ * 4. 필터 적용 후 최대 200개 마커 반환
  *
  * @param swLat - 남서쪽 위도
  * @param swLng - 남서쪽 경도
@@ -1530,6 +1613,160 @@ export async function getApartmentMapMarkers(
     return cached;
   }
 
+  // ── 실 API 경로 ──────────────────────────────────────────────
+  if (isRealApiKey(process.env.MOLIT_API_KEY)) {
+    try {
+      // 1. 뷰포트 안에 중심 좌표가 들어오는 구 목록 추출
+      const inBoundsLawdCds = LAWD_CD_LIST.filter(
+        (d) => d.lat >= swLat && d.lat <= neLat && d.lng >= swLng && d.lng <= neLng,
+      );
+
+      if (inBoundsLawdCds.length === 0) {
+        console.log('[Molit] 지도 마커: 뷰포트 내 구 없음 → Mock 폴백');
+        return getMockMarkersWithFilter(swLat, swLng, neLat, neLng, priceFilter, complexFilter);
+      }
+
+      // 2. 최대 5개 구를 병렬 조회 (API quota 보호)
+      const targetLawdCds = inBoundsLawdCds.slice(0, 5);
+      // 현재 연월 (YYYYMM 형식)
+      const now = new Date();
+      const currentYm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      console.log(
+        `[Molit] 지도 마커 실 API 조회: ${targetLawdCds.map((d) => d.lawdCd).join(', ')} (${currentYm})`,
+      );
+
+      const results = await Promise.allSettled(
+        targetLawdCds.map((d) =>
+          getApartmentTrades(d.lawdCd, currentYm, 1, 100),
+        ),
+      );
+
+      // 3. 성공한 구의 거래 데이터를 마커로 변환
+      let allMarkers: ApartmentMapMarker[] = [];
+
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          const { items } = result.value;
+          const lawdCd = targetLawdCds[i].lawdCd;
+          const converted = tradesToMapMarkers(items, lawdCd);
+          allMarkers = allMarkers.concat(converted);
+        } else {
+          console.warn(
+            `[Molit] 구 ${targetLawdCds[i].lawdCd} 조회 실패:`,
+            result.reason,
+          );
+        }
+      });
+
+      // 이번 달 데이터 없으면 전달도 조회 (신고 지연 대응)
+      if (allMarkers.length === 0) {
+        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevYm = `${prevDate.getFullYear()}${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+        console.log(`[Molit] 이번 달 데이터 없음 → 전달(${prevYm}) 재조회`);
+        const prevResults = await Promise.allSettled(
+          targetLawdCds.map((d) => getApartmentTrades(d.lawdCd, prevYm, 1, 100)),
+        );
+        prevResults.forEach((result, i) => {
+          if (result.status === 'fulfilled') {
+            const { items } = result.value;
+            const converted = tradesToMapMarkers(items, targetLawdCds[i].lawdCd);
+            allMarkers = allMarkers.concat(converted);
+          }
+        });
+      }
+
+      // 여전히 없으면 Mock 폴백
+      if (allMarkers.length === 0) {
+        console.warn('[Molit] 지도 마커: 실 API 결과 없음 → Mock 폴백');
+        return getMockMarkersWithFilter(swLat, swLng, neLat, neLng, priceFilter, complexFilter);
+      }
+
+      // 4. 필터 적용
+      let markers = allMarkers;
+
+      if (priceFilter !== undefined && priceFilter > 0) {
+        markers = markers.filter((apt) => apt.price <= priceFilter);
+      }
+
+      // 단지 특성 필터: 실 API 데이터에는 특성 정보가 없으므로 undefined 필드는 필터 제외
+      if (complexFilter) {
+        if (complexFilter.minUnit !== undefined) {
+          markers = markers.filter(
+            (apt) => apt.unitCount !== undefined && apt.unitCount >= complexFilter.minUnit!,
+          );
+        }
+        if (complexFilter.isBrand !== undefined) {
+          markers = markers.filter(
+            (apt) => apt.isBrand === undefined || apt.isBrand === complexFilter.isBrand,
+          );
+        }
+        if (complexFilter.isWalkSubway !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.isWalkSubway === undefined || apt.isWalkSubway === complexFilter.isWalkSubway,
+          );
+        }
+        if (complexFilter.isLargeComplex !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.isLargeComplex === undefined ||
+              apt.isLargeComplex === complexFilter.isLargeComplex,
+          );
+        }
+        if (complexFilter.isNewBuild !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.isNewBuild === undefined || apt.isNewBuild === complexFilter.isNewBuild,
+          );
+        }
+        if (complexFilter.isFlat !== undefined) {
+          markers = markers.filter(
+            (apt) => apt.isFlat === undefined || apt.isFlat === complexFilter.isFlat,
+          );
+        }
+        if (complexFilter.hasElementarySchool !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.hasElementarySchool === undefined ||
+              apt.hasElementarySchool === complexFilter.hasElementarySchool,
+          );
+        }
+      }
+
+      // 최대 200개 제한
+      const limited = markers.slice(0, MAP_MARKERS_MAX);
+
+      console.log(
+        `[Molit] 지도 마커 실 API: 전체 ${allMarkers.length}개 → 필터 후 ${markers.length}개 → 반환 ${limited.length}개`,
+      );
+
+      // 캐시 저장 (5분 - 실 API 데이터)
+      cacheService.set(cacheKey, limited, 300);
+      return limited;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`[Molit] 지도 마커 실 API 실패 → Mock 폴백: ${msg}`);
+      // 실패 시 Mock 폴백으로 계속 진행
+    }
+  }
+
+  // ── Mock 경로 (API 키 없음 또는 실 API 실패) ─────────────────
+  return getMockMarkersWithFilter(swLat, swLng, neLat, neLng, priceFilter, complexFilter);
+}
+
+/**
+ * Mock 데이터에서 뷰포트 및 필터를 적용해 마커 목록을 반환합니다.
+ * getApartmentMapMarkers 의 Mock 폴백 경로에서 공통으로 사용합니다.
+ */
+function getMockMarkersWithFilter(
+  swLat: number,
+  swLng: number,
+  neLat: number,
+  neLng: number,
+  priceFilter?: number,
+  complexFilter?: ComplexFilter,
+): ApartmentMapMarker[] {
   // 뷰포트 내 아파트 필터링
   let markers = MAP_MARKERS_MOCK.filter(
     (apt) =>
@@ -1580,9 +1817,11 @@ export async function getApartmentMapMarkers(
     }
   }
 
-  console.log(`[Molit] 지도 마커 조회: 뷰포트 내 ${markers.length}개 반환`);
+  console.log(`[Molit] 지도 마커 Mock: 뷰포트 내 ${markers.length}개 반환`);
 
-  // 캐시 저장 (30초 - 지도는 자주 갱신)
+  // 캐시 저장 (30초 - Mock 데이터는 짧게)
+  const filterKey = complexFilter ? JSON.stringify(complexFilter) : 'none';
+  const cacheKey = `map:${swLat}:${swLng}:${neLat}:${neLng}:${priceFilter ?? 'all'}:${filterKey}`;
   cacheService.set(cacheKey, markers, 30);
 
   return markers;

@@ -1,12 +1,13 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useKakaoMap, isVisible } from '../hooks/useKakaoMap';
 import { useMapStore } from '../stores/mapStore';
 import { useApartmentDetail } from '../hooks/useApartment';
 import { useGeocoder } from '../hooks/useGeocoder';
+import { useIsPC } from '../hooks/useBreakpoint';
 import BottomSheet from '../components/ui/BottomSheet';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { Button, Chip, IconButton, useToast } from '@wanteddev/wds';
+import { Box, FlexBox, Typography, Button, Chip, IconButton, useToast } from '@wanteddev/wds';
 import { IconChevronLeft, IconArrowRight } from '@wanteddev/wds-icon';
 import { formatPriceShort, formatChange, formatUnits } from '../utils/formatNumber';
 import type { MapApartment, PriceFilter, AreaFilter, UnitCountFilter, ComplexFeature, ApartmentComplex } from '../types';
@@ -267,6 +268,9 @@ export default function MapPage() {
     );
   };
 
+  // PC 여부 (md:hidden / hidden md:flex Tailwind 패턴 대체)
+  const isPC = useIsPC();
+
   // 선택된 MapApartment (청약 정보 패널 렌더링용)
   // C-1: MOCK_MAP_APARTMENTS 대신 동적으로 관리되는 mapApartments state를 조회 소스로 사용
   const selectedMapApt = selectedApartment
@@ -274,24 +278,40 @@ export default function MapPage() {
     : null;
 
   return (
-    <div
-      className="relative w-full flex"
-      style={{ height: '100svh', backgroundColor: 'var(--semantic-background-alternative)' }}
+    <Box
+      style={{
+        position: 'relative',
+        width: '100%',
+        display: 'flex',
+        height: '100svh',
+        backgroundColor: 'var(--semantic-background-alternative)',
+      }}
     >
       {/* ─── 데스크탑 좌측 사이드 패널 ─── */}
-      <aside
-        className="hidden md:flex flex-col w-[380px] flex-shrink-0 z-20 h-full overflow-hidden"
+      <Box
+        as="aside"
         style={{
+          display: isPC ? 'flex' : 'none',
+          flexDirection: 'column',
+          width: '380px',
+          flexShrink: 0,
+          zIndex: 20,
+          height: '100%',
+          overflow: 'hidden',
           backgroundColor: 'var(--semantic-background-normal-normal)',
           borderRight: '1px solid var(--semantic-line-normal)',
         }}
       >
         {/* 패널 헤더 */}
-        <div
-          className="px-4 py-4 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--semantic-line-normal)' }}
+        <Box
+          style={{
+            padding: '16px',
+            flexShrink: 0,
+            borderBottom: '1px solid var(--semantic-line-normal)',
+          }}
         >
-          <div className="flex items-center gap-2 mb-3">
+          {/* 뒤로가기 + 로고 */}
+          <FlexBox alignItems="center" style={{ gap: '8px', marginBottom: '12px' }}>
             <IconButton
               variant="normal"
               onClick={() => navigate(-1)}
@@ -299,25 +319,26 @@ export default function MapPage() {
             >
               <IconChevronLeft />
             </IconButton>
-            <div className="flex items-center gap-1.5">
-              <img src="/favicon.svg" alt="봄집" width={24} height={24} className="rounded-md" />
-              <span
-                className="text-base font-black"
-                style={{ color: 'var(--semantic-label-normal)' }}
-              >
+            <FlexBox alignItems="center" style={{ gap: '6px' }}>
+              <img src="/favicon.svg" alt="봄집" style={{ width: '24px', height: '24px', borderRadius: '6px' }} />
+              <Typography variant="body1" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
                 봄집 지도
-              </span>
-            </div>
-          </div>
+              </Typography>
+            </FlexBox>
+          </FlexBox>
 
           {/* 검색바 */}
-          <div
-            className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-            style={{ backgroundColor: 'var(--semantic-background-alternative)' }}
+          <FlexBox
+            alignItems="center"
+            style={{
+              gap: '8px',
+              borderRadius: '12px',
+              padding: '10px 12px',
+              backgroundColor: 'var(--semantic-background-alternative)',
+            }}
           >
             <svg
-              className="w-4 h-4 flex-shrink-0"
-              style={{ color: 'var(--semantic-label-assistive)' }}
+              style={{ width: '16px', height: '16px', flexShrink: 0, color: 'var(--semantic-label-assistive)' }}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -329,14 +350,20 @@ export default function MapPage() {
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}
               placeholder="단지명 검색"
-              className="flex-1 text-sm bg-transparent outline-none"
-              style={{ color: 'var(--semantic-label-normal)' }}
+              style={{
+                flex: 1,
+                fontSize: '14px',
+                backgroundColor: 'transparent',
+                outline: 'none',
+                border: 'none',
+                color: 'var(--semantic-label-normal)',
+              }}
             />
-          </div>
+          </FlexBox>
 
           {/* ── 필터 그룹 1: 가격대 ── */}
-          <LnbSectionLabel label="가격대" className="mt-3" />
-          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+          <LnbSectionLabel label="가격대" style={{ marginTop: '12px' }} />
+          <FlexBox style={{ gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
             {PRICE_FILTERS.map((filter) => (
               <Chip
                 key={filter.value}
@@ -348,21 +375,30 @@ export default function MapPage() {
                 {filter.label}
               </Chip>
             ))}
-          </div>
+          </FlexBox>
 
           {/* ── 필터 그룹 2: 레이어 ── */}
-          <div className="flex items-center gap-2 mt-3">
+          <FlexBox alignItems="center" style={{ gap: '8px', marginTop: '12px' }}>
             <LnbSectionLabel label="레이어" />
             {activeLayerCount > 0 && (
-              <span
-                className="inline-flex items-center px-1.5 rounded-full text-[10px] font-bold"
-                style={{ background: 'var(--semantic-primary-normal)', color: 'var(--semantic-static-white)', height: '16px' }}
+              <Box
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0 6px',
+                  borderRadius: '999px',
+                  height: '16px',
+                  background: 'var(--semantic-primary-normal)',
+                  color: 'var(--semantic-static-white)',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                }}
               >
                 {activeLayerCount} 활성
-              </span>
+              </Box>
             )}
-          </div>
-          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+          </FlexBox>
+          <FlexBox style={{ gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
             <Chip
               size="small"
               variant="outlined"
@@ -387,11 +423,11 @@ export default function MapPage() {
             >
               청약
             </Chip>
-          </div>
+          </FlexBox>
 
           {/* ── 필터 그룹 3: 평형대 칩 (20/30/40/50평대) ── */}
-          <LnbSectionLabel label="평형대" className="mt-3" />
-          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+          <LnbSectionLabel label="평형대" style={{ marginTop: '12px' }} />
+          <FlexBox style={{ gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
             {PYEONG_FILTER_OPTIONS.map((opt) => (
               <Chip
                 key={opt.value}
@@ -403,11 +439,11 @@ export default function MapPage() {
                 {opt.label}
               </Chip>
             ))}
-          </div>
+          </FlexBox>
 
           {/* ── 필터 그룹 4: 세부 평형 (59/74/84/109㎡) ── */}
-          <LnbSectionLabel label="평형(㎡)" className="mt-3" />
-          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+          <LnbSectionLabel label="평형(㎡)" style={{ marginTop: '12px' }} />
+          <FlexBox style={{ gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
             {AREA_FILTERS.map((filter) => (
               <Chip
                 key={filter.value}
@@ -421,11 +457,11 @@ export default function MapPage() {
                 {filter.label}
               </Chip>
             ))}
-          </div>
+          </FlexBox>
 
           {/* ── 필터 그룹 5: 세대수 ── */}
-          <LnbSectionLabel label="세대수" className="mt-3" />
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
+          <LnbSectionLabel label="세대수" style={{ marginTop: '12px' }} />
+          <FlexBox style={{ gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
             {UNIT_COUNT_OPTIONS.map((opt) => (
               <Chip
                 key={opt.value}
@@ -437,22 +473,32 @@ export default function MapPage() {
                 {opt.label}
               </Chip>
             ))}
-          </div>
+          </FlexBox>
 
           {/* ── 필터 그룹 6: 단지특성 ── */}
-          <div className="mt-3">
-            <div className="flex items-center gap-2">
+          <Box style={{ marginTop: '12px' }}>
+            <FlexBox alignItems="center" style={{ gap: '8px' }}>
               <LnbSectionLabel label="단지특성" />
               {complexFeatures.size > 0 && (
-                <span
-                  className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold"
-                  style={{ backgroundColor: 'var(--semantic-primary-normal)', color: 'var(--semantic-static-white)' }}
+                <Box
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '999px',
+                    fontSize: '9px',
+                    fontWeight: 700,
+                    backgroundColor: 'var(--semantic-primary-normal)',
+                    color: 'var(--semantic-static-white)',
+                  }}
                 >
                   {complexFeatures.size}
-                </span>
+                </Box>
               )}
-            </div>
-            <div className="flex flex-wrap gap-1.5 mt-1.5">
+            </FlexBox>
+            <FlexBox style={{ gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
               {COMPLEX_FEATURE_OPTIONS.map((opt) => (
                 <Chip
                   key={opt.value}
@@ -464,33 +510,39 @@ export default function MapPage() {
                   {opt.label}
                 </Chip>
               ))}
-            </div>
-          </div>
-        </div>
+            </FlexBox>
+          </Box>
+        </Box>
 
         {/* 아파트 목록 */}
-        <div className="flex-1 overflow-y-auto">
-          <div
-            className="px-4 py-2.5"
-            style={{ borderBottom: '1px solid var(--semantic-line-normal)' }}
+        <Box style={{ flex: 1, overflowY: 'auto' }}>
+          <Box
+            style={{
+              padding: '10px 16px',
+              borderBottom: '1px solid var(--semantic-line-normal)',
+            }}
           >
-            <p
-              className="text-xs"
-              style={{ color: 'var(--semantic-label-assistive)' }}
-            >
+            <Typography variant="caption1" style={{ color: 'var(--semantic-label-assistive)' }}>
               총 {filteredList.length}개 단지
-            </p>
-          </div>
+            </Typography>
+          </Box>
 
           {filteredList.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: '8px' }}>
+            <FlexBox
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              style={{ padding: '64px 0', gap: '8px' }}
+            >
               <svg width="40" height="40" style={{ color: 'var(--semantic-line-normal)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
-              <p style={{ fontSize: '14px', color: 'var(--semantic-label-assistive)' }}>검색 결과가 없습니다</p>
-            </div>
+              <Typography variant="body2" style={{ color: 'var(--semantic-label-assistive)' }}>
+                검색 결과가 없습니다
+              </Typography>
+            </FlexBox>
           ) : (
-            <ul>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {filteredList.map((apt) => {
                 const isSelected = selectedApartment?.id === apt.id;
                 const eok = apt.price / 10000;
@@ -519,23 +571,43 @@ export default function MapPage() {
                       onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-alternative)'; }}
                       onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--semantic-background-normal-normal)'; }}
                     >
-                      <div style={{
-                        flexShrink: 0,
-                        backgroundColor: markerBgColor,
-                        color: '#FFFFFF',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        minWidth: '52px',
-                        textAlign: 'center',
-                      }}>
+                      {/* 가격 뱃지 */}
+                      <Box
+                        style={{
+                          flexShrink: 0,
+                          backgroundColor: markerBgColor,
+                          color: '#FFFFFF',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          padding: '4px 10px',
+                          borderRadius: '999px',
+                          minWidth: '52px',
+                          textAlign: 'center',
+                        }}
+                      >
                         {formatPriceShort(apt.price)}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: '14px', fontWeight: 700, color: 'var(--semantic-label-normal)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apt.name}</p>
-                        <p style={{ fontSize: '12px', color: 'var(--semantic-label-assistive)', marginTop: '2px' }}>{apt.area}㎡ 기준</p>
-                      </div>
+                      </Box>
+                      {/* 단지명 + 평형 */}
+                      <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          weight="bold"
+                          style={{
+                            color: 'var(--semantic-label-normal)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {apt.name}
+                        </Typography>
+                        <Typography
+                          variant="caption1"
+                          style={{ color: 'var(--semantic-label-assistive)', marginTop: '2px' }}
+                        >
+                          {apt.area}㎡ 기준
+                        </Typography>
+                      </Box>
                       {isSelected && (
                         <svg width="16" height="16" style={{ color: 'var(--semantic-primary-normal)', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
@@ -547,13 +619,14 @@ export default function MapPage() {
               })}
             </ul>
           )}
-        </div>
+        </Box>
 
         {/* 선택된 아파트 상세 (데스크탑 패널 하단) */}
         {selectedApartment && (
-          <div
-            className="flex-shrink-0 p-4"
+          <Box
             style={{
+              flexShrink: 0,
+              padding: '16px',
               borderTop: '1px solid var(--semantic-line-normal)',
               backgroundColor: 'var(--semantic-background-normal-normal)',
             }}
@@ -568,42 +641,79 @@ export default function MapPage() {
                 onDetailClick={() => navigate(`/apartment/${selectedDetail.id}`)}
               />
             ) : (
-              <div>
-                <h3 className="font-bold text-base" style={{ color: 'var(--semantic-label-normal)' }}>{selectedApartment.name}</h3>
-                <p className="text-xl font-black mt-1" style={{ color: 'var(--semantic-label-normal)' }}>
+              <Box>
+                <Typography variant="body1" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
+                  {selectedApartment.name}
+                </Typography>
+                <Typography
+                  variant="title2"
+                  weight="bold"
+                  style={{ color: 'var(--semantic-label-normal)', marginTop: '4px' }}
+                >
                   {formatPriceShort(selectedApartment.recentPrice)}
-                </p>
+                </Typography>
                 {/* 상세 데이터 로딩 중 스피너 표시 */}
                 {isDetailLoading && (
-                  <div className="flex items-center justify-center py-2">
+                  <FlexBox alignItems="center" justifyContent="center" style={{ padding: '8px 0' }}>
                     <LoadingSpinner message="상세 정보 로딩중..." />
-                  </div>
+                  </FlexBox>
                 )}
-                <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={() => navigate(`/apartment/${selectedApartment.id}`)}>
+                <Button
+                  variant="solid"
+                  color="primary"
+                  fullWidth
+                  style={{ marginTop: '12px' }}
+                  onClick={() => navigate(`/apartment/${selectedApartment.id}`)}
+                >
                   상세보기
                 </Button>
-              </div>
+              </Box>
             )}
-          </div>
+          </Box>
         )}
-      </aside>
+      </Box>
 
       {/* ─── 지도 영역 ─── */}
-      <div className="relative flex-1 h-full">
-        <div ref={mapContainerRef} className="w-full h-full" />
+      <Box style={{ position: 'relative', flex: 1, height: '100%' }}>
+        <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 
         {/* 카카오맵 미사용 시 Mock 맵 UI */}
         {(!isLoaded || isError) && (
-          <div className="absolute inset-0 bg-[#E8EEF4] flex flex-col">
+          <Box
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: '#E8EEF4',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             <MockMapBackground apartments={mapApartments} onMarkerClick={handleMarkerClick} />
-          </div>
+          </Box>
         )}
 
         {/* ── 모바일 상단 오버레이 (검색바 + 필터 행) ── */}
-        <div className="md:hidden absolute top-0 left-0 right-0 z-20 p-4 pt-safe">
+        <Box
+          style={{
+            display: isPC ? 'none' : 'block',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            padding: '16px',
+          }}
+        >
           {/* 검색바 + 뒤로가기 */}
-          <div className="flex items-center gap-2">
-            <div className="rounded-xl shadow-md flex-shrink-0" style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}>
+          <FlexBox alignItems="center" style={{ gap: '8px' }}>
+            <Box
+              style={{
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                flexShrink: 0,
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+              }}
+            >
               <IconButton
                 variant="normal"
                 onClick={() => navigate(-1)}
@@ -611,14 +721,20 @@ export default function MapPage() {
               >
                 <IconChevronLeft />
               </IconButton>
-            </div>
-            <div
-              className="flex-1 rounded-xl shadow-md flex items-center gap-2 px-4 py-3"
-              style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}
+            </Box>
+            <FlexBox
+              alignItems="center"
+              style={{
+                flex: 1,
+                borderRadius: '12px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                gap: '8px',
+                padding: '12px 16px',
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+              }}
             >
               <svg
-                className="w-4 h-4"
-                style={{ color: 'var(--semantic-label-assistive)' }}
+                style={{ width: '16px', height: '16px', color: 'var(--semantic-label-assistive)' }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -630,14 +746,20 @@ export default function MapPage() {
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 placeholder="주소, 단지명 검색"
-                className="flex-1 text-sm outline-none bg-transparent"
-                style={{ color: 'var(--semantic-label-normal)' }}
+                style={{
+                  flex: 1,
+                  fontSize: '14px',
+                  outline: 'none',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: 'var(--semantic-label-normal)',
+                }}
               />
-            </div>
-          </div>
+            </FlexBox>
+          </FlexBox>
 
           {/* 행 1: 가격대 필터 (가로 스크롤) */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <Box style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             {PRICE_FILTERS.map((filter) => (
               <Chip
                 key={filter.value}
@@ -650,10 +772,10 @@ export default function MapPage() {
                 {filter.label}
               </Chip>
             ))}
-          </div>
+          </Box>
 
           {/* 행 2: 레이어 필터 (가로 스크롤) */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <Box style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             <Chip
               size="small"
               variant="outlined"
@@ -682,21 +804,28 @@ export default function MapPage() {
               청약
             </Chip>
             {activeLayerCount > 0 && (
-              <span
-                className="flex-shrink-0 flex items-center px-2 rounded-full text-[10px] font-bold shadow-sm"
+              <Box
                 style={{
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '0 8px',
+                  borderRadius: '999px',
+                  height: '32px',
+                  fontSize: '10px',
+                  fontWeight: 700,
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
                   backgroundColor: 'var(--semantic-primary-normal)',
                   color: 'var(--semantic-static-white)',
-                  height: '32px',
                 }}
               >
                 {activeLayerCount} 활성
-              </span>
+              </Box>
             )}
-          </div>
+          </Box>
 
           {/* 행 3: 평형대 필터 칩 (20/30/40/50평대) */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <Box style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             {PYEONG_FILTER_OPTIONS.map((opt) => (
               <Chip
                 key={opt.value}
@@ -709,10 +838,10 @@ export default function MapPage() {
                 {opt.label}
               </Chip>
             ))}
-          </div>
+          </Box>
 
           {/* 행 4: 세부 평형 필터 (59/74/84/109㎡) */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <Box style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             {AREA_FILTERS.map((filter) => (
               <Chip
                 key={filter.value}
@@ -727,10 +856,10 @@ export default function MapPage() {
                 {filter.label}
               </Chip>
             ))}
-          </div>
+          </Box>
 
           {/* 행 5: 세대수 필터 (가로 스크롤) */}
-          <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <Box style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             {UNIT_COUNT_OPTIONS.map((opt) => (
               <Chip
                 key={opt.value}
@@ -743,10 +872,10 @@ export default function MapPage() {
                 {opt.label}
               </Chip>
             ))}
-          </div>
+          </Box>
 
           {/* 행 6: 단지특성 필터 (가로 스크롤) */}
-          <div className="flex gap-1.5 mt-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+          <Box style={{ display: 'flex', gap: '6px', marginTop: '6px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
             {COMPLEX_FEATURE_OPTIONS.map((opt) => (
               <Chip
                 key={opt.value}
@@ -759,20 +888,33 @@ export default function MapPage() {
                 {opt.label}
               </Chip>
             ))}
-          </div>
-        </div>
+          </Box>
+        </Box>
 
         {/* ── 마커/히트맵 뷰 토글 버튼 (지도 우상단) ── */}
-        <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+        <FlexBox
+          flexDirection="column"
+          alignItems="flex-end"
+          style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 20, gap: '8px' }}
+        >
           {/* 토글 버튼 */}
-          <div
-            className="flex rounded-lg overflow-hidden shadow-md"
-            style={{ border: '1px solid var(--semantic-line-normal)' }}
+          <FlexBox
+            style={{
+              borderRadius: '8px',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              border: '1px solid var(--semantic-line-normal)',
+            }}
           >
             <button
               onClick={() => setViewMode('marker')}
-              className="px-3 py-2 text-[13px] font-medium transition-colors"
               style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                transition: 'background-color 0.15s, color 0.15s',
+                border: 'none',
+                cursor: 'pointer',
                 backgroundColor: viewMode === 'marker' ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
                 color: viewMode === 'marker' ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
               }}
@@ -782,8 +924,13 @@ export default function MapPage() {
             </button>
             <button
               onClick={() => setViewMode('heatmap')}
-              className="px-3 py-2 text-[13px] font-medium transition-colors"
               style={{
+                padding: '8px 12px',
+                fontSize: '13px',
+                fontWeight: 500,
+                transition: 'background-color 0.15s, color 0.15s',
+                border: 'none',
+                cursor: 'pointer',
                 backgroundColor: viewMode === 'heatmap' ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
                 color: viewMode === 'heatmap' ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
               }}
@@ -791,83 +938,106 @@ export default function MapPage() {
             >
               히트맵
             </button>
-          </div>
+          </FlexBox>
 
-          {/* 마커 모드 가격 범례 */}
-          {viewMode === 'marker' && (
-            <div
-              className="hidden md:flex rounded-xl px-3 py-2 gap-3 items-center"
+          {/* 마커 모드 가격 범례 (PC만 표시) */}
+          {viewMode === 'marker' && isPC && (
+            <FlexBox
+              alignItems="center"
               style={{
+                borderRadius: '12px',
+                padding: '8px 12px',
+                gap: '12px',
                 backgroundColor: 'var(--semantic-background-normal-normal)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
                 border: '1px solid var(--semantic-line-normal)',
               }}
             >
-              <span
-                className="text-xs font-semibold"
-                style={{ color: 'var(--semantic-label-assistive)' }}
-              >
+              <Typography variant="caption1" weight="bold" style={{ color: 'var(--semantic-label-assistive)' }}>
                 가격 범례
-              </span>
+              </Typography>
               {PRICE_LEGEND_ITEMS.map((item) => (
-                <div key={item.label} className="flex items-center gap-1">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: item.color }}
+                <FlexBox key={item.label} alignItems="center" style={{ gap: '4px' }}>
+                  <Box
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '999px',
+                      flexShrink: 0,
+                      backgroundColor: item.color,
+                    }}
                   />
-                  <span
-                    className="text-[11px]"
-                    style={{ color: 'var(--semantic-label-assistive)' }}
-                  >
+                  <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>
                     {item.label}
-                  </span>
-                </div>
+                  </Typography>
+                </FlexBox>
               ))}
-            </div>
+            </FlexBox>
           )}
 
-          {/* 히트맵 모드 거래량 범례 */}
-          {viewMode === 'heatmap' && (
-            <div
-              className="hidden md:flex rounded-xl px-3 py-2 gap-3 items-center"
+          {/* 히트맵 모드 거래량 범례 (PC만 표시) */}
+          {viewMode === 'heatmap' && isPC && (
+            <FlexBox
+              alignItems="center"
               style={{
+                borderRadius: '12px',
+                padding: '8px 12px',
+                gap: '12px',
                 backgroundColor: 'var(--semantic-background-normal-normal)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
                 border: '1px solid var(--semantic-line-normal)',
               }}
             >
-              <span
-                className="text-xs font-semibold"
-                style={{ color: 'var(--semantic-label-assistive)' }}
-              >
+              <Typography variant="caption1" weight="bold" style={{ color: 'var(--semantic-label-assistive)' }}>
                 거래량
-              </span>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(209,213,219,0.6)' }} />
-                <span className="text-[11px]" style={{ color: 'var(--semantic-label-assistive)' }}>적음</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(251,191,36,0.7)' }} />
-                <span className="text-[11px]" style={{ color: 'var(--semantic-label-assistive)' }}>보통</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'rgba(249,115,22,0.8)' }} />
-                <span className="text-[11px]" style={{ color: 'var(--semantic-label-assistive)' }}>많음</span>
-              </div>
-            </div>
+              </Typography>
+              {[
+                { color: 'rgba(209,213,219,0.6)', label: '적음' },
+                { color: 'rgba(251,191,36,0.7)', label: '보통' },
+                { color: 'rgba(249,115,22,0.8)', label: '많음' },
+              ].map((item) => (
+                <FlexBox key={item.label} alignItems="center" style={{ gap: '4px' }}>
+                  <Box
+                    style={{
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '999px',
+                      background: item.color,
+                    }}
+                  />
+                  <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>
+                    {item.label}
+                  </Typography>
+                </FlexBox>
+              ))}
+            </FlexBox>
           )}
-        </div>
+        </FlexBox>
 
         {/* 현재 위치 버튼 */}
         <button
           onClick={handleCurrentLocation}
-          className="absolute right-4 bottom-32 md:bottom-8 z-20 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-colors"
-          style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}
+          style={{
+            position: 'absolute',
+            right: '16px',
+            bottom: isPC ? '32px' : '128px',
+            zIndex: 20,
+            width: '48px',
+            height: '48px',
+            borderRadius: '999px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.15s',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: 'var(--semantic-background-normal-normal)',
+          }}
           aria-label="현재 위치"
         >
           <svg
-            className="w-5 h-5"
-            style={{ color: 'var(--semantic-primary-normal)' }}
+            style={{ width: '20px', height: '20px', color: 'var(--semantic-primary-normal)' }}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -879,14 +1049,23 @@ export default function MapPage() {
 
         {/* 지도 로딩 표시 */}
         {!isLoaded && !isError && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/50 z-10">
+          <FlexBox
+            alignItems="center"
+            justifyContent="center"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(255,255,255,0.5)',
+              zIndex: 10,
+            }}
+          >
             <LoadingSpinner message="지도 로딩중..." />
-          </div>
+          </FlexBox>
         )}
-      </div>
+      </Box>
 
       {/* ─── 모바일 선택된 단지 바텀시트 ─── */}
-      <div className="md:hidden">
+      <Box style={{ display: isPC ? 'none' : 'block' }}>
         <BottomSheet
           isOpen={isBottomSheetOpen}
           onClose={closeBottomSheet}
@@ -900,35 +1079,41 @@ export default function MapPage() {
               navigate={navigate}
             />
           ) : selectedApartment ? (
-            <div className="p-5">
+            <Box style={{ padding: '20px' }}>
               {/* 청약 정보 섹션 (청약 마커인 경우) */}
               {selectedMapApt && (selectedMapApt.markerType === 'subOngoing' || selectedMapApt.markerType === 'subUpcoming') && (
                 <SubscriptionInfoSection apt={selectedMapApt} navigate={navigate} />
               )}
-              <h3 className="font-bold text-lg" style={{ color: 'var(--semantic-label-normal)' }}>{selectedApartment.name}</h3>
-              <p className="text-2xl font-black mt-2" style={{ color: 'var(--semantic-label-normal)' }}>
+              <Typography variant="title3" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
+                {selectedApartment.name}
+              </Typography>
+              <Typography
+                variant="title1"
+                weight="bold"
+                style={{ color: 'var(--semantic-label-normal)', marginTop: '8px' }}
+              >
                 {formatPriceShort(selectedApartment.recentPrice)}
-              </p>
+              </Typography>
               {/* 상세 데이터 로딩 중 스피너 표시 */}
               {isDetailLoading && (
-                <div className="flex items-center justify-center py-2">
+                <FlexBox alignItems="center" justifyContent="center" style={{ padding: '8px 0' }}>
                   <LoadingSpinner message="상세 정보 로딩중..." />
-                </div>
+                </FlexBox>
               )}
               <Button
                 variant="solid"
                 color="primary"
                 fullWidth
-                className="mt-4"
+                style={{ marginTop: '16px' }}
                 onClick={() => navigate(`/apartment/${selectedApartment.id}`)}
               >
                 상세보기
               </Button>
-            </div>
+            </Box>
           ) : null}
         </BottomSheet>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -937,14 +1122,20 @@ export default function MapPage() {
 // ────────────────────────────────────────────────────────────
 
 // LNB 섹션 라벨 (데스크탑 사이드패널 전용)
-function LnbSectionLabel({ label, className = '' }: { label: string; className?: string }) {
+function LnbSectionLabel({ label, style }: { label: string; style?: React.CSSProperties }) {
   return (
-    <p
-      className={className}
-      style={{ fontSize: '11px', fontWeight: 600, color: 'var(--semantic-label-assistive)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+    <Typography
+      variant="caption1"
+      weight="bold"
+      style={{
+        color: 'var(--semantic-label-assistive)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        ...style,
+      }}
     >
       {label}
-    </p>
+    </Typography>
   );
 }
 
@@ -990,10 +1181,10 @@ function SubscriptionInfoSection({
   }
 
   return (
-    <div className="mb-3 pb-3" style={{ borderBottom: '1px solid var(--semantic-line-normal)' }}>
+    <Box style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: '1px solid var(--semantic-line-normal)' }}>
       {/* 상태 뱃지 + D-Day */}
-      <div className="flex items-center gap-2 mb-2">
-        <span
+      <FlexBox alignItems="center" style={{ gap: '8px', marginBottom: '8px' }}>
+        <Box
           style={{
             height: '22px',
             padding: '0 8px',
@@ -1007,21 +1198,23 @@ function SubscriptionInfoSection({
           }}
         >
           {isOngoing ? '청약 진행중' : '청약 예정'}
-        </span>
+        </Box>
         {dDayText && (
-          <span style={{ fontSize: '14px', fontWeight: 800, color: dDayColor }}>
+          <Typography variant="body2" weight="bold" style={{ color: dDayColor }}>
             {dDayText}
-          </span>
+          </Typography>
         )}
-      </div>
+      </FlexBox>
 
       {/* 분양가 정보 */}
-      <div className="flex items-center gap-2 mt-1.5">
-        <span style={{ fontSize: '12px', color: 'var(--semantic-label-assistive)', fontWeight: 500 }}>분양가</span>
-        <span style={{ fontSize: '13px', color: 'var(--semantic-label-normal)', fontWeight: 700 }}>
+      <FlexBox alignItems="center" style={{ gap: '8px', marginTop: '6px' }}>
+        <Typography variant="caption1" weight="medium" style={{ color: 'var(--semantic-label-assistive)' }}>
+          분양가
+        </Typography>
+        <Typography variant="caption1" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
           {formatPriceShort(apt.price)}
-        </span>
-      </div>
+        </Typography>
+      </FlexBox>
 
       {/* 청약 상세 보기 버튼 */}
       {apt.subId && (
@@ -1032,12 +1225,12 @@ function SubscriptionInfoSection({
           size="small"
           onClick={() => navigate(`/subscription/${apt.subId}`)}
           trailingContent={<IconArrowRight />}
-          className="mt-3"
+          style={{ marginTop: '12px' }}
         >
           청약 상세 보기
         </Button>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -1062,60 +1255,72 @@ function DesktopApartmentSummary({
         : 'var(--semantic-label-assistive)';
 
   return (
-    <div>
-      <h3
-        className="font-black text-base leading-snug"
-        style={{ color: 'var(--semantic-label-normal)' }}
-      >
+    <Box>
+      <Typography variant="body1" weight="bold" style={{ color: 'var(--semantic-label-normal)', lineHeight: 1.3 }}>
         {apartment.name}
-      </h3>
-      <p
-        className="text-xs mt-0.5"
-        style={{ color: 'var(--semantic-label-assistive)' }}
+      </Typography>
+      <Typography
+        variant="caption1"
+        style={{ color: 'var(--semantic-label-assistive)', marginTop: '2px' }}
       >
         {apartment.address || `${apartment.district} ${apartment.dong}`}
-      </p>
-      <div className="flex items-baseline gap-2 mt-2">
-        <span
-          className="text-xl font-black"
-          style={{ color: 'var(--semantic-label-normal)' }}
-        >
+      </Typography>
+      <FlexBox alignItems="baseline" style={{ gap: '8px', marginTop: '8px' }}>
+        <Typography variant="title3" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
           {formatPriceShort(apartment.recentPrice)}
-        </span>
-        <span
-          className="text-xs"
-          style={{ color: 'var(--semantic-label-assistive)' }}
-        >
+        </Typography>
+        <Typography variant="caption1" style={{ color: 'var(--semantic-label-assistive)' }}>
           {apartment.recentPriceArea}㎡
-        </span>
-        <span
-          className="text-xs font-bold"
-          style={{ color: priceChangeColor }}
-        >
+        </Typography>
+        <Typography variant="caption1" weight="bold" style={{ color: priceChangeColor }}>
           {formatChange(apartment.priceChange)}
-        </span>
-      </div>
-      <div
-        className="grid grid-cols-3 gap-2 mt-3 pt-3 text-center"
-        style={{ borderTop: '1px solid var(--semantic-line-normal)' }}
+        </Typography>
+      </FlexBox>
+      {/* 세대수 / 준공 / 건설사 3열 그리드 */}
+      <Box
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '8px',
+          marginTop: '12px',
+          paddingTop: '12px',
+          textAlign: 'center',
+          borderTop: '1px solid var(--semantic-line-normal)',
+        }}
       >
-        <div>
-          <p className="text-[10px]" style={{ color: 'var(--semantic-label-assistive)' }}>세대수</p>
-          <p className="text-xs font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{formatUnits(apartment.totalUnits)}</p>
-        </div>
-        <div>
-          <p className="text-[10px]" style={{ color: 'var(--semantic-label-assistive)' }}>준공</p>
-          <p className="text-xs font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builtYear}년</p>
-        </div>
-        <div>
-          <p className="text-[10px]" style={{ color: 'var(--semantic-label-assistive)' }}>건설사</p>
-          <p className="text-xs font-bold mt-0.5 truncate" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builder}</p>
-        </div>
-      </div>
-      <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={onDetailClick}>
+        <Box>
+          <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>세대수</Typography>
+          <Typography variant="caption1" weight="bold" style={{ color: 'var(--semantic-label-normal)', marginTop: '2px' }}>
+            {formatUnits(apartment.totalUnits)}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>준공</Typography>
+          <Typography variant="caption1" weight="bold" style={{ color: 'var(--semantic-label-normal)', marginTop: '2px' }}>
+            {apartment.builtYear}년
+          </Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>건설사</Typography>
+          <Typography
+            variant="caption1"
+            weight="bold"
+            style={{
+              color: 'var(--semantic-label-normal)',
+              marginTop: '2px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {apartment.builder}
+          </Typography>
+        </Box>
+      </Box>
+      <Button variant="solid" color="primary" fullWidth style={{ marginTop: '12px' }} onClick={onDetailClick}>
         상세보기
       </Button>
-    </div>
+    </Box>
   );
 }
 
@@ -1144,70 +1349,81 @@ function ApartmentSummary({
         : 'var(--semantic-label-assistive)';
 
   return (
-    <div className="p-5">
-      <h3
-        className="font-black text-lg leading-snug"
-        style={{ color: 'var(--semantic-label-normal)' }}
-      >
+    <Box style={{ padding: '20px' }}>
+      <Typography variant="title3" weight="bold" style={{ color: 'var(--semantic-label-normal)', lineHeight: 1.3 }}>
         {apartment.name}
-      </h3>
-      <p
-        className="text-sm mt-1"
-        style={{ color: 'var(--semantic-label-assistive)' }}
+      </Typography>
+      <Typography
+        variant="body2"
+        style={{ color: 'var(--semantic-label-assistive)', marginTop: '4px' }}
       >
         {apartment.address || `${apartment.district} ${apartment.dong}`}
-      </p>
+      </Typography>
 
       {/* 청약 정보 섹션 (청약 마커인 경우 상단에 표시) */}
       {selectedMapApt && (selectedMapApt.markerType === 'subOngoing' || selectedMapApt.markerType === 'subUpcoming') && (
-        <div className="mt-3">
+        <Box style={{ marginTop: '12px' }}>
           <SubscriptionInfoSection apt={selectedMapApt} navigate={navigate} />
-        </div>
+        </Box>
       )}
 
-      <div className="flex items-baseline gap-2 mt-3">
-        <span
-          className="text-2xl font-black"
-          style={{ color: 'var(--semantic-label-normal)' }}
-        >
+      <FlexBox alignItems="baseline" style={{ gap: '8px', marginTop: '12px' }}>
+        <Typography variant="title1" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
           {formatPriceShort(apartment.recentPrice)}
-        </span>
-        <span
-          className="text-sm"
-          style={{ color: 'var(--semantic-label-assistive)' }}
-        >
+        </Typography>
+        <Typography variant="body2" style={{ color: 'var(--semantic-label-assistive)' }}>
           {apartment.recentPriceArea}㎡
-        </span>
-        <span
-          className="text-sm font-bold"
-          style={{ color: mobilepriceChangeColor }}
-        >
+        </Typography>
+        <Typography variant="body2" weight="bold" style={{ color: mobilepriceChangeColor }}>
           {formatChange(apartment.priceChange)}
-        </span>
-      </div>
+        </Typography>
+      </FlexBox>
 
-      <div
-        className="grid grid-cols-3 gap-3 mt-4 pt-4"
-        style={{ borderTop: '1px solid var(--semantic-line-normal)' }}
+      {/* 세대수 / 준공 / 건설사 3열 그리드 */}
+      <Box
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '12px',
+          marginTop: '16px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--semantic-line-normal)',
+        }}
       >
-        <div>
-          <p className="text-xs" style={{ color: 'var(--semantic-label-assistive)' }}>세대수</p>
-          <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{formatUnits(apartment.totalUnits)}</p>
-        </div>
-        <div>
-          <p className="text-xs" style={{ color: 'var(--semantic-label-assistive)' }}>준공</p>
-          <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builtYear}년</p>
-        </div>
-        <div>
-          <p className="text-xs" style={{ color: 'var(--semantic-label-assistive)' }}>건설사</p>
-          <p className="text-sm font-bold mt-0.5 truncate" style={{ color: 'var(--semantic-label-normal)' }}>{apartment.builder}</p>
-        </div>
-      </div>
+        <Box>
+          <Typography variant="caption1" style={{ color: 'var(--semantic-label-assistive)' }}>세대수</Typography>
+          <Typography variant="body2" weight="bold" style={{ color: 'var(--semantic-label-normal)', marginTop: '2px' }}>
+            {formatUnits(apartment.totalUnits)}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption1" style={{ color: 'var(--semantic-label-assistive)' }}>준공</Typography>
+          <Typography variant="body2" weight="bold" style={{ color: 'var(--semantic-label-normal)', marginTop: '2px' }}>
+            {apartment.builtYear}년
+          </Typography>
+        </Box>
+        <Box>
+          <Typography variant="caption1" style={{ color: 'var(--semantic-label-assistive)' }}>건설사</Typography>
+          <Typography
+            variant="body2"
+            weight="bold"
+            style={{
+              color: 'var(--semantic-label-normal)',
+              marginTop: '2px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {apartment.builder}
+          </Typography>
+        </Box>
+      </Box>
 
-      <Button variant="solid" color="primary" fullWidth className="mt-5" onClick={onDetailClick}>
+      <Button variant="solid" color="primary" fullWidth style={{ marginTop: '20px' }} onClick={onDetailClick}>
         상세보기
       </Button>
-    </div>
+    </Box>
   );
 }
 
@@ -1222,11 +1438,24 @@ function MockMapBackground({
   apartments: MapApartment[];
   onMarkerClick: (apt: MapApartment) => void;
 }) {
+  const positions = [
+    { top: '20%', left: '25%' },
+    { top: '35%', left: '60%' },
+    { top: '50%', left: '35%' },
+    { top: '65%', left: '55%' },
+    { top: '25%', left: '70%' },
+    { top: '70%', left: '20%' },
+    { top: '45%', left: '80%' },
+    { top: '15%', left: '50%' },
+  ];
+
   return (
-    <div className="relative w-full h-full overflow-hidden">
-      <div
-        className="absolute inset-0"
+    <Box style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+      {/* 격자 배경 */}
+      <Box
         style={{
+          position: 'absolute',
+          inset: 0,
           backgroundImage: `
             linear-gradient(rgba(180, 200, 220, 0.3) 1px, transparent 1px),
             linear-gradient(90deg, rgba(180, 200, 220, 0.3) 1px, transparent 1px)
@@ -1235,32 +1464,44 @@ function MockMapBackground({
           backgroundColor: '#E8EEF4',
         }}
       />
-      <div className="absolute inset-0 opacity-30">
-        <div className="absolute bg-white h-2" style={{ top: '30%', left: 0, right: 0 }} />
-        <div className="absolute bg-white h-2" style={{ top: '60%', left: 0, right: 0 }} />
-        <div className="absolute bg-white w-2" style={{ left: '40%', top: 0, bottom: 0 }} />
-        <div className="absolute bg-white w-2" style={{ left: '70%', top: 0, bottom: 0 }} />
-      </div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-        <div className="rounded-2xl p-4 shadow-lg" style={{ backgroundColor: 'var(--semantic-background-normal-normal)' }}>
-          <p className="text-sm font-bold" style={{ color: 'var(--semantic-label-normal)' }}>카카오맵 연동 필요</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--semantic-label-assistive)' }}>.env에 VITE_KAKAO_MAP_KEY 설정</p>
-        </div>
-      </div>
+      {/* 도로 모형 */}
+      <Box style={{ position: 'absolute', inset: 0, opacity: 0.3 }}>
+        <Box style={{ position: 'absolute', backgroundColor: 'white', height: '8px', top: '30%', left: 0, right: 0 }} />
+        <Box style={{ position: 'absolute', backgroundColor: 'white', height: '8px', top: '60%', left: 0, right: 0 }} />
+        <Box style={{ position: 'absolute', backgroundColor: 'white', width: '8px', left: '40%', top: 0, bottom: 0 }} />
+        <Box style={{ position: 'absolute', backgroundColor: 'white', width: '8px', left: '70%', top: 0, bottom: 0 }} />
+      </Box>
+      {/* 카카오맵 미연동 안내 */}
+      <Box
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+        }}
+      >
+        <Box
+          style={{
+            borderRadius: '16px',
+            padding: '16px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            backgroundColor: 'var(--semantic-background-normal-normal)',
+          }}
+        >
+          <Typography variant="body2" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
+            카카오맵 연동 필요
+          </Typography>
+          <Typography variant="caption1" style={{ color: 'var(--semantic-label-assistive)', marginTop: '4px' }}>
+            .env에 VITE_KAKAO_MAP_KEY 설정
+          </Typography>
+        </Box>
+      </Box>
+      {/* 목업 마커 */}
       {apartments.slice(0, 8).map((apt, i) => {
         const eok = apt.price / 10000;
         const markerBgColor =
           eok >= 20 ? '#D63031' : eok >= 10 ? '#FF4B4B' : eok >= 5 ? '#FF9500' : '#8B95A1';
-        const positions = [
-          { top: '20%', left: '25%' },
-          { top: '35%', left: '60%' },
-          { top: '50%', left: '35%' },
-          { top: '65%', left: '55%' },
-          { top: '25%', left: '70%' },
-          { top: '70%', left: '20%' },
-          { top: '45%', left: '80%' },
-          { top: '15%', left: '50%' },
-        ];
         return (
           <button
             key={apt.id}
@@ -1284,7 +1525,7 @@ function MockMapBackground({
           </button>
         );
       })}
-    </div>
+    </Box>
   );
 }
 
