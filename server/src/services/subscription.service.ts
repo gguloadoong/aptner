@@ -702,7 +702,7 @@ export async function getSubscriptions(
 
   // 시도 필터
   if (sido) {
-    list = list.filter((s) => s.sido.includes(sido));
+    list = list.filter((s) => s.sido === sido || s.sido.startsWith(sido));
   }
 
   // 정렬 (MAJOR-04 추가)

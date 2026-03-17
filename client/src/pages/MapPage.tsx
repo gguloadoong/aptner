@@ -48,7 +48,7 @@ export default function MapPage() {
   const { geocodeAddress, batchGeocode } = useGeocoder();
 
   // 바텀시트용 선택 아파트 상세 정보
-  const { data: selectedDetail } = useApartmentDetail(selectedApartment?.id);
+  const { data: selectedDetail, isLoading: isDetailLoading } = useApartmentDetail(selectedApartment?.id);
 
   // 마커 클릭 핸들러
   const handleMarkerClick = useCallback((apt: MapApartment) => {
@@ -92,6 +92,25 @@ export default function MapPage() {
       priceChangeType: 'flat',
     });
   }, [setSelectedApartment]);
+
+  // 카카오맵 로드 실패 또는 미로드 시 서울 전역 기본 데이터 로드 (목록 패널 빈 화면 방지)
+  useEffect(() => {
+    // 지도가 정상 로드된 경우에는 handleBoundsChange가 데이터를 채우므로 스킵
+    if (isLoaded) return;
+
+    // 서울 전역 바운더리 (SW: 37.41, 126.76 / NE: 37.70, 127.18)
+    const SEOUL_SW_LAT = 37.41;
+    const SEOUL_SW_LNG = 126.76;
+    const SEOUL_NE_LAT = 37.70;
+    const SEOUL_NE_LNG = 127.18;
+
+    getApartmentsByBounds(SEOUL_SW_LAT, SEOUL_SW_LNG, SEOUL_NE_LAT, SEOUL_NE_LNG)
+      .then((data) => {
+        // 이미 handleBoundsChange가 데이터를 채운 경우(isLoaded 전환 후) 덮어쓰지 않음
+        setMapApartments((prev) => (prev.length > 0 ? prev : data));
+      })
+      .catch((err) => console.warn('[MapPage] 기본 데이터 로드 실패:', err));
+  }, [isLoaded, getApartmentsByBounds, setMapApartments]);
 
   // 뷰포트 변경 핸들러
   // 1) 기존 MapApartment 마커 갱신 (청약 포함)
@@ -356,19 +375,29 @@ export default function MapPage() {
           <div className="mt-4">
             <p className="text-[11px] font-semibold text-[#8B95A1] uppercase tracking-wide mb-2">세대수</p>
             <div className="flex flex-wrap gap-1.5">
-              {UNIT_COUNT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setUnitCountFilter(opt.value)}
-                  className={`h-[32px] px-3 rounded-full text-[12px] font-medium transition-all ${
-                    unitCountFilter === opt.value
-                      ? 'bg-[#191F28] text-white'
-                      : 'bg-white border border-[#E5E8EB] text-[#8B95A1] hover:border-[#191F28]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              {UNIT_COUNT_OPTIONS.map((opt) => {
+                const isActive = unitCountFilter === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setUnitCountFilter(opt.value)}
+                    style={{
+                      height: '32px',
+                      padding: '0 12px',
+                      borderRadius: '999px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      border: isActive ? 'none' : '1px solid var(--semantic-line-normal)',
+                      backgroundColor: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
+                      color: isActive ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -383,19 +412,29 @@ export default function MapPage() {
               )}
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {COMPLEX_FEATURE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => toggleComplexFeature(opt.value)}
-                  className={`h-[32px] px-3 rounded-full text-[12px] font-medium transition-all ${
-                    complexFeatures.has(opt.value)
-                      ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                      : 'bg-white border border-[#E5E8EB] text-[#8B95A1] hover:border-[#191F28]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              {COMPLEX_FEATURE_OPTIONS.map((opt) => {
+                const isActive = complexFeatures.has(opt.value);
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => toggleComplexFeature(opt.value)}
+                    style={{
+                      height: '32px',
+                      padding: '0 12px',
+                      borderRadius: '999px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      border: isActive ? '1px solid var(--semantic-primary-normal)' : '1px solid var(--semantic-line-normal)',
+                      backgroundColor: isActive ? 'var(--semantic-primary-weak)' : 'var(--semantic-background-normal-normal)',
+                      color: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-label-alternative)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -492,6 +531,12 @@ export default function MapPage() {
                 <p className="text-xl font-black text-[#191F28] mt-1">
                   {formatPriceShort(selectedApartment.recentPrice)}
                 </p>
+                {/* 상세 데이터 로딩 중 스피너 표시 */}
+                {isDetailLoading && (
+                  <div className="flex items-center justify-center py-2">
+                    <LoadingSpinner message="상세 정보 로딩중..." />
+                  </div>
+                )}
                 <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={() => navigate(`/apartment/${selectedApartment.id}`)}>
                   상세보기
                 </Button>
@@ -616,38 +661,62 @@ export default function MapPage() {
 
           {/* 행 5: 세대수 필터 (가로 스크롤) */}
           <div className="flex gap-2 mt-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {UNIT_COUNT_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setUnitCountFilter(opt.value)}
-                className={`flex-shrink-0 h-[32px] px-3 rounded-full text-[12px] font-medium whitespace-nowrap transition-all ${
-                  unitCountFilter === opt.value
-                    ? 'bg-[#191F28] text-white'
-                    : 'bg-white border border-[#E5E8EB] text-[#8B95A1]'
-                }`}
-                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {UNIT_COUNT_OPTIONS.map((opt) => {
+              const isActive = unitCountFilter === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setUnitCountFilter(opt.value)}
+                  style={{
+                    flexShrink: 0,
+                    height: '32px',
+                    padding: '0 12px',
+                    borderRadius: '999px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+                    border: isActive ? 'none' : '1px solid var(--semantic-line-normal)',
+                    backgroundColor: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-background-normal-normal)',
+                    color: isActive ? 'var(--semantic-static-white)' : 'var(--semantic-label-alternative)',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* 행 6: 단지특성 필터 (가로 스크롤) */}
           <div className="flex gap-2 mt-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {COMPLEX_FEATURE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => toggleComplexFeature(opt.value)}
-                className={`flex-shrink-0 h-[32px] px-3 rounded-full text-[12px] font-medium whitespace-nowrap transition-all ${
-                  complexFeatures.has(opt.value)
-                    ? 'bg-blue-50 text-blue-600 border border-blue-200'
-                    : 'bg-white border border-[#E5E8EB] text-[#8B95A1]'
-                }`}
-                style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.10)' }}
-              >
-                {opt.label}
-              </button>
-            ))}
+            {COMPLEX_FEATURE_OPTIONS.map((opt) => {
+              const isActive = complexFeatures.has(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => toggleComplexFeature(opt.value)}
+                  style={{
+                    flexShrink: 0,
+                    height: '32px',
+                    padding: '0 12px',
+                    borderRadius: '999px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+                    border: isActive ? '1px solid var(--semantic-primary-normal)' : '1px solid var(--semantic-line-normal)',
+                    backgroundColor: isActive ? 'var(--semantic-primary-weak)' : 'var(--semantic-background-normal-normal)',
+                    color: isActive ? 'var(--semantic-primary-normal)' : 'var(--semantic-label-alternative)',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -762,6 +831,12 @@ export default function MapPage() {
               <p className="text-2xl font-black text-[#191F28] mt-2">
                 {formatPriceShort(selectedApartment.recentPrice)}
               </p>
+              {/* 상세 데이터 로딩 중 스피너 표시 */}
+              {isDetailLoading && (
+                <div className="flex items-center justify-center py-2">
+                  <LoadingSpinner message="상세 정보 로딩중..." />
+                </div>
+              )}
               <Button
                 variant="solid"
                 color="primary"

@@ -194,22 +194,37 @@ interface RawHotApartment {
   rank?: number;
   isRecordHigh?: boolean;
   hotRank?: number;
+  // 아파트 상세 조회 시 추가 반환 필드
+  totalUnits?: number;
+  buildYear?: number;
+  builder?: string;
+  address?: string;
+  lawdCd?: string;
+  areas?: Array<{ area: number; recentPrice: number }>;
 }
 
 function adaptHotApartment(raw: RawHotApartment, index: number): Apartment {
+  // areas 배열: BE 상세 조회 시 면적별 요약 배열 제공, 없으면 기본 단일 면적
+  const areaStrings: string[] =
+    raw.areas && raw.areas.length > 0
+      ? raw.areas.map((a) => String(Math.round(a.area)))
+      : [String(raw.area)];
+
   return {
     id: raw.aptCode,
     name: raw.apartmentName,
-    address: raw.lawdNm,
+    // BE 상세 조회 시 address 필드 존재, 없으면 lawdNm으로 fallback
+    address: raw.address ?? raw.lawdNm,
     district: raw.lawdNm.split(' ').slice(0, 2).join(' '),
     dong: raw.lawdNm.split(' ')[2] || '',
     // M-3: || 연산자는 0이 falsy라 lat/lng=0인 경우 fallback으로 대체됨 → ?? 로 수정
     lat: raw.lat ?? 37.5665,
     lng: raw.lng ?? 126.978,
-    totalUnits: 0,
-    builtYear: 0,
-    builder: '',
-    areas: [String(raw.area)],
+    // BE 상세 조회 시 totalUnits, buildYear, builder 제공
+    totalUnits: raw.totalUnits ?? 0,
+    builtYear: raw.buildYear ?? 0,
+    builder: raw.builder ?? '',
+    areas: areaStrings,
     recentPrice: raw.recentPrice,
     recentPriceArea: String(raw.area),
     priceChange: raw.priceChangeRate,
@@ -221,6 +236,8 @@ function adaptHotApartment(raw: RawHotApartment, index: number): Apartment {
     hotRank: raw.hotRank ?? raw.rank ?? index + 1,
     hotTags: [],  // BE에서 태그 미제공 시 빈 배열
     rankChange: 0,
+    // 전세가율 조회용 법정동 코드
+    lawdCd: raw.lawdCd,
   };
 }
 
@@ -252,9 +269,11 @@ export async function getApartmentDetail(id: string): Promise<Apartment | null> 
     return MOCK_APARTMENTS.find((apt) => apt.id === id) ?? null;
   }
 
-  // BE 응답은 { success: true, data: Apartment } 래퍼 구조
-  const response = await api.get<{ success: true; data: Apartment }>(`/apartments/${id}`);
-  return response.data.data;
+  // BE 응답은 { success: true, data: HotApartment } 래퍼 구조
+  // HotApartment → Apartment 어댑터를 통해 FE 타입으로 변환
+  const response = await api.get<{ success: true; data: RawHotApartment }>(`/apartments/${id}`);
+  if (!response.data.data) return null;
+  return adaptHotApartment(response.data.data, 0);
 }
 
 // 아파트 실거래가 히스토리 조회
@@ -309,11 +328,12 @@ export async function searchApartments(keyword: string): Promise<Apartment[]> {
     ).slice(0, 10);
   }
 
-  // BE 응답은 { success: true, data: Apartment[] } 래퍼 구조
-  const response = await api.get<{ success: true; data: Apartment[] }>('/apartments/search', {
+  // BE 응답은 { success: true, data: HotApartment[] } 래퍼 구조
+  // HotApartment → Apartment 어댑터를 통해 FE 타입으로 변환
+  const response = await api.get<{ success: true; data: RawHotApartment[] }>('/apartments/search', {
     params: { q: keyword },
   });
-  return response.data.data;
+  return response.data.data.map((raw, idx) => adaptHotApartment(raw, idx));
 }
 
 // 뷰포트 기준 아파트 단지 목록 조회 (호갱노노 스타일 - 좌표 없음, Geocoder 필요)
