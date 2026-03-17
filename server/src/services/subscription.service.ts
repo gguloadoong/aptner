@@ -8,6 +8,7 @@
 import axios from 'axios';
 import {
   Subscription,
+  SubscriptionArea,
   SubscriptionDetail,
   SubscriptionQueryParams,
   SubscriptionStatus,
@@ -71,6 +72,47 @@ export async function fetchRealSubscriptions(page = 1, perPage = 20): Promise<an
 }
 
 /**
+ * LH 주택형 상세 API를 호출하여 면적별 분양가 정보를 가져옵니다.
+ * API: getAPTLttotPblancMdl
+ *
+ * 반환 구조: Map<HOUSE_MANAGE_NO, 주택형 목록>
+ * 키 없거나 API 실패 시 빈 Map을 반환합니다.
+ *
+ * @param page - 페이지 번호 (1부터 시작)
+ * @param perPage - 가져올 주택형 건수 (공고 1건당 보통 2~5개 주택형)
+ */
+async function fetchHouseTypeDetails(page = 1, perPage = 500): Promise<Map<string, any[]>> {
+  const apiKey = process.env.LH_SUBSCRIPTION_API_KEY;
+  if (!apiKey) return new Map();
+
+  try {
+    const response = await axios.get(
+      'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl',
+      {
+        params: { serviceKey: apiKey, page, perPage },
+        timeout: LH_API_TIMEOUT,
+      }
+    );
+
+    const items: any[] = response.data?.data ?? [];
+    console.log(`[Subscription] 주택형 API 응답: ${items.length}건`);
+
+    // HOUSE_MANAGE_NO 기준으로 그룹화
+    const typeMap = new Map<string, any[]>();
+    for (const item of items) {
+      const key = String(item.HOUSE_MANAGE_NO ?? item.PBLANC_NO ?? '');
+      if (!key) continue;
+      if (!typeMap.has(key)) typeMap.set(key, []);
+      typeMap.get(key)!.push(item);
+    }
+    return typeMap;
+  } catch (err) {
+    console.warn('[Subscription] 주택형 API 호출 실패 → areas 빈 배열로 대체:', err);
+    return new Map();
+  }
+}
+
+/**
  * LH API 날짜 문자열(YYYYMMDD 또는 YYYY-MM-DD)을 YYYY-MM-DD 형식으로 정규화합니다.
  * 잘못된 포맷이 들어오면 빈 문자열을 반환합니다.
  */
@@ -89,13 +131,55 @@ function normalizeDateStr(raw: string | undefined | null): string {
 }
 
 /**
+ * LH 주택형 API 항목에서 가격(만원)을 파싱합니다.
+ * LTTOT_TOP_AMOUNT 필드가 만원 단위 숫자 문자열입니다.
+ * 10억(100,000만원) 초과면 원 단위로 간주하여 만원으로 환산합니다.
+ */
+function parseHouseTypePrice(raw: string | number | null | undefined): number {
+  const n = Number(raw) || 0;
+  return n > 1_000_000 ? Math.round(n / 10000) : n;
+}
+
+/**
+ * LH 주택형 API 항목 하나를 SubscriptionArea 타입으로 변환합니다.
+ * HOUSE_TY 예시: "084.9345A" → typeName="84A", area=84.93
+ */
+function adaptHouseTypeItem(item: any): SubscriptionArea {
+  const rawType = String(item.HOUSE_TY ?? '').trim();
+  // "084.9345A" → 숫자부 앞 3자리가 전용면적, 뒤 문자가 타입 구분자
+  const typeMatch = rawType.match(/^(\d+)\.(\d+)([A-Z]?)$/);
+  let typeName = rawType;
+  let area = 0;
+  if (typeMatch) {
+    const intPart = parseInt(typeMatch[1], 10);
+    const decPart = typeMatch[2].slice(0, 2); // 소수점 2자리까지
+    const suffix = typeMatch[3] || '';
+    area = parseFloat(`${intPart}.${decPart}`);
+    typeName = `${intPart}${suffix}`;
+  }
+
+  // 공급 세대수: 일반공급(SUPLY_HSHLDCO) + 특별공급(SPSPLY_HSHLDCO)
+  const supply = (Number(item.SUPLY_HSHLDCO) || 0) + (Number(item.SPSPLY_HSHLDCO) || 0);
+
+  return {
+    typeName,
+    area,
+    supply,
+    price: parseHouseTypePrice(item.LTTOT_TOP_AMOUNT),
+  };
+}
+
+/**
  * LH API 응답을 Subscription 타입으로 변환합니다.
  *
  * 날짜 필드: API는 YYYYMMDD 형식으로 반환하므로 normalizeDateStr()로 변환합니다.
- * 가격 필드: LTTOT_TOP_AMOUNT는 만원 단위로 제공됩니다.
- *            값이 1,000 이상이면 원 단위로 간주하여 만원으로 환산합니다.
+ * 가격 필드: 주택형별 LTTOT_TOP_AMOUNT(만원)에서 min/max를 계산합니다.
+ *            주택형 데이터 없으면 0으로 유지됩니다.
+ *
+ * @param item - LH 분양공고 API 항목
+ * @param houseTypeMap - 주택형 API 결과 Map (HOUSE_MANAGE_NO → 주택형 목록)
  */
-function adaptLhItem(item: any): Subscription {
+function adaptLhItem(item: any, houseTypeMap: Map<string, any[]>): Subscription {
   // 날짜 필드 정규화 (YYYYMMDD → YYYY-MM-DD)
   const startDate = normalizeDateStr(item.RCEPT_BGNDE ?? item.SPSPLY_RCEPT_BGNDE);
   // 일반공급 2순위 마감일을 우선 사용하고, 없으면 접수 마감일로 fallback
@@ -109,26 +193,36 @@ function adaptLhItem(item: any): Subscription {
   const sido = item.SUBSCRPT_AREA_CODE_NM ?? address.split(' ')[0] ?? '';
   const sigungu = address.split(' ')[1] ?? '';
 
-  // 분양가 처리: LTTOT_TOP_AMOUNT가 만원 단위인지 원 단위인지 판별
-  // 10억(100,000만원) 이상의 큰 값이면 원 단위로 간주하여 10,000으로 나눔
-  const rawPrice = Number(item.LTTOT_TOP_AMOUNT) || 0;
-  const priceInManwon = rawPrice > 1_000_000 ? Math.round(rawPrice / 10000) : rawPrice;
+  // 주택형별 면적/분양가 정보 구성
+  const houseManageNo = String(item.HOUSE_MANAGE_NO ?? item.PBLANC_NO ?? '');
+  const rawTypeItems = houseTypeMap.get(houseManageNo) ?? [];
+  const areas: SubscriptionArea[] = rawTypeItems
+    .map(adaptHouseTypeItem)
+    .filter((a) => a.area > 0)
+    // 같은 typeName이 중복될 수 있으므로 typeName 기준 중복 제거
+    .filter((a, idx, arr) => arr.findIndex((b) => b.typeName === a.typeName) === idx)
+    .sort((a, b) => a.area - b.area);
+
+  // 분양가 min/max: 주택형 데이터 있으면 그 값 사용, 없으면 0
+  const prices = areas.map((a) => a.price).filter((p) => p > 0);
+  const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+  const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
 
   return {
-    id: item.HOUSE_MANAGE_NO ?? item.PBLANC_NO ?? String(Math.random()),
+    id: houseManageNo || String(Math.random()),
     name: item.HOUSE_NM ?? '단지명 없음',
     constructor: item.CNSTRCT_ENTRPS_NM ?? '',
     sido,
     sigungu,
     address,
-    minPrice: priceInManwon,
-    maxPrice: priceInManwon,
+    minPrice,
+    maxPrice,
     totalSupply: Number(item.TOT_SUPLY_HSHLDCO) || 0,
     startDate,
     endDate,
     announceDate,
     type: item.HOUSE_DTL_SECD_NM === '공공' ? '특별공급' : '일반공급',
-    areas: [],
+    areas,
     status: calcStatus(startDate, endDate),
     dDay: endDate ? calcDDay(endDate) : 0,
   };
@@ -585,9 +679,13 @@ export async function getSubscriptions(
   let list: Subscription[];
   if (isRealLhApiKey()) {
     try {
-      const rawItems = await fetchRealSubscriptions(page, 100);
-      list = rawItems.map(adaptLhItem);
-      console.log(`[Subscription] 실 API 데이터 ${list.length}건 사용`);
+      // 분양공고 목록과 주택형 데이터를 병렬로 가져옴
+      const [rawItems, houseTypeMap] = await Promise.all([
+        fetchRealSubscriptions(page, 100),
+        fetchHouseTypeDetails(1, 500),
+      ]);
+      list = rawItems.map((item) => adaptLhItem(item, houseTypeMap));
+      console.log(`[Subscription] 실 API 데이터 ${list.length}건 사용 (주택형 그룹 ${houseTypeMap.size}개)`);
     } catch (err) {
       console.error('[Subscription] 실 API 실패 → Mock fallback:', err);
       list = buildSubscriptions();
