@@ -1329,8 +1329,9 @@ export async function getHotApartments(
         tradeCount: apt.trades.length,
         priceChange,
         priceChangeRate: Math.round(priceChangeRate * 10) / 10,
-        lat: undefined,
-        lng: undefined,
+        // 실 API에서는 좌표 정보 없음 → null로 명시 (FE에서 undefined와 구분)
+        lat: null,
+        lng: null,
       };
     });
 
@@ -1374,8 +1375,9 @@ export async function getHotApartments(
             tradeCount: apt.trades.length,
             priceChange: pc,
             priceChangeRate: Math.round((first.price > 0 ? (pc / first.price) * 100 : 0) * 10) / 10,
-            lat: undefined,
-            lng: undefined,
+            // 실 API에서는 좌표 정보 없음 → null로 명시
+            lat: null,
+            lng: null,
           };
         });
         cacheService.set(cacheKey, prevHotList, CACHE_TTL.APARTMENT_TRADE);
@@ -1507,6 +1509,13 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
     return null;
   }
 
+  // 대표 면적 유형 목록 (84㎡ 중심으로 ±20㎡ 범위 면적 생성)
+  const areas = [
+    { area: 59, recentPrice: Math.round(found.basePrice * 0.72) },
+    { area: 84, recentPrice: found.basePrice },
+    { area: 109, recentPrice: Math.round(found.basePrice * 1.28) },
+  ];
+
   const result: HotApartment = {
     rank: 0,
     aptCode: found.aptCode,
@@ -1521,6 +1530,55 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
     lng: found.lng,
     isRecordHigh: found.isRecordHigh,
     hotRank: found.hotRank,
+    // 아파트 상세 추가 필드
+    totalUnits: found.totalUnits,
+    buildYear: found.builtYear,
+    builder: found.builder,
+    areas,
+    // lawdNm에서 법정동 코드(lawdCd) 매핑은 미지원 → 필드 생략
+  };
+
+  cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
+  return result;
+}
+
+/**
+ * 특정 아파트의 분양가(최근 실거래 기반 근사치)를 반환합니다.
+ *
+ * 현재는 Mock 데이터의 basePrice를 분양가로 근사 반환합니다.
+ * TODO: 국토부 분양가 정보 공개 API(getAptPriceInfo) 연동 시 교체
+ *
+ * @param aptCode - 아파트 코드 (예: APT001)
+ * @returns { salePrice: number | null, date: string | null }
+ */
+export async function getSalePriceByAptCode(
+  aptCode: string,
+): Promise<{ salePrice: number | null; date: string | null }> {
+  const cacheKey = `sale-price:${aptCode}`;
+
+  const cached = cacheService.get<{ salePrice: number | null; date: string | null }>(cacheKey);
+  if (cached) {
+    console.log(`[Molit] 분양가 캐시 히트: ${aptCode}`);
+    return cached;
+  }
+
+  // Mock 데이터에서 aptCode로 검색
+  const found = APT_BASE_DATA.find((apt) => apt.aptCode === aptCode);
+  if (!found) {
+    console.log(`[Molit] 분양가 조회 — 아파트 없음: aptCode=${aptCode}`);
+    return { salePrice: null, date: null };
+  }
+
+  // 준공 연도 기반 입주 연도를 분양일자로 근사 (실제 분양일 = 준공 약 2년 전)
+  const saleYear = found.builtYear ? found.builtYear - 2 : null;
+  const saleDate = saleYear ? `${saleYear}-01-01` : null;
+
+  // 분양가는 현재 시세의 70~90% 수준으로 근사 (실 API 없을 때 참고값)
+  const approxSalePrice = Math.round(found.basePrice * 0.78);
+
+  const result = {
+    salePrice: approxSalePrice,
+    date: saleDate,
   };
 
   cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
