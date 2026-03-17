@@ -48,7 +48,7 @@ export default function MapPage() {
   const { geocodeAddress, batchGeocode } = useGeocoder();
 
   // 바텀시트용 선택 아파트 상세 정보
-  const { data: selectedDetail } = useApartmentDetail(selectedApartment?.id);
+  const { data: selectedDetail, isLoading: isDetailLoading } = useApartmentDetail(selectedApartment?.id);
 
   // 마커 클릭 핸들러
   const handleMarkerClick = useCallback((apt: MapApartment) => {
@@ -531,6 +531,12 @@ export default function MapPage() {
                 <p className="text-xl font-black text-[#191F28] mt-1">
                   {formatPriceShort(selectedApartment.recentPrice)}
                 </p>
+                {/* 상세 데이터 로딩 중 스피너 표시 */}
+                {isDetailLoading && (
+                  <div className="flex items-center justify-center py-2">
+                    <LoadingSpinner message="상세 정보 로딩중..." />
+                  </div>
+                )}
                 <Button variant="solid" color="primary" fullWidth className="mt-3" onClick={() => navigate(`/apartment/${selectedApartment.id}`)}>
                   상세보기
                 </Button>
@@ -825,6 +831,12 @@ export default function MapPage() {
               <p className="text-2xl font-black text-[#191F28] mt-2">
                 {formatPriceShort(selectedApartment.recentPrice)}
               </p>
+              {/* 상세 데이터 로딩 중 스피너 표시 */}
+              {isDetailLoading && (
+                <div className="flex items-center justify-center py-2">
+                  <LoadingSpinner message="상세 정보 로딩중..." />
+                </div>
+              )}
               <Button
                 variant="solid"
                 color="primary"
