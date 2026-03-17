@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   BarChart,
   Bar,
@@ -10,10 +11,11 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import api from '../services/api';
 import ApartmentCard from '../components/apartment/ApartmentCard';
 // BottomNav는 AppLayout에서 통합 처리됨
 // MOCK_SURGE_ALERTS는 사용자 신뢰도 문제로 skeleton UI로 대체
-import { MOCK_WEEKLY_RANKING, MOCK_REGION_TRENDS } from '../mocks/trends.mock';
+import { MOCK_WEEKLY_RANKING } from '../mocks/trends.mock';
 import { useHotApartments, useSupplyData } from '../hooks/useApartment';
 import type { SupplyDataPoint } from '../services/apartment.service';
 import { Chip, Box, FlexBox, Typography, TopNavigation, TopNavigationButton, Skeleton } from '@wanteddev/wds';
@@ -21,6 +23,15 @@ import { useIsPC } from '../hooks/useBreakpoint';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
 
 const REGIONS = ['전국', '서울', '경기', '인천', '부산'];
+
+// 지역 코드 맵 — BE /trends/region API 쿼리 파라미터용
+const REGION_CODE_MAP: Record<string, string> = {
+  '전국': '00', '서울': '11', '경기': '41', '인천': '28',
+  '부산': '26', '대구': '27', '대전': '30', '광주': '29',
+};
+
+// 거래량 급등 단지 섹션 — 실 데이터 준비 전까지 숨김 처리
+const SHOW_HOT_TRADES = false;
 
 // 트렌드 페이지 — Tailwind 제거, WDS Box/FlexBox/Typography 사용
 export default function TrendPage() {
@@ -41,7 +52,24 @@ export default function TrendPage() {
 
   const { data: supplyData = [] } = useSupplyData(supplyRegion, 12);
 
-  const chartData = MOCK_REGION_TRENDS.map((t) => ({
+  // 지역별 가격 변동률 — 실 API 연동 (BE /trends/region)
+  const {
+    data: regionTrends,
+    isLoading: isRegionLoading,
+    isError: isRegionError,
+  } = useQuery({
+    queryKey: ['trends', 'region', selectedRegion],
+    queryFn: () =>
+      api
+        .get<{ success: true; data: Array<{ region: string; priceChange: number; avgPrice: number }> }>(
+          `/trends/region?regionCode=${REGION_CODE_MAP[selectedRegion] ?? '00'}`
+        )
+        .then((r) => r.data.data),
+    staleTime: 5 * 60 * 1000, // 5분 캐시
+  });
+
+  // API 응답을 차트 데이터로 변환
+  const chartData = (regionTrends ?? []).map((t) => ({
     region: t.region,
     change: t.priceChange,
     avg: Math.round(t.avgPrice / 10000),
@@ -184,40 +212,81 @@ export default function TrendPage() {
                 <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginBottom: '16px' }}>
                   지역별 가격 변동률
                 </Typography>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid, #E5E8EB)" vertical={false} />
-                    <XAxis dataKey="region" tick={{ fontSize: 12, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip
-                      formatter={(value) => [`${value}%`, '변동률']}
-                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: 12 }}
-                    />
-                    <Bar dataKey="change" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                      {chartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.change > 0 ? '#FF4B4B' : entry.change < 0 ? '#3B82F6' : 'var(--color-chart-line, #0066FF)'}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
 
-                {/* 지역 요약 카드 — 실제 데이터 연동 전 준비 중 표시 */}
-                <Box
-                  sx={{
-                    marginTop: '16px',
-                    padding: '12px',
-                    backgroundColor: 'var(--semantic-background-normal-alternative)',
-                    borderRadius: '12px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
-                    지역별 시세 데이터 준비 중입니다
-                  </Typography>
-                </Box>
+                {/* 로딩 중 스켈레톤 */}
+                {isRegionLoading && (
+                  <Box sx={{ height: '200px', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'flex-end' }}>
+                    <FlexBox alignItems="flex-end" gap="8px" style={{ height: '160px' }}>
+                      {[70, 45, 90, 55, 80].map((h, i) => (
+                        <Skeleton key={i} variant="rectangle" width="100%" height={`${h}%`} style={{ borderRadius: '4px 4px 0 0', flex: 1 }} />
+                      ))}
+                    </FlexBox>
+                    <FlexBox gap="8px">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Skeleton key={i} variant="text" width="100%" height="12px" style={{ flex: 1 }} />
+                      ))}
+                    </FlexBox>
+                  </Box>
+                )}
+
+                {/* 에러 상태 */}
+                {isRegionError && !isRegionLoading && (
+                  <Box
+                    sx={{
+                      height: '200px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'var(--semantic-background-normal-alternative)',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                      데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* 빈 상태 */}
+                {!isRegionLoading && !isRegionError && chartData.length === 0 && (
+                  <Box
+                    sx={{
+                      height: '200px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'var(--semantic-background-normal-alternative)',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                      {selectedRegion} 지역 변동률 데이터가 없습니다
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* 차트 — 데이터 있을 때만 렌더링 */}
+                {!isRegionLoading && !isRegionError && chartData.length > 0 && (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid, #E5E8EB)" vertical={false} />
+                      <XAxis dataKey="region" tick={{ fontSize: 12, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: 'var(--color-chart-axis, #8B95A1)' }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+                      <Tooltip
+                        formatter={(value) => [`${value}%`, '변동률']}
+                        contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: 12 }}
+                      />
+                      <Bar dataKey="change" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        {chartData.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.change > 0 ? '#FF4B4B' : entry.change < 0 ? '#3B82F6' : 'var(--color-chart-line, #0066FF)'}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </Box>
 
               {/* 입주 물량 예정 차트 */}
@@ -304,48 +373,50 @@ export default function TrendPage() {
                 </FlexBox>
               </Box>
 
-              {/* 거래량 급등 알림 — 실제 데이터 연동 전 skeleton UI 표시 */}
-              <Box
-                as="section"
-                sx={{
-                  padding: isMobile ? '20px' : '24px',
-                  backgroundColor: 'var(--semantic-background-normal-normal)',
-                  borderRadius: isMobile ? '0' : '16px',
-                  border: isMobile ? 'none' : '1px solid var(--semantic-line-normal)',
-                  marginBottom: isMobile ? '12px' : '0',
-                }}
-              >
-                <FlexBox alignItems="center" gap="8px" style={{ marginBottom: '16px' }}>
-                  <div style={{ width: '8px', height: '8px', backgroundColor: 'var(--semantic-line-normal)', borderRadius: '50%' }} />
-                  <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-                    거래량 급등 단지
-                  </Typography>
-                </FlexBox>
-                <FlexBox flexDirection="column" gap="12px">
-                  {[1, 2, 3].map((i) => (
-                    <Box
-                      key={i}
-                      sx={{
-                        padding: '16px',
-                        backgroundColor: 'var(--semantic-background-normal-alternative)',
-                        borderRadius: '12px',
-                        border: '1px solid var(--semantic-line-normal)',
-                      }}
-                    >
-                      <FlexBox alignItems="center" justifyContent="space-between">
-                        <div style={{ flex: 1 }}>
-                          <Skeleton variant="text" width="60%" height="14px" />
-                          <Skeleton variant="text" width="40%" height="11px" style={{ marginTop: '6px' }} />
-                        </div>
-                        <Skeleton variant="rectangle" width="44px" height="24px" />
-                      </FlexBox>
-                    </Box>
-                  ))}
-                  <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', textAlign: 'center', display: 'block', marginTop: '4px' }}>
-                    거래량 데이터 준비 중입니다
-                  </Typography>
-                </FlexBox>
-              </Box>
+              {/* 거래량 급등 단지 — 실 데이터 준비 완료 전까지 숨김 처리 */}
+              {SHOW_HOT_TRADES && (
+                <Box
+                  as="section"
+                  sx={{
+                    padding: isMobile ? '20px' : '24px',
+                    backgroundColor: 'var(--semantic-background-normal-normal)',
+                    borderRadius: isMobile ? '0' : '16px',
+                    border: isMobile ? 'none' : '1px solid var(--semantic-line-normal)',
+                    marginBottom: isMobile ? '12px' : '0',
+                  }}
+                >
+                  <FlexBox alignItems="center" gap="8px" style={{ marginBottom: '16px' }}>
+                    <div style={{ width: '8px', height: '8px', backgroundColor: 'var(--semantic-line-normal)', borderRadius: '50%' }} />
+                    <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+                      거래량 급등 단지
+                    </Typography>
+                  </FlexBox>
+                  <FlexBox flexDirection="column" gap="12px">
+                    {[1, 2, 3].map((i) => (
+                      <Box
+                        key={i}
+                        sx={{
+                          padding: '16px',
+                          backgroundColor: 'var(--semantic-background-normal-alternative)',
+                          borderRadius: '12px',
+                          border: '1px solid var(--semantic-line-normal)',
+                        }}
+                      >
+                        <FlexBox alignItems="center" justifyContent="space-between">
+                          <div style={{ flex: 1 }}>
+                            <Skeleton variant="text" width="60%" height="14px" />
+                            <Skeleton variant="text" width="40%" height="11px" style={{ marginTop: '6px' }} />
+                          </div>
+                          <Skeleton variant="rectangle" width="44px" height="24px" />
+                        </FlexBox>
+                      </Box>
+                    ))}
+                    <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', textAlign: 'center', display: 'block', marginTop: '4px' }}>
+                      거래량 데이터 준비 중입니다
+                    </Typography>
+                  </FlexBox>
+                </Box>
+              )}
             </FlexBox>
           </div>
         </Box>

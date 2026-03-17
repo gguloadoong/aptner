@@ -109,7 +109,7 @@ router.get('/trades', apiRateLimiter, async (req: Request, res: Response, next: 
  * Query params:
  *   - q: 검색 키워드 (필수, 빈 문자열 불가)
  */
-router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/search', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { q } = req.query as Partial<Record<string, string>>;
 
@@ -155,7 +155,7 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
  *             '전국' 또는 미지정 시 전체 반환
  *   - limit: 랭킹 개수 (선택, 기본: 10, 최대: 20)
  */
-router.get('/hot', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/hot', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { region, limit } = req.query as Partial<Record<string, string>>;
 
@@ -285,7 +285,7 @@ router.get('/complexes', apiRateLimiter, async (req: Request, res: Response, nex
  *   - neLng: 북동쪽 경도 (필수)
  *   - priceFilter: 가격 상한 필터 (선택, 만원 단위)
  */
-router.get('/map', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/map', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { swLat, swLng, neLat, neLng, priceFilter } = req.query as Partial<Record<string, string>>;
 
@@ -381,7 +381,7 @@ router.get('/map', async (req: Request, res: Response, next: NextFunction) => {
 router.get(
   '/:aptCode/jeonse-rate',
   apiRateLimiter,
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, _next: NextFunction) => {
     try {
       const { aptCode } = req.params;
       const { lawdCd } = req.query as Partial<Record<string, string>>;
@@ -417,7 +417,12 @@ router.get(
         data,
       });
     } catch (error) {
-      next(error);
+      // API 실패 시 500을 그대로 내보내지 않고 전세가율 null fallback 반환
+      console.warn(`[Apartment] 전세가율 조회 실패 → fallback 반환: aptCode=${req.params.aptCode}`, error instanceof Error ? error.message : error);
+      res.json({
+        success: true,
+        data: { jeonseRate: null, isEstimated: true },
+      });
     }
   },
 );

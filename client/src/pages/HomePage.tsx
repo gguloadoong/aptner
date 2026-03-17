@@ -27,6 +27,9 @@ import {
 } from '@wanteddev/wds-icon';
 import type { Apartment } from '../types';
 
+// 지역 시세 섹션 — TrendPage 실 API 연동 완료 후 동일 훅 재사용 예정. 그 전까지 숨김 처리
+const SHOW_REGION_PRICE = false;
+
 export default function HomePage() {
   const navigate = useNavigate();
   const isMobile = !useIsPC();
@@ -352,56 +355,58 @@ export default function HomePage() {
                 )}
               </Box>
 
-              {/* Section 3: 지역 시세 */}
-              <Box as="section">
-                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
-                  <div>
-                    <Typography
-                      variant="heading1"
-                      weight="bold"
-                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
-                    >
-                      지역 시세
-                    </Typography>
-                    <Typography
-                      variant="caption1"
-                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
-                    >
-                      주간 평균 실거래가
-                    </Typography>
-                  </div>
-                  <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
-                    더보기
-                  </TextButton>
-                </FlexBox>
-
-                {/* 지역 시세 — 실제 데이터 연동 전 skeleton UI 표시 */}
-                <Box
-                  sx={{
-                    padding: '20px 16px',
-                    textAlign: 'center',
-                    backgroundColor: 'var(--semantic-background-normal-normal)',
-                    borderRadius: '16px',
-                    border: '1px solid var(--semantic-line-normal)',
-                  }}
-                >
-                  <FlexBox flexDirection="column" gap="8px">
-                    {[1, 2, 3].map((i) => (
-                      <FlexBox key={i} alignItems="center" justifyContent="space-between" gap="12px">
-                        <Skeleton variant="text" width="60px" height="13px" />
-                        <Skeleton variant="text" width="80px" height="13px" />
-                        <Skeleton variant="text" width="48px" height="13px" />
-                      </FlexBox>
-                    ))}
-                    <Typography
-                      variant="caption2"
-                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '8px', display: 'block' }}
-                    >
-                      지역 시세 데이터 준비 중입니다
-                    </Typography>
+              {/* Section 3: 지역 시세 — SHOW_REGION_PRICE=true 시 활성화 */}
+              {SHOW_REGION_PRICE && (
+                <Box as="section">
+                  <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
+                    <div>
+                      <Typography
+                        variant="heading1"
+                        weight="bold"
+                        sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
+                      >
+                        지역 시세
+                      </Typography>
+                      <Typography
+                        variant="caption1"
+                        sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
+                      >
+                        주간 평균 실거래가
+                      </Typography>
+                    </div>
+                    <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
+                      더보기
+                    </TextButton>
                   </FlexBox>
+
+                  {/* 지역 시세 — 실제 데이터 연동 전 skeleton UI 표시 */}
+                  <Box
+                    sx={{
+                      padding: '20px 16px',
+                      textAlign: 'center',
+                      backgroundColor: 'var(--semantic-background-normal-normal)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--semantic-line-normal)',
+                    }}
+                  >
+                    <FlexBox flexDirection="column" gap="8px">
+                      {[1, 2, 3].map((i) => (
+                        <FlexBox key={i} alignItems="center" justifyContent="space-between" gap="12px">
+                          <Skeleton variant="text" width="60px" height="13px" />
+                          <Skeleton variant="text" width="80px" height="13px" />
+                          <Skeleton variant="text" width="48px" height="13px" />
+                        </FlexBox>
+                      ))}
+                      <Typography
+                        variant="caption2"
+                        sx={{ color: 'var(--semantic-label-assistive)', marginTop: '8px', display: 'block' }}
+                      >
+                        지역 시세 데이터 준비 중입니다
+                      </Typography>
+                    </FlexBox>
+                  </Box>
                 </Box>
-              </Box>
+              )}
 
               {/* 지도 바로가기 배너 (데스크탑에서만 우측 하단에 위치) */}
               {!isMobile && (
