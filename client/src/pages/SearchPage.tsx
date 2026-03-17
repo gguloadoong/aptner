@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApartmentSearch } from '../hooks/useApartment';
 import ApartmentCard from '../components/apartment/ApartmentCard';
-import { Loading, Button, Box, FlexBox, Typography, TopNavigation, TopNavigationButton } from '@wanteddev/wds';
+import { Button, Box, FlexBox, Typography, TopNavigation, TopNavigationButton } from '@wanteddev/wds';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
 import SearchBar from '../components/ui/SearchBar';
 
@@ -36,9 +36,39 @@ export default function SearchPage() {
           </Typography>
         )}
 
-        {isLoading ? (
-          <FlexBox alignItems="center" justifyContent="center" style={{ padding: '64px 0' }}>
-            <Loading size="32px" />
+        {/* 검색어가 1자 이하일 때 안내 */}
+        {!isLoading && query.length > 0 && query.length < 2 ? (
+          <FlexBox flexDirection="column" alignItems="center" justifyContent="center" gap="8px" style={{ padding: '64px 0' }}>
+            <Typography variant="body2" sx={{ color: 'var(--semantic-label-assistive)' }}>
+              2글자 이상 입력해주세요
+            </Typography>
+          </FlexBox>
+        ) : isLoading ? (
+          <FlexBox flexDirection="column" gap="12px">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Box
+                key={i}
+                sx={{
+                  height: '80px',
+                  backgroundColor: 'var(--semantic-background-normal-normal)',
+                  borderRadius: '12px',
+                  border: '1px solid var(--semantic-line-normal)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '0 16px',
+                }}
+              >
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <Box sx={{ height: '14px', width: '55%', backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '4px' }} />
+                  <Box sx={{ height: '12px', width: '35%', backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '4px' }} />
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                  <Box sx={{ height: '16px', width: '48px', backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '4px' }} />
+                  <Box sx={{ height: '12px', width: '36px', backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '4px' }} />
+                </Box>
+              </Box>
+            ))}
           </FlexBox>
         ) : isError ? (
           <FlexBox flexDirection="column" alignItems="center" justifyContent="center" gap="16px" style={{ padding: '64px 0' }}>

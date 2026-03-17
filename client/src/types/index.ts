@@ -5,8 +5,8 @@ export interface Apartment {
   address: string;
   district: string; // 시군구
   dong: string; // 동
-  lat: number;
-  lng: number;
+  lat?: number; // Geocoder 변환 전엔 undefined일 수 있음
+  lng?: number; // Geocoder 변환 전엔 undefined일 수 있음
   totalUnits: number;
   builtYear: number;
   builder: string;

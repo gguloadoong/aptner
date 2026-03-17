@@ -1073,8 +1073,8 @@ export const MOCK_MAP_APARTMENTS: MapApartment[] = [
   ...MOCK_APARTMENTS.map((apt) => ({
     id: apt.id,
     name: apt.name,
-    lat: apt.lat,
-    lng: apt.lng,
+    lat: apt.lat!, // mock 데이터는 항상 좌표 포함
+    lng: apt.lng!, // mock 데이터는 항상 좌표 포함
     price: apt.recentPrice,
     area: apt.recentPriceArea,
     areas: apt.areas,
