@@ -332,6 +332,25 @@ export interface ApartmentComplex {
   buildYear?: number;
 }
 
+// ---- 거래량 급등 단지 ----
+
+export interface HotTradeApartment {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  /** 이번 주 거래 수 */
+  tradeCount: number;
+  /** 지난 주 거래 수 */
+  prevTradeCount: number;
+  /** 변동률 % (예: 150 = 150% 증가) */
+  changeRate: number;
+  /** 최근 거래가 (만원) */
+  recentPrice: number;
+  priceChangeType: 'up' | 'down' | 'flat';
+}
+
 // ---- 요청 파라미터 ----
 
 export interface TradeQueryParams {

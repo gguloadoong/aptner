@@ -7,6 +7,7 @@ import { CardSkeleton } from '../components/ui/LoadingSpinner';
 import {
   Tab, TabList, TabListItem, Chip, Button,
   Box, FlexBox, Typography, TopNavigation, TopNavigationButton,
+  Select, Option,
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
@@ -154,29 +155,18 @@ export default function SubscriptionPage() {
               ))}
             </div>
 
-            {/* 정렬 선택 */}
-            <select
+            {/* 정렬 선택 — WDS Select */}
+            <Select
               value={sort}
-              onChange={(e) => setSort(e.target.value as SortOrder)}
-              style={{
-                flexShrink: 0,
-                fontSize: '12px',
-                color: 'var(--semantic-label-alternative)',
-                border: '1px solid var(--semantic-line-normal)',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                backgroundColor: 'var(--semantic-background-normal-normal)',
-                outline: 'none',
-                cursor: 'pointer',
-                fontWeight: 500,
-              }}
+              onChange={(v) => setSort(v as SortOrder)}
+              sx={{ flexShrink: 0 }}
             >
               {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
+                <Option key={opt.value} value={opt.value}>
                   {opt.label}
-                </option>
+                </Option>
               ))}
-            </select>
+            </Select>
           </FlexBox>
         </Box>
       </Box>

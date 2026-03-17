@@ -2015,3 +2015,75 @@ export async function searchApartments(keyword: string): Promise<HotApartment[]>
 
   return result;
 }
+
+// ============================================================
+// [P1-01] 주변 단지 좌표 기반 검색
+// ============================================================
+
+/**
+ * Haversine 공식으로 두 좌표 간 직선 거리를 미터 단위로 계산합니다.
+ */
+function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // 지구 반경 (미터)
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * 기준 좌표에서 반경 내 아파트 단지를 최대 10개 반환합니다.
+ * Mock 모드: APT_BASE_DATA 기반 Haversine 거리 필터링
+ *
+ * @param lat     기준 위도
+ * @param lng     기준 경도
+ * @param radius  검색 반경 (미터)
+ */
+export async function getNearbyApartments(
+  lat: number,
+  lng: number,
+  radius: number,
+): Promise<HotApartment[]> {
+  const cacheKey = `nearby:${lat.toFixed(4)}:${lng.toFixed(4)}:${radius}`;
+  const cached = cacheService.get<HotApartment[]>(cacheKey);
+  if (cached) {
+    console.log(`[Molit] 주변 단지 캐시 히트: lat=${lat}, lng=${lng}, radius=${radius}`);
+    return cached;
+  }
+
+  // APT_BASE_DATA에서 반경 내 단지 필터링 후 거리 오름차순 정렬, 최대 10개
+  const nearby = APT_BASE_DATA
+    .map((apt) => ({
+      apt,
+      distance: calcDistance(lat, lng, apt.lat, apt.lng),
+    }))
+    .filter(({ distance }) => distance <= radius)
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 10)
+    .map(({ apt }, idx) => ({
+      rank: idx + 1,
+      aptCode: apt.aptCode,
+      apartmentName: apt.apartmentName,
+      lawdNm: apt.lawdNm,
+      recentPrice: apt.basePrice,
+      area: apt.area,
+      tradeCount: apt.tradeCount,
+      priceChange: apt.priceChange,
+      priceChangeRate: apt.priceChangeRate,
+      lat: apt.lat,
+      lng: apt.lng,
+      isRecordHigh: apt.isRecordHigh,
+      hotRank: apt.hotRank,
+    }));
+
+  console.log(`[Molit] 주변 단지 검색: lat=${lat}, lng=${lng}, radius=${radius} → ${nearby.length}건`);
+
+  // 캐시 저장 (30초)
+  cacheService.set(cacheKey, nearby, 30);
+
+  return nearby;
+}

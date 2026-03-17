@@ -13,6 +13,7 @@ import {
   getApartmentById,
   searchApartments,
   getJeonseRate,
+  getNearbyApartments,
 } from '../services/molit.service';
 import { getComplexesByViewport } from '../services/complex.service';
 import { apiRateLimiter } from '../middleware/security';
@@ -136,6 +137,74 @@ router.get('/search', apiRateLimiter, async (req: Request, res: Response, next: 
     }
 
     const data = await searchApartments(keyword);
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/apartments/nearby
+ * 좌표 기반 반경 내 아파트 단지 검색
+ *
+ * Query params:
+ *   - lat: 기준 위도 (필수)
+ *   - lng: 기준 경도 (필수)
+ *   - radius: 검색 반경 미터 (선택, 기본: 1000, 범위: 200~5000)
+ */
+router.get('/nearby', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lat, lng, radius } = req.query as Partial<Record<string, string>>;
+
+    // lat/lng 필수 검증
+    if (!lat || !lng) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_PARAMS',
+          message: 'lat(위도)와 lng(경도)는 필수 파라미터입니다.',
+        },
+      });
+      return;
+    }
+
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    // 좌표 유효성 검증
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDS',
+          message: 'lat, lng는 숫자여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    // radius 범위 검증 (200 ~ 5000m)
+    const DEFAULT_RADIUS = 1000;
+    const MIN_RADIUS = 200;
+    const MAX_RADIUS = 5000;
+    let radiusNum = radius ? parseFloat(radius) : DEFAULT_RADIUS;
+
+    if (isNaN(radiusNum) || radiusNum < MIN_RADIUS || radiusNum > MAX_RADIUS) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_RADIUS',
+          message: `radius는 ${MIN_RADIUS}~${MAX_RADIUS} 범위의 숫자여야 합니다.`,
+        },
+      });
+      return;
+    }
+
+    const data = await getNearbyApartments(latNum, lngNum, radiusNum);
 
     res.json({
       success: true,
@@ -421,7 +490,7 @@ router.get(
       console.warn(`[Apartment] 전세가율 조회 실패 → fallback 반환: aptCode=${req.params.aptCode}`, error instanceof Error ? error.message : error);
       res.json({
         success: true,
-        data: { jeonseRate: null, isEstimated: true },
+        data: { jeonseRate: null, jeonsePrice: null, tradePrice: null, isEstimated: true },
       });
     }
   },
