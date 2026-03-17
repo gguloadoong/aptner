@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSubscriptions } from '../hooks/useSubscription';
 import SubscriptionCard from '../components/subscription/SubscriptionCard';
 import { CardSkeleton } from '../components/ui/LoadingSpinner';
-import { BottomNav } from './HomePage';
+// BottomNav는 AppLayout에서 통합 처리됨
 import {
   Tab, TabList, TabListItem, Chip, Button,
   Box, FlexBox, Typography, TopNavigation, TopNavigationButton,
@@ -210,8 +210,6 @@ export default function SubscriptionPage() {
         </Box>
       </Box>
 
-      {/* 모바일 하단 내비게이션 */}
-      {isMobile && <BottomNav />}
     </div>
   );
 }

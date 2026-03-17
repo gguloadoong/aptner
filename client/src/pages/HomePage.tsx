@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useHotApartments } from '../hooks/useApartment';
 import { useSubscriptions } from '../hooks/useSubscription';
 import HeroApartmentCard from '../components/apartment/HeroApartmentCard';
@@ -14,8 +14,6 @@ import RankChange from '../components/apartment/RankChange';
 import { useBookmarkStore } from '../stores/bookmarkStore';
 import CompareBar from '../components/apartment/CompareBar';
 import {
-  BottomNavigation,
-  BottomNavigationItem,
   Button,
   TextButton,
   IconButton,
@@ -26,11 +24,6 @@ import {
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
 import {
-  IconHome,
-  IconHomeFill,
-  IconLocation,
-  IconLocationFill,
-  IconCalendar,
   IconChevronRight,
   IconSearch,
 } from '@wanteddev/wds-icon';
@@ -412,10 +405,7 @@ export default function HomePage() {
         </Box>
       </Box>
 
-      {/* 모바일 하단 내비게이션 */}
-      {isMobile && <BottomNav />}
-
-      {/* 단지 비교 바 */}
+      {/* 단지 비교 바 — AppLayout의 BottomNav 위에 렌더링되도록 z-index 주의 */}
       <CompareBar />
     </div>
   );
@@ -674,38 +664,5 @@ function HotApartmentEmpty() {
   );
 }
 
-// BottomNav — WDS BottomNavigation 적용 (모바일 전용)
-export function BottomNav() {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-
-  return (
-    <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30 }}>
-      <BottomNavigation
-        value={pathname}
-        onValueChange={(value) => navigate(value)}
-      >
-        <BottomNavigationItem
-          value="/"
-          label="홈"
-          icon={pathname === '/' ? <IconHomeFill /> : <IconHome />}
-        />
-        <BottomNavigationItem
-          value="/map"
-          label="지도"
-          icon={pathname === '/map' ? <IconLocationFill /> : <IconLocation />}
-        />
-        <BottomNavigationItem
-          value="/subscription"
-          label="청약"
-          icon={<IconCalendar />}
-        />
-        <BottomNavigationItem
-          value="/trend"
-          label="트렌드"
-          icon={<IconSearch />}
-        />
-      </BottomNavigation>
-    </div>
-  );
-}
+// BottomNav — AppLayout으로 이동됨. 하위 호환을 위해 re-export 유지
+export { default as BottomNav } from '../components/layout/BottomNav';

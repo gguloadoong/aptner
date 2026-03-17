@@ -11,7 +11,7 @@ import {
   Cell,
 } from 'recharts';
 import ApartmentCard from '../components/apartment/ApartmentCard';
-import { BottomNav } from './HomePage';
+// BottomNav는 AppLayout에서 통합 처리됨
 import { MOCK_WEEKLY_RANKING, MOCK_REGION_TRENDS, MOCK_SURGE_ALERTS } from '../mocks/trends.mock';
 import { formatPriceShort, formatChange } from '../utils/formatNumber';
 import { useHotApartments, useSupplyData } from '../hooks/useApartment';
@@ -321,8 +321,6 @@ export default function TrendPage() {
         </Box>
       </Box>
 
-      {/* 모바일 하단 내비게이션 */}
-      {isMobile && <BottomNav />}
     </div>
   );
 }

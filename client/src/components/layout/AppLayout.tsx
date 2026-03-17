@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import BomzipLogo from '../ui/BomzipLogo';
+import BottomNav from './BottomNav';
 import { FlexBox, Box, Typography, Divider } from '@wanteddev/wds';
 import { useIsPC } from '../../hooks/useBreakpoint';
 import {
@@ -11,6 +12,9 @@ import {
   IconSearch,
 } from '@wanteddev/wds-icon';
 import type { ReactNode } from 'react';
+
+// BottomNav 표시 대상 경로 (지도 페이지는 전체화면 레이아웃이므로 자체 처리)
+const BOTTOM_NAV_PATHS = ['/', '/map', '/subscription', '/trend'];
 
 // PC 사이드바 네비 아이템 정의
 const NAV_ITEMS = [
@@ -199,6 +203,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <Box sx={{ flex: 1, minWidth: 0 }}>
         {children}
       </Box>
+
+      {/* 모바일 하단 네비게이션 — 지도 페이지 제외한 BottomNav 대상 경로에서만 표시 */}
+      {!isPC && pathname !== '/map' && BOTTOM_NAV_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/')) && (
+        <BottomNav />
+      )}
     </FlexBox>
   );
 }
