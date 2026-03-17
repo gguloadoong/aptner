@@ -13,8 +13,9 @@ import {
 } from '@wanteddev/wds-icon';
 import type { ReactNode } from 'react';
 
-// BottomNav 표시 대상 경로 (지도 페이지는 전체화면 레이아웃이므로 자체 처리)
-const BOTTOM_NAV_PATHS = ['/', '/map', '/subscription', '/trend'];
+// BottomNav 표시 대상 경로 — 정확히 일치하는 경우만 표시
+// /subscription/:id 상세, /apartment/:id 상세 등 하위 경로는 제외
+const BOTTOM_NAV_PATHS = ['/', '/map', '/subscription', '/trend', '/search'];
 
 // PC 사이드바 네비 아이템 정의
 const NAV_ITEMS = [
@@ -204,8 +205,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {children}
       </Box>
 
-      {/* 모바일 하단 네비게이션 — 지도 페이지 제외한 BottomNav 대상 경로에서만 표시 */}
-      {!isPC && pathname !== '/map' && BOTTOM_NAV_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/')) && (
+      {/* 모바일 하단 네비게이션 — BOTTOM_NAV_PATHS와 정확히 일치하는 경로에서만 표시
+          /subscription/:id, /apartment/:id 등 상세 페이지는 제외 */}
+      {!isPC && BOTTOM_NAV_PATHS.includes(pathname) && (
         <BottomNav />
       )}
     </FlexBox>

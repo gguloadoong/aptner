@@ -4,11 +4,9 @@ import { useHotApartments } from '../hooks/useApartment';
 import { useSubscriptions } from '../hooks/useSubscription';
 import HeroApartmentCard from '../components/apartment/HeroApartmentCard';
 import UrgentSubscriptionCard from '../components/subscription/UrgentSubscriptionCard';
-import RegionChip from '../components/home/RegionChip';
 import SearchBar from '../components/ui/SearchBar';
 import BomzipLogo from '../components/ui/BomzipLogo';
 import { formatPriceShort, formatChange, calcDday } from '../utils/formatNumber';
-import { MOCK_REGION_TRENDS } from '../mocks/trends.mock';
 import HotTag from '../components/apartment/HotTag';
 import RankChange from '../components/apartment/RankChange';
 import { useBookmarkStore } from '../stores/bookmarkStore';
@@ -377,21 +375,32 @@ export default function HomePage() {
                   </TextButton>
                 </FlexBox>
 
-                {/* 가로 스크롤 pill 칩 */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '8px',
-                    overflowX: 'auto',
-                    scrollbarWidth: 'none',
-                    msOverflowStyle: 'none',
-                    flexWrap: isMobile ? undefined : 'wrap',
-                  } as React.CSSProperties}
+                {/* 지역 시세 — 실제 데이터 연동 전 skeleton UI 표시 */}
+                <Box
+                  sx={{
+                    padding: '20px 16px',
+                    textAlign: 'center',
+                    backgroundColor: 'var(--semantic-background-normal-normal)',
+                    borderRadius: '16px',
+                    border: '1px solid var(--semantic-line-normal)',
+                  }}
                 >
-                  {MOCK_REGION_TRENDS.map((trend) => (
-                    <RegionChip key={trend.region} trend={trend} />
-                  ))}
-                </div>
+                  <FlexBox flexDirection="column" gap="8px">
+                    {[1, 2, 3].map((i) => (
+                      <FlexBox key={i} alignItems="center" justifyContent="space-between" gap="12px">
+                        <Skeleton variant="text" width="60px" height="13px" />
+                        <Skeleton variant="text" width="80px" height="13px" />
+                        <Skeleton variant="text" width="48px" height="13px" />
+                      </FlexBox>
+                    ))}
+                    <Typography
+                      variant="caption2"
+                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '8px', display: 'block' }}
+                    >
+                      지역 시세 데이터 준비 중입니다
+                    </Typography>
+                  </FlexBox>
+                </Box>
               </Box>
 
               {/* 지도 바로가기 배너 (데스크탑에서만 우측 하단에 위치) */}

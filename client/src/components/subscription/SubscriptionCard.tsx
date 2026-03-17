@@ -18,8 +18,9 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
   };
 
   const dday = calcDday(subscription.deadline);
+  // D-day 당일 포함, D-3 이내를 긴급으로 처리
   const isDdayUrgent =
-    dday !== '마감' && dday !== 'D-day' && parseInt(dday.replace('D-', '')) <= 3;
+    dday !== '마감' && (dday === 'D-day' || parseInt(dday.replace('D-', '')) <= 3);
 
   const ddayColor = isDdayUrgent
     ? '#FF4B4B'
@@ -116,7 +117,7 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
             청약 마감
           </Typography>
           <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-            {subscription.deadline.slice(5).replace('-', '/')}
+            {subscription.deadline ? subscription.deadline.slice(5).replace('-', '/') : '일정 미정'}
           </Typography>
         </div>
       </div>

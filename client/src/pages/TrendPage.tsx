@@ -12,11 +12,11 @@ import {
 } from 'recharts';
 import ApartmentCard from '../components/apartment/ApartmentCard';
 // BottomNav는 AppLayout에서 통합 처리됨
-import { MOCK_WEEKLY_RANKING, MOCK_REGION_TRENDS, MOCK_SURGE_ALERTS } from '../mocks/trends.mock';
-import { formatPriceShort, formatChange } from '../utils/formatNumber';
+// MOCK_SURGE_ALERTS는 사용자 신뢰도 문제로 skeleton UI로 대체
+import { MOCK_WEEKLY_RANKING, MOCK_REGION_TRENDS } from '../mocks/trends.mock';
 import { useHotApartments, useSupplyData } from '../hooks/useApartment';
 import type { SupplyDataPoint } from '../services/apartment.service';
-import { Chip, Box, FlexBox, Typography, TopNavigation, TopNavigationButton } from '@wanteddev/wds';
+import { Chip, Box, FlexBox, Typography, TopNavigation, TopNavigationButton, Skeleton } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
 
@@ -204,12 +204,20 @@ export default function TrendPage() {
                   </BarChart>
                 </ResponsiveContainer>
 
-                {/* 지역 요약 카드 */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '16px' }}>
-                  {MOCK_REGION_TRENDS.map((trend) => (
-                    <RegionCard key={trend.region} trend={trend} />
-                  ))}
-                </div>
+                {/* 지역 요약 카드 — 실제 데이터 연동 전 준비 중 표시 */}
+                <Box
+                  sx={{
+                    marginTop: '16px',
+                    padding: '12px',
+                    backgroundColor: 'var(--semantic-background-normal-alternative)',
+                    borderRadius: '12px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
+                    지역별 시세 데이터 준비 중입니다
+                  </Typography>
+                </Box>
               </Box>
 
               {/* 입주 물량 예정 차트 */}
@@ -296,7 +304,7 @@ export default function TrendPage() {
                 </FlexBox>
               </Box>
 
-              {/* 거래량 급등 알림 */}
+              {/* 거래량 급등 알림 — 실제 데이터 연동 전 skeleton UI 표시 */}
               <Box
                 as="section"
                 sx={{
@@ -308,19 +316,34 @@ export default function TrendPage() {
                 }}
               >
                 <FlexBox alignItems="center" gap="8px" style={{ marginBottom: '16px' }}>
-                  <div style={{ width: '8px', height: '8px', backgroundColor: '#FF4B4B', borderRadius: '50%', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '8px', height: '8px', backgroundColor: 'var(--semantic-line-normal)', borderRadius: '50%' }} />
                   <Typography variant="body1" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
                     거래량 급등 단지
                   </Typography>
                 </FlexBox>
                 <FlexBox flexDirection="column" gap="12px">
-                  {MOCK_SURGE_ALERTS.map((alert) => (
-                    <SurgeAlertCard
-                      key={alert.id}
-                      alert={alert}
-                      onPress={() => navigate(`/apartment/${alert.apartmentId}`)}
-                    />
+                  {[1, 2, 3].map((i) => (
+                    <Box
+                      key={i}
+                      sx={{
+                        padding: '16px',
+                        backgroundColor: 'var(--semantic-background-normal-alternative)',
+                        borderRadius: '12px',
+                        border: '1px solid var(--semantic-line-normal)',
+                      }}
+                    >
+                      <FlexBox alignItems="center" justifyContent="space-between">
+                        <div style={{ flex: 1 }}>
+                          <Skeleton variant="text" width="60%" height="14px" />
+                          <Skeleton variant="text" width="40%" height="11px" style={{ marginTop: '6px' }} />
+                        </div>
+                        <Skeleton variant="rectangle" width="44px" height="24px" />
+                      </FlexBox>
+                    </Box>
                   ))}
+                  <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', textAlign: 'center', display: 'block', marginTop: '4px' }}>
+                    거래량 데이터 준비 중입니다
+                  </Typography>
                 </FlexBox>
               </Box>
             </FlexBox>
@@ -332,80 +355,4 @@ export default function TrendPage() {
   );
 }
 
-// 지역 요약 카드
-function RegionCard({ trend }: { trend: (typeof MOCK_REGION_TRENDS)[0] }) {
-  const isUp = trend.priceChange > 0;
-  const isDown = trend.priceChange < 0;
 
-  return (
-    <Box sx={{ backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '12px', padding: '12px' }}>
-      <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {trend.region}
-      </Typography>
-      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '4px' }}>
-        {formatPriceShort(trend.avgPrice)}
-      </Typography>
-      <Typography
-        variant="caption1"
-        weight="medium"
-        sx={{ color: isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
-      >
-        {isUp ? '▲' : isDown ? '▼' : ''} {formatChange(trend.priceChange)}
-      </Typography>
-      <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '4px' }}>
-        {trend.tradeVolume.toLocaleString()}건
-      </Typography>
-    </Box>
-  );
-}
-
-// 거래량 급등 카드
-function SurgeAlertCard({
-  alert,
-  onPress,
-}: {
-  alert: (typeof MOCK_SURGE_ALERTS)[0];
-  onPress: () => void;
-}) {
-  return (
-    <button
-      onClick={onPress}
-      style={{
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px',
-        backgroundColor: '#FFF5F5',
-        borderRadius: '12px',
-        border: '1px solid rgba(255,75,75,0.1)',
-        cursor: 'pointer',
-        transition: 'background-color 150ms',
-      }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFEBEB'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#FFF5F5'; }}
-    >
-      <div style={{ textAlign: 'left' }}>
-        <FlexBox alignItems="center" gap="8px">
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF4B4B', backgroundColor: 'rgba(255,75,75,0.1)', padding: '2px 8px', borderRadius: '9999px' }}>
-            급등
-          </span>
-          <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-            {alert.apartmentName}
-          </Typography>
-        </FlexBox>
-        <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '4px' }}>
-          {alert.district} · {alert.date}
-        </Typography>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <Typography variant="body1" weight="bold" sx={{ color: '#FF4B4B' }}>
-          +{alert.surgeRate.toFixed(0)}%
-        </Typography>
-        <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>
-          {alert.previousVolume}건 → {alert.currentVolume}건
-        </Typography>
-      </div>
-    </button>
-  );
-}

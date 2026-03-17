@@ -219,22 +219,34 @@ export default function SubscriptionDetailPage() {
                   </GridItem>
                   <GridItem columns={4}>
                     <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>가점</Typography>
-                    <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '2px' }}>{area.generalRatio}%</Typography>
+                    <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '2px' }}>
+                      {area.generalRatio != null ? `${area.generalRatio}%` : '정보 없음'}
+                    </Typography>
                   </GridItem>
                   <GridItem columns={4}>
                     <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>추첨</Typography>
-                    <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '2px' }}>{area.lotteryRatio}%</Typography>
+                    <Typography variant="caption1" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '2px' }}>
+                      {area.lotteryRatio != null ? `${area.lotteryRatio}%` : '정보 없음'}
+                    </Typography>
                   </GridItem>
                 </Grid>
 
-                {/* 가점/추첨 비율 바 */}
-                <div style={{ marginTop: '8px', height: '6px', backgroundColor: 'var(--semantic-line-normal)', borderRadius: '9999px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${area.generalRatio}%`, backgroundColor: 'var(--semantic-primary-normal)', borderRadius: '9999px' }} />
-                </div>
-                <FlexBox justifyContent="space-between" style={{ marginTop: '2px' }}>
-                  <Typography variant="caption2" sx={{ color: 'var(--semantic-primary-normal)' }}>가점 {area.generalRatio}%</Typography>
-                  <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)' }}>추첨 {area.lotteryRatio}%</Typography>
-                </FlexBox>
+                {/* 가점/추첨 비율 바 — 두 값이 모두 있을 때만 표시 */}
+                {area.generalRatio != null && area.lotteryRatio != null ? (
+                  <>
+                    <div style={{ marginTop: '8px', height: '6px', backgroundColor: 'var(--semantic-line-normal)', borderRadius: '9999px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${area.generalRatio}%`, backgroundColor: 'var(--semantic-primary-normal)', borderRadius: '9999px' }} />
+                    </div>
+                    <FlexBox justifyContent="space-between" style={{ marginTop: '2px' }}>
+                      <Typography variant="caption2" sx={{ color: 'var(--semantic-primary-normal)' }}>가점 {area.generalRatio}%</Typography>
+                      <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)' }}>추첨 {area.lotteryRatio}%</Typography>
+                    </FlexBox>
+                  </>
+                ) : (
+                  <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '8px' }}>
+                    가점/추첨 비율 정보 없음
+                  </Typography>
+                )}
               </Box>
             ))}
           </FlexBox>
