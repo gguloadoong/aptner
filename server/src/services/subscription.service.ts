@@ -743,6 +743,42 @@ export async function getSubscriptionById(id: string): Promise<SubscriptionDetai
     return cached;
   }
 
+  // 실 API 키 설정 시: 실 API 데이터에서 먼저 검색
+  // 목록(getSubscriptions)이 실 API 기반 ID를 반환하므로, 상세도 실 API에서 찾아야 합니다.
+  if (isRealLhApiKey()) {
+    try {
+      const [rawItems, houseTypeMap] = await Promise.all([
+        fetchRealSubscriptions(1, 100),
+        fetchHouseTypeDetails(1, 500),
+      ]);
+      const realList = rawItems.map((item) => adaptLhItem(item, houseTypeMap));
+      const realFound = realList.find((s) => s.id === id);
+      if (realFound) {
+        const detail: SubscriptionDetail = {
+          ...realFound,
+          schedule: {
+            specialStartDate: subtractDays(realFound.startDate, 2),
+            specialEndDate: subtractDays(realFound.startDate, 1),
+            firstPriorityDate: realFound.startDate,
+            secondPriorityDate: addDays(realFound.startDate, 1),
+            announceDate: realFound.announceDate,
+            contractStartDate: addDays(realFound.announceDate, 7),
+            contractEndDate: addDays(realFound.announceDate, 14),
+          },
+          specialSupply: Math.floor(realFound.totalSupply * 0.3),
+        };
+        cacheService.set(cacheKey, detail, CACHE_TTL.SUBSCRIPTION);
+        return detail;
+      }
+      // 실 API 목록에도 없으면 null 반환 (Mock fallback 없음 — ID 체계 혼용 방지)
+      console.warn(`[Subscription] 실 API 에서 ID "${id}" 없음 → null 반환`);
+      return null;
+    } catch (err) {
+      console.error('[Subscription] 실 API 상세 조회 실패 → Mock fallback:', err);
+    }
+  }
+
+  // 실 API 키 미설정 시: Mock 데이터에서 검색
   const list = buildSubscriptions();
   const found = list.find((s) => s.id === id);
 
