@@ -2619,10 +2619,14 @@ export async function getRecordHighApartments(
       });
     }
 
-    // priceChangeRate 내림차순 정렬
-    recordHighs.sort((a, b) => b.priceChangeRate - a.priceChangeRate);
+    // 데이터 품질 필터: 전달 대비 50% 초과 변동은 이상값(다른 층/조건 혼용)으로 제외
+    const filtered = recordHighs.filter((r) => r.priceChangeRate <= 50);
 
-    const result = recordHighs.slice(0, limit);
+    // 실거래가 내림차순 정렬 (신고가 = 높은 금액 우선)
+    filtered.sort((a, b) => b.recentPrice - a.recentPrice);
+    const recordHighsSorted = filtered.length > 0 ? filtered : recordHighs.sort((a, b) => b.recentPrice - a.recentPrice);
+
+    const result = recordHighsSorted.slice(0, limit);
 
     // 신고가 경신 단지가 없으면 Mock fallback
     if (result.length === 0) {
