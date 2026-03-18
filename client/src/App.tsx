@@ -20,6 +20,7 @@ const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ComparePage = lazy(() => import('./pages/ComparePage'));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage'));
 const HotRankingPage = lazy(() => import('./pages/HotRankingPage'));
+const SubscriptionCalendarPage = lazy(() => import('./pages/SubscriptionCalendarPage'));
 
 // React Query 클라이언트 설정
 const queryClient = new QueryClient({
@@ -82,6 +83,7 @@ function App() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/map" element={<MapPage />} />
                   <Route path="/subscription" element={<SubscriptionPage />} />
+                  <Route path="/subscription/calendar" element={<SubscriptionCalendarPage />} />
                   <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
                   <Route path="/apartment/:id" element={<ApartmentDetailPage />} />
                   <Route path="/trend" element={<TrendPage />} />
