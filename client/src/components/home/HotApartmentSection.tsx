@@ -234,7 +234,7 @@ export default function HotApartmentSection({ region }: HotApartmentSectionProps
             weight="medium"
             sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
           >
-            조회 · 거래량 기준 주간 랭킹
+            거래량 기준 · 수도권 아파트
           </Typography>
         </div>
         <TextButton size="small" color="primary" onClick={() => navigate('/hot')}>

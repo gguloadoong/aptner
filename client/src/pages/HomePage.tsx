@@ -12,11 +12,10 @@ import {
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
 import { IconSearch } from '@wanteddev/wds-icon';
-import QuickActionTabs from '../components/home/QuickActionTabs';
-import TodaySubscriptionBadge from '../components/home/TodaySubscriptionBadge';
 import HotApartmentSection from '../components/home/HotApartmentSection';
 import WeeklySubscriptionTimeline from '../components/home/WeeklySubscriptionTimeline';
 import RecordHighSection from '../components/home/RecordHighSection';
+import MarketSummaryBanner from '../components/home/MarketSummaryBanner';
 import { useSubscriptions } from '../hooks/useSubscription';
 import type { NewTradeItem } from '../stores/bookmarkStore';
 
@@ -155,20 +154,17 @@ export default function HomePage() {
               />
             )}
 
-            {/* 퀵 액션 탭 */}
-            <QuickActionTabs />
+            {/* 시장 요약 배너 */}
+            <MarketSummaryBanner />
 
-            {/* 오늘의 청약 배지 (D-7 이내) */}
-            <TodaySubscriptionBadge />
+            {/* 이달의 신고가 섹션 */}
+            <RecordHighSection />
 
-            {/* 주간 청약 타임라인 */}
+            {/* 주간 청약 타임라인 (오늘 청약 건수 Badge 통합) */}
             <WeeklySubscriptionTimeline
               subscriptions={allSubscriptions}
               isLoading={timelineLoading}
             />
-
-            {/* 이달의 신고가 섹션 */}
-            <RecordHighSection />
 
             {/* HOT 아파트 랭킹 */}
             <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>

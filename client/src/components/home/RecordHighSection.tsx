@@ -141,10 +141,10 @@ function RecordHighSkeleton() {
   );
 }
 
-// 데이터 시점 캡션 — 현재 월 기준
+// 섹션 타이틀 — 현재 월 기준 동적 표시
 function getDataCaption(): string {
   const now = new Date();
-  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 기준`;
+  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 신고가`;
 }
 
 export default function RecordHighSection() {
@@ -159,19 +159,21 @@ export default function RecordHighSection() {
     <Box as="section" sx={{ padding: '0 16px' }}>
       {/* 섹션 헤더 */}
       <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
-        <Typography
-          variant="title3"
-          weight="bold"
-          sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
-        >
-          이달의 신고가
-        </Typography>
-        <Typography
-          variant="caption2"
-          sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}
-        >
-          {getDataCaption()}
-        </Typography>
+        <div>
+          <Typography
+            variant="title3"
+            weight="bold"
+            sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
+          >
+            {getDataCaption()}
+          </Typography>
+          <Typography
+            variant="caption1"
+            sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
+          >
+            국토부 실거래가 기준 · 2~3주 지연
+          </Typography>
+        </div>
       </FlexBox>
 
       {isLoading ? (

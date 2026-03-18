@@ -65,6 +65,7 @@ router.get('/health', (_req: Request, res: Response) => {
         'GET /api/subscriptions?status=upcoming',
         'GET /api/subscriptions?status=closed',
         'GET /api/subscriptions/:id',
+        'GET /api/trends/summary',
         'GET /api/trends/region?regionCode=11',
         'GET /api/apartments/map-prices?lawdCd=11200&year=2025&month=2',
         'GET /api/regions/lawdCd?lat=37.56&lng=126.97',

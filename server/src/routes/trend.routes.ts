@@ -5,7 +5,7 @@
 // GET /api/regions/:siDoCd/sigungu
 // ============================================================
 import { Router, Request, Response, NextFunction } from 'express';
-import { getRegionTrend } from '../services/trend.service';
+import { getRegionTrend, getMarketSummary } from '../services/trend.service';
 import { cacheService, CACHE_TTL } from '../services/cache.service';
 import { SiDo, SiGunGu, TrendQueryParams, HotTradeApartment } from '../types';
 import { getHotTradeApartments } from '../services/hot-trade.service';
@@ -94,6 +94,23 @@ const SI_GUN_GU_LIST: SiGunGu[] = [
   { code: '28245', name: '계양구', siDoCode: '28' },
   { code: '28260', name: '서구', siDoCode: '28' },
 ];
+
+/**
+ * GET /api/trends/summary
+ * 전국(주요 시도) 시장 요약 조회
+ * - 전국 평균 거래가, 전월 대비 변동률, 이번 달 거래량
+ * - 실 API 키 없으면 Mock fallback 반환
+ * - 캐시 TTL: 6시간
+ */
+router.get('/summary', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await getMarketSummary();
+    res.set('Cache-Control', 'public, max-age=21600');
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * GET /api/trends/hot-trades

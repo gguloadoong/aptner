@@ -33,9 +33,12 @@ function parseDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
-// Date → 'YYYY-MM-DD' 키 문자열
+// Date → 'YYYY-MM-DD' 키 문자열 (KST 로컬 기준, toISOString() UTC 변환 금지)
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export default function WeeklySubscriptionTimeline({
@@ -82,16 +85,40 @@ export default function WeeklySubscriptionTimeline({
     );
   }
 
+  // 오늘 날짜 키 기준 청약 건수 계산
+  const todayKey = dateKey(today);
+  const todaySubCount = subsByDate.get(todayKey)?.length ?? 0;
+
   return (
     <Box as="section" sx={{ padding: '0 16px' }}>
       {/* 섹션 헤더 */}
-      <Typography
-        variant="caption1"
-        weight="bold"
-        sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginBottom: '8px', letterSpacing: '0.02em' }}
-      >
-        이번 주 청약 일정
-      </Typography>
+      <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '8px' }}>
+        <Typography
+          variant="caption1"
+          weight="bold"
+          sx={{ color: 'var(--semantic-label-assistive)', letterSpacing: '0.02em' }}
+        >
+          이번 주 청약 일정
+        </Typography>
+        {todaySubCount > 0 && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              backgroundColor: 'var(--semantic-primary-normal)',
+              color: 'white',
+              fontSize: '11px',
+              fontWeight: 700,
+              lineHeight: 1.5,
+              flexShrink: 0,
+            }}
+          >
+            오늘 {todaySubCount}건
+          </span>
+        )}
+      </FlexBox>
 
       {/* 타임라인 가로 스크롤 */}
       <Box
