@@ -4,6 +4,7 @@ import {
   getApartmentHistory,
   getApartmentsByBounds,
   getHotApartments,
+  getHotApartmentRanking,
   searchApartments,
   getSupplyData,
 } from '../services/apartment.service';
@@ -75,5 +76,14 @@ export function useSupplyData(region = '전국', months = 12) {
     queryKey: ['supply', region, months],
     queryFn: () => getSupplyData(region, months),
     staleTime: 60 * 60 * 1000, // 1시간
+  });
+}
+
+// HOT 아파트 랭킹 조회 훅 (HotApartment[] 반환 — HotApartmentSection 전용)
+export function useHotRanking(region?: string, limit = 3) {
+  return useQuery({
+    queryKey: ['apartments', 'hotRanking', region, limit],
+    queryFn: () => getHotApartmentRanking(region, limit),
+    staleTime: 5 * 60 * 1000,
   });
 }

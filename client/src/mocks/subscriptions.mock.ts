@@ -7,37 +7,44 @@ function daysFromNow(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// endDate 기준 D-day 숫자 계산 (오늘 = 0, 미래 = 양수, 과거 = 음수)
+function calcDayDiff(endDate: string): number {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  return Math.round((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+}
+
 // 날짜 기반 status 동적 계산
-function calcStatus(startDate: string, deadline: string): SubscriptionStatus {
+function calcStatus(startDate: string, endDate: string): SubscriptionStatus {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const start = new Date(startDate);
-  const end = new Date(deadline);
+  const end = new Date(endDate);
   if (now < start) return 'upcoming';
   if (now > end) return 'closed';
   return 'ongoing';
 }
 
-// 청약 Mock 데이터
+// 청약 Mock 데이터 (CRIT-01: BE 확정 타입 기준)
 // 날짜는 daysFromNow()로 동적 생성하여 항상 현재 기준 상대값을 유지합니다.
-// ongoing:  startDate 과거, deadline 미래
+// ongoing:  startDate 과거, endDate 미래
 // upcoming: startDate 미래
-// closed:   deadline 과거
+// closed:   endDate 과거
 
 function buildMockSubscriptions(): Subscription[] {
-  const items: Omit<Subscription, 'status'>[] = [
+  const items: Omit<Subscription, 'status' | 'dDay'>[] = [
     // ---- ongoing 3개 ----
     {
       id: 'sub-001',
       name: '힐스테이트 동탄 2차',
       location: '경기도 화성시 동탄2신도시',
-      district: '화성시',
-      startPrice: 42000,
-      maxPrice: 65000,
-      deadline: daysFromNow(4),
       startDate: daysFromNow(-2),
-      supplyUnits: 1240,
-      type: 'general',
+      endDate: daysFromNow(4),
+      totalUnits: 1240,
+      supplyPrice: 42000,
+      district: '화성시',
       areas: [
         { area: '59', price: 42000, units: 400, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 58000, units: 600, generalRatio: 75, lotteryRatio: 25 },
@@ -50,13 +57,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-002',
       name: '래미안 원베일리 2단지',
       location: '서울특별시 서초구 반포동',
-      district: '서초구',
-      startPrice: 180000,
-      maxPrice: 280000,
-      deadline: daysFromNow(6),
       startDate: daysFromNow(-3),
-      supplyUnits: 386,
-      type: 'general',
+      endDate: daysFromNow(6),
+      totalUnits: 386,
+      supplyPrice: 180000,
+      district: '서초구',
       areas: [
         { area: '59', price: 180000, units: 100, generalRatio: 100, lotteryRatio: 0 },
         { area: '84', price: 240000, units: 200, generalRatio: 100, lotteryRatio: 0 },
@@ -69,13 +74,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-003',
       name: '검단 푸르지오 더파크',
       location: '인천광역시 서구 검단신도시',
-      district: '서구',
-      startPrice: 35000,
-      maxPrice: 52000,
-      deadline: daysFromNow(2),
       startDate: daysFromNow(-5),
-      supplyUnits: 880,
-      type: 'general',
+      endDate: daysFromNow(2),
+      totalUnits: 880,
+      supplyPrice: 35000,
+      district: '서구',
       areas: [
         { area: '59', price: 35000, units: 300, generalRatio: 40, lotteryRatio: 60 },
         { area: '74', price: 44000, units: 380, generalRatio: 75, lotteryRatio: 25 },
@@ -89,13 +92,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-004',
       name: 'e편한세상 광명 어반센트로',
       location: '경기도 광명시 광명동',
-      district: '광명시',
-      startPrice: 55000,
-      maxPrice: 80000,
-      deadline: daysFromNow(20),
       startDate: daysFromNow(18),
-      supplyUnits: 542,
-      type: 'general',
+      endDate: daysFromNow(20),
+      totalUnits: 542,
+      supplyPrice: 55000,
+      district: '광명시',
       areas: [
         { area: '59', price: 55000, units: 180, generalRatio: 75, lotteryRatio: 25 },
         { area: '84', price: 72000, units: 280, generalRatio: 75, lotteryRatio: 25 },
@@ -108,13 +109,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-005',
       name: '위례 자이 더시티',
       location: '경기도 하남시 학암동',
-      district: '하남시',
-      startPrice: 65000,
-      maxPrice: 95000,
-      deadline: daysFromNow(25),
       startDate: daysFromNow(22),
-      supplyUnits: 784,
-      type: 'general',
+      endDate: daysFromNow(25),
+      totalUnits: 784,
+      supplyPrice: 65000,
+      district: '하남시',
       areas: [
         { area: '59', price: 65000, units: 250, generalRatio: 75, lotteryRatio: 25 },
         { area: '84', price: 85000, units: 400, generalRatio: 75, lotteryRatio: 25 },
@@ -127,13 +126,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-006',
       name: '과천 르센토 데시앙',
       location: '경기도 과천시 주암동',
-      district: '과천시',
-      startPrice: 88000,
-      maxPrice: 135000,
-      deadline: daysFromNow(30),
       startDate: daysFromNow(28),
-      supplyUnits: 612,
-      type: 'special',
+      endDate: daysFromNow(30),
+      totalUnits: 612,
+      supplyPrice: 88000,
+      district: '과천시',
       areas: [
         { area: '59', price: 88000, units: 200, generalRatio: 0, lotteryRatio: 100 },
         { area: '84', price: 115000, units: 300, generalRatio: 75, lotteryRatio: 25 },
@@ -146,13 +143,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-007',
       name: '송도 랜드마크시티 센트럴 더샵',
       location: '인천광역시 연수구 송도동',
-      district: '연수구',
-      startPrice: 48000,
-      maxPrice: 72000,
-      deadline: daysFromNow(37),
       startDate: daysFromNow(35),
-      supplyUnits: 1058,
-      type: 'general',
+      endDate: daysFromNow(37),
+      totalUnits: 1058,
+      supplyPrice: 48000,
+      district: '연수구',
       areas: [
         { area: '59', price: 48000, units: 350, generalRatio: 40, lotteryRatio: 60 },
         { area: '74', price: 62000, units: 450, generalRatio: 75, lotteryRatio: 25 },
@@ -166,13 +161,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-008',
       name: '힐스테이트 대구 더퍼스트',
       location: '대구광역시 수성구 황금동',
-      district: '수성구',
-      startPrice: 45000,
-      maxPrice: 68000,
-      deadline: daysFromNow(-15),
       startDate: daysFromNow(-19),
-      supplyUnits: 432,
-      type: 'general',
+      endDate: daysFromNow(-15),
+      totalUnits: 432,
+      supplyPrice: 45000,
+      district: '수성구',
       areas: [
         { area: '59', price: 45000, units: 150, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 62000, units: 200, generalRatio: 75, lotteryRatio: 25 },
@@ -185,13 +178,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-009',
       name: '롯데캐슬 부산 센트럴파크',
       location: '부산광역시 동구 범일동',
-      district: '동구',
-      startPrice: 38000,
-      maxPrice: 58000,
-      deadline: daysFromNow(-25),
       startDate: daysFromNow(-28),
-      supplyUnits: 680,
-      type: 'general',
+      endDate: daysFromNow(-25),
+      totalUnits: 680,
+      supplyPrice: 38000,
+      district: '동구',
       areas: [
         { area: '59', price: 38000, units: 250, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 52000, units: 350, generalRatio: 75, lotteryRatio: 25 },
@@ -204,13 +195,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'sub-010',
       name: '동탄역 롯데캐슬 나노시티',
       location: '경기도 화성시 영통구 이의동',
-      district: '화성시',
-      startPrice: 52000,
-      maxPrice: 78000,
-      deadline: daysFromNow(-35),
       startDate: daysFromNow(-38),
-      supplyUnits: 924,
-      type: 'general',
+      endDate: daysFromNow(-35),
+      totalUnits: 924,
+      supplyPrice: 52000,
+      district: '화성시',
       areas: [
         { area: '59', price: 52000, units: 300, generalRatio: 40, lotteryRatio: 60 },
         { area: '74', price: 65000, units: 400, generalRatio: 75, lotteryRatio: 25 },
@@ -224,13 +213,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'SUB009',
       name: '동탄2 아이파크 더레이크',
       location: '경기 화성시 동탄',
-      district: '화성시',
-      startPrice: 38000,
-      maxPrice: 85000,
-      deadline: daysFromNow(8),
       startDate: daysFromNow(-5),
-      supplyUnits: 1284,
-      type: 'general',
+      endDate: daysFromNow(8),
+      totalUnits: 1284,
+      supplyPrice: 38000,
+      district: '화성시',
       areas: [
         { area: '59', price: 38000, units: 312, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 55000, units: 742, generalRatio: 75, lotteryRatio: 25 },
@@ -243,13 +230,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'SUB010',
       name: '과천 푸르지오 어울림 라비엔오',
       location: '경기 과천시',
-      district: '과천시',
-      startPrice: 72000,
-      maxPrice: 118000,
-      deadline: daysFromNow(4),
       startDate: daysFromNow(-3),
-      supplyUnits: 429,
-      type: 'general',
+      endDate: daysFromNow(4),
+      totalUnits: 429,
+      supplyPrice: 72000,
+      district: '과천시',
       areas: [
         { area: '59', price: 72000, units: 180, generalRatio: 75, lotteryRatio: 25 },
         { area: '84', price: 95000, units: 249, generalRatio: 75, lotteryRatio: 25 },
@@ -262,13 +247,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'SUB011',
       name: '부산 북항 르엘',
       location: '부산 동구 범일동',
-      district: '동구',
-      startPrice: 52000,
-      maxPrice: 128000,
-      deadline: daysFromNow(22),
       startDate: daysFromNow(18),
-      supplyUnits: 1096,
-      type: 'general',
+      endDate: daysFromNow(22),
+      totalUnits: 1096,
+      supplyPrice: 52000,
+      district: '동구',
       areas: [
         { area: '59', price: 52000, units: 420, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 78000, units: 546, generalRatio: 75, lotteryRatio: 25 },
@@ -281,13 +264,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'SUB012',
       name: '세종 6-3생활권 힐스테이트',
       location: '세종특별자치시 어진동',
-      district: '세종시',
-      startPrice: 29000,
-      maxPrice: 72000,
-      deadline: daysFromNow(29),
       startDate: daysFromNow(25),
-      supplyUnits: 842,
-      type: 'general',
+      endDate: daysFromNow(29),
+      totalUnits: 842,
+      supplyPrice: 29000,
+      district: '세종시',
       areas: [
         { area: '59', price: 29000, units: 310, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 42000, units: 420, generalRatio: 75, lotteryRatio: 25 },
@@ -301,13 +282,11 @@ function buildMockSubscriptions(): Subscription[] {
       id: 'SUB013',
       name: '안산 그랑시티자이 2차',
       location: '경기 안산시 단원구',
-      district: '안산시',
-      startPrice: 32000,
-      maxPrice: 78000,
-      deadline: daysFromNow(-45),
       startDate: daysFromNow(-60),
-      supplyUnits: 2037,
-      type: 'general',
+      endDate: daysFromNow(-45),
+      totalUnits: 2037,
+      supplyPrice: 32000,
+      district: '안산시',
       areas: [
         { area: '59', price: 32000, units: 820, generalRatio: 40, lotteryRatio: 60 },
         { area: '84', price: 48000, units: 1017, generalRatio: 75, lotteryRatio: 25 },
@@ -320,7 +299,8 @@ function buildMockSubscriptions(): Subscription[] {
 
   return items.map((item) => ({
     ...item,
-    status: calcStatus(item.startDate, item.deadline),
+    status: calcStatus(item.startDate, item.endDate),
+    dDay: calcDayDiff(item.endDate),
   }));
 }
 

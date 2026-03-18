@@ -19,6 +19,7 @@ const TrendPage = lazy(() => import('./pages/TrendPage'));
 const SearchPage = lazy(() => import('./pages/SearchPage'));
 const ComparePage = lazy(() => import('./pages/ComparePage'));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage'));
+const HotRankingPage = lazy(() => import('./pages/HotRankingPage'));
 
 // React Query 클라이언트 설정
 const queryClient = new QueryClient({
@@ -87,6 +88,7 @@ function App() {
                   <Route path="/search" element={<SearchPage />} />
                   <Route path="/compare" element={<ComparePage />} />
                   <Route path="/bookmarks" element={<BookmarksPage />} />
+                  <Route path="/hot" element={<HotRankingPage />} />
                   {/* 404 처리 */}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

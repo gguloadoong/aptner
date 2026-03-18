@@ -22,6 +22,15 @@ function TrendIcon() {
   );
 }
 
+// 핫 랭킹 아이콘 (불꽃 모양 인라인 SVG)
+function HotIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2C8 6 6 10 8 14c-2-1-3-3-3-5C3 14 5 20 12 22c7-2 9-8 7-13-1 2-3 3-5 2 2-2 2-6-2-9z" />
+    </svg>
+  );
+}
+
 export default function BottomNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -51,6 +60,11 @@ export default function BottomNav() {
           value="/trend"
           label="트렌드"
           icon={<TrendIcon />}
+        />
+        <BottomNavigationItem
+          value="/hot"
+          label="핫"
+          icon={<HotIcon />}
         />
       </BottomNavigation>
     </div>

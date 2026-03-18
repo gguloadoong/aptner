@@ -36,7 +36,7 @@ export const useBookmarkStore = create<BookmarkStore>()(
           if (!str) return null;
           const parsed = JSON.parse(str);
           // Array로 저장된 bookmarks를 Set으로 복원
-          parsed.state.bookmarks = new Set(parsed.state.bookmarks);
+          parsed.state.bookmarks = new Set(parsed.state.bookmarks ?? []);
           return parsed;
         },
         setItem: (name, value) => {

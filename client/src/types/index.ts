@@ -29,7 +29,7 @@ export interface Apartment {
 export interface TradeHistory {
   id: string;
   apartmentId: string;
-  date: string; // YYYY-MM
+  dealDate: string; // YYYY-MM (MAJOR-07: BE dealDate 필드명 통일)
   floor: number;
   area: string; // 면적 (예: '84')
   price: number; // 만원
@@ -42,31 +42,33 @@ export interface SubscriptionSchedule {
   contractEndDate?: string;   // 계약 종료일 (YYYY-MM-DD)
 }
 
-// 청약 정보
+// 청약 정보 (BE 확정 타입 — CRIT-01)
 export interface Subscription {
   id: string;
-  name: string;
-  location: string;
-  district: string;
-  startPrice: number; // 최저 분양가 (만원)
-  maxPrice: number; // 최고 분양가 (만원)
-  deadline: string; // YYYY-MM-DD
-  startDate: string; // 청약 시작일
+  name: string;           // 단지명
+  location: string;       // 공급 지역
   status: 'ongoing' | 'upcoming' | 'closed';
-  supplyUnits: number; // 공급 세대수
-  type: 'general' | 'special'; // 일반/특별
+  startDate: string;      // ISO 8601
+  endDate: string;        // ISO 8601
+  dDay: number;           // 음수면 마감
+  totalUnits: number;
+  supplyPrice?: number;   // 분양가 (만원), optional
+  // FE 내부 확장 필드 (어댑터 레이어에서 채워짐)
+  district?: string;
   areas: SubscriptionArea[];
   schedule?: SubscriptionSchedule; // BE 제공 일정 정보
+  address?: string;   // 상세 주소 (Kakao Geocoder 입력용)
   lat?: number;
   lng?: number;
 }
 
 export interface SubscriptionArea {
-  area: string;
-  price: number; // 만원
-  units: number;
-  generalRatio: number; // 가점 비율 (%)
-  lotteryRatio: number; // 추첨 비율 (%)
+  typeName?: string;  // 평형 이름 (예: 59A)
+  area: string;       // 전용 면적 문자열 (m²)
+  units: number;      // 공급 세대수
+  price: number;      // 분양가 (만원)
+  generalRatio?: number;
+  lotteryRatio?: number;
 }
 
 // 지역별 트렌드
@@ -118,6 +120,28 @@ declare global {
   }
 }
 
+// 카카오 Places 검색 결과 단건 타입
+export interface KakaoPlaceResult {
+  place_name: string;   // 장소명
+  x: string;           // 경도 (lng)
+  y: string;           // 위도 (lat)
+  address_name: string; // 지번 주소
+  road_address_name: string; // 도로명 주소
+  id: string;
+}
+
+// 카카오 Places 검색 서비스 인터페이스
+export interface KakaoPlacesService {
+  categorySearch: (
+    code: string,
+    callback: (result: KakaoPlaceResult[], status: string) => void,
+    options: {
+      bounds?: unknown;
+      size?: number;
+    }
+  ) => void;
+}
+
 export interface KakaoMaps {
   maps: {
     load: (callback: () => void) => void;
@@ -128,7 +152,19 @@ export interface KakaoMaps {
     Circle: new (options: object) => KakaoCircle;
     event: {
       addListener: (target: object, type: string, handler: () => void) => void;
+      removeListener: (target: object, type: string, handler: () => void) => void;
     };
+    // Places 검색 서비스 (AT4: 아파트 카테고리)
+    services: {
+      Places: new () => KakaoPlacesService;
+      Status: {
+        OK: string;
+        ZERO_RESULT: string;
+        ERROR: string;
+      };
+    };
+    // 현재 지도 뷰포트 bounds 조회용 (SW, NE 좌표로 bounds 생성 또는 빈 인스턴스)
+    LatLngBounds: new (sw?: KakaoLatLng, ne?: KakaoLatLng) => unknown;
   };
 }
 
@@ -159,6 +195,30 @@ export interface KakaoBounds {
 export interface KakaoCustomOverlay {
   setMap: (map: KakaoMap | null) => void;
   getPosition: () => KakaoLatLng;
+}
+
+// 핫 아파트 랭킹 타입 (BE /api/apartments/hot 응답 — P1 HotRankingPage)
+export interface HotApartment {
+  rank: number;
+  rankChange: number | null; // 양수=상승, 음수=하락, 0=유지, null=신규
+  aptCode: string;
+  name: string;
+  location: string;
+  recentPrice: number;       // 원 단위
+  tradeCount: number;
+  tradeSurgeRate: number;    // % (정수, e.g. 340)
+}
+
+// 신고가 경신 단지 타입 (홈 v2 RecordHighSection)
+export interface RecordHighApartment {
+  aptName: string;
+  location: string;
+  area: number;
+  recentPrice: number;      // 만원
+  previousPrice: number;    // 만원
+  priceChangeRate: number;  // %
+  dealDate: string;         // "YYYY-MM"
+  lawdCd: string;
 }
 
 // API 응답 공통 타입

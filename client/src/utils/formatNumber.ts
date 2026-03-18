@@ -32,6 +32,7 @@ export function formatPriceShort(manwon: number): string {
 
 // 변동률 포맷 (예: 3.2 -> "+3.2%", -1.5 -> "-1.5%")
 export function formatChange(rate: number): string {
+  if (!isFinite(rate) || isNaN(rate)) return '0%';
   if (rate > 0) return `+${rate.toFixed(1)}%`;
   if (rate < 0) return `${rate.toFixed(1)}%`;
   return '0%';

@@ -1,12 +1,19 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Subscription } from '../../types';
-import { formatPrice, calcDday } from '../../utils/formatNumber';
+import { formatPrice } from '../../utils/formatNumber';
 import { Box, FlexBox, Typography } from '@wanteddev/wds';
 import SubscriptionBadge from './SubscriptionBadge';
 
 interface SubscriptionCardProps {
   subscription: Subscription;
+}
+
+// dDay 숫자 → 표시 문자열 변환 (CRIT-01)
+function formatDday(dDay: number): string {
+  if (dDay < 0) return '마감';
+  if (dDay === 0) return '오늘 마감';
+  return `D-${dDay}`;
 }
 
 // 청약 카드 컴포넌트
@@ -17,10 +24,10 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
     navigate(`/subscription/${subscription.id}`);
   };
 
-  const dday = calcDday(subscription.deadline);
-  // D-day 당일 포함, D-3 이내를 긴급으로 처리
+  const ddayText = formatDday(subscription.dDay);
+  // D-day 당일(0) 포함, D-3 이내를 긴급으로 처리
   const isDdayUrgent =
-    dday !== '마감' && (dday === 'D-day' || parseInt(dday.replace('D-', '')) <= 3);
+    subscription.status !== 'closed' && subscription.dDay >= 0 && subscription.dDay <= 3;
 
   const ddayColor = isDdayUrgent
     ? '#FF4B4B'
@@ -56,16 +63,9 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
     >
       {/* 헤더: 상태 뱃지 + D-day */}
       <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '12px' }}>
-        <FlexBox alignItems="center" gap="8px">
-          <SubscriptionBadge status={subscription.status} />
-          {subscription.type === 'special' && (
-            <span style={{ fontSize: '12px', padding: '2px 8px', backgroundColor: '#F3E5F5', color: '#7B1FA2', fontWeight: 600, borderRadius: '9999px' }}>
-              특별
-            </span>
-          )}
-        </FlexBox>
+        <SubscriptionBadge status={subscription.status} />
         <Typography variant="body2" weight="bold" sx={{ color: ddayColor }}>
-          {dday}
+          {ddayText}
         </Typography>
       </FlexBox>
 
@@ -98,10 +98,10 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
       >
         <div>
           <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginBottom: '2px' }}>
-            최저 분양가
+            분양가
           </Typography>
           <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-            {subscription.startPrice ? formatPrice(subscription.startPrice) : '분양가 미정'}
+            {subscription.supplyPrice != null ? formatPrice(subscription.supplyPrice) : '미정'}
           </Typography>
         </div>
         <div>
@@ -109,7 +109,7 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
             공급세대
           </Typography>
           <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-            {subscription.supplyUnits ? subscription.supplyUnits.toLocaleString() : '--'}세대
+            {subscription.totalUnits ? subscription.totalUnits.toLocaleString() : '--'}세대
           </Typography>
         </div>
         <div>
@@ -117,7 +117,7 @@ const SubscriptionCard = React.memo<SubscriptionCardProps>(({ subscription }) =>
             청약 마감
           </Typography>
           <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-            {subscription.deadline ? subscription.deadline.slice(5).replace('-', '/') : '일정 미정'}
+            {subscription.endDate ? subscription.endDate.slice(5).replace('-', '/') : '일정 미정'}
           </Typography>
         </div>
       </div>

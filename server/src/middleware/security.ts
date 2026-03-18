@@ -34,7 +34,14 @@ export function corsMiddleware(): RequestHandler {
 
   return cors({
     origin: (origin, callback) => {
-      // origin이 없는 경우: 서버 간 요청(헬스체크, Railway 내부 등) 허용
+      // origin === null: 파일 프로토콜(file://) 또는 sandboxed iframe — 명시적 차단
+      if (origin === 'null') {
+        console.warn('[Security] CORS 차단: null origin (file:// 또는 sandboxed iframe)');
+        callback(new Error('CORS: null origin은 허용되지 않습니다.'));
+        return;
+      }
+
+      // origin이 undefined인 경우: 서버 간 요청(헬스체크, Railway 내부 등) 허용
       if (!origin) {
         callback(null, true);
         return;
@@ -78,7 +85,7 @@ export function corsMiddleware(): RequestHandler {
  */
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15분
-  max: 100,
+  max: process.env.NODE_ENV === 'production' ? 300 : 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -106,7 +113,7 @@ export const globalRateLimiter = rateLimit({
  */
 export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1분
-  max: 20,
+  max: process.env.NODE_ENV === 'production' ? 60 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {

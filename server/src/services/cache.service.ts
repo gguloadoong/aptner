@@ -13,6 +13,8 @@ export const CACHE_TTL = {
   REGION: 60 * 60 * 24,
   /** 트렌드: 30분 */
   TREND: 60 * 30,
+  /** 지도 마커용 거래가 요약: 1시간 */
+  MAP_PRICES: 60 * 60,
 } as const;
 
 class CacheService {

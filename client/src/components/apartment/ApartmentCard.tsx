@@ -245,7 +245,7 @@ function RankChangeBadge({ change }: { change: number | 'new' }) {
     return <span style={{ fontSize: '10px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
   }
   if (change < 0) {
-    return <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change as number)}</span>;
+    return <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
   }
   return <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--semantic-label-assistive)' }}>-</span>;
 }

@@ -3,7 +3,7 @@ import { useSubscriptionDetail } from '../hooks/useSubscription';
 import SubscriptionBadge from '../components/subscription/SubscriptionBadge';
 import { Loading, Box, FlexBox, Typography, Grid, GridItem, TopNavigation, TopNavigationButton } from '@wanteddev/wds';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
-import { formatPrice, calcDday, formatArea } from '../utils/formatNumber';
+import { formatPrice, formatArea } from '../utils/formatNumber';
 import type { SubscriptionSchedule } from '../types';
 
 // 청약 상세 페이지
@@ -37,9 +37,13 @@ export default function SubscriptionDetailPage() {
     );
   }
 
-  const dday = calcDday(subscription.deadline);
+  // dDay 숫자 → 표시 문자열 (CRIT-01)
+  const ddayText =
+    subscription.dDay < 0 ? '마감' :
+    subscription.dDay === 0 ? '오늘 마감' :
+    `D-${subscription.dDay}`;
   const isDdayUrgent =
-    dday !== '마감' && (dday === 'D-day' || parseInt(dday.replace('D-', '')) <= 3);
+    subscription.status !== 'closed' && subscription.dDay >= 0 && subscription.dDay <= 3;
 
   const ddayColor = isDdayUrgent
     ? '#FF4B4B'
@@ -77,16 +81,9 @@ export default function SubscriptionDetailPage() {
           }}
         >
           <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '12px' }}>
-            <FlexBox alignItems="center" gap="8px">
-              <SubscriptionBadge status={subscription.status} />
-              {subscription.type === 'special' && (
-                <span style={{ fontSize: '12px', padding: '2px 8px', backgroundColor: '#F3E5F5', color: '#7B1FA2', fontWeight: 600, borderRadius: '9999px' }}>
-                  특별공급
-                </span>
-              )}
-            </FlexBox>
+            <SubscriptionBadge status={subscription.status} />
             <Typography variant="heading2" weight="bold" sx={{ color: ddayColor }}>
-              {dday}
+              {ddayText}
             </Typography>
           </FlexBox>
 
@@ -129,20 +126,20 @@ export default function SubscriptionDetailPage() {
             <GridItem columns={6}>
               <Box sx={{ backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '12px', padding: '16px' }}>
                 <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginBottom: '4px' }}>
-                  최저 분양가
+                  분양가
                 </Typography>
                 <Typography variant="heading2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-                  {formatPrice(subscription.startPrice)}
+                  {subscription.supplyPrice != null ? formatPrice(subscription.supplyPrice) : '미정'}
                 </Typography>
               </Box>
             </GridItem>
             <GridItem columns={6}>
               <Box sx={{ backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '12px', padding: '16px' }}>
                 <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginBottom: '4px' }}>
-                  최고 분양가
+                  공급세대
                 </Typography>
                 <Typography variant="heading2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
-                  {formatPrice(subscription.maxPrice)}
+                  {subscription.totalUnits.toLocaleString()}세대
                 </Typography>
               </Box>
             </GridItem>
@@ -162,7 +159,7 @@ export default function SubscriptionDetailPage() {
           </Typography>
           <SubscriptionTimeline
             startDate={subscription.startDate}
-            deadline={subscription.deadline}
+            endDate={subscription.endDate}
             schedule={subscription.schedule}
           />
         </Box>
@@ -196,7 +193,7 @@ export default function SubscriptionDetailPage() {
           <FlexBox flexDirection="column" gap="12px">
             {subscription.areas.map((area) => (
               <Box
-                key={area.area}
+                key={area.typeName ?? area.area}
                 sx={{
                   border: '1px solid var(--semantic-line-normal)',
                   borderRadius: '12px',
@@ -268,7 +265,7 @@ export default function SubscriptionDetailPage() {
               <Box sx={{ backgroundColor: 'var(--semantic-background-normal-alternative)', borderRadius: '12px', padding: '12px' }}>
                 <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}>총 공급세대</Typography>
                 <Typography variant="heading2" weight="bold" sx={{ color: 'var(--semantic-label-normal)', display: 'block', marginTop: '4px' }}>
-                  {subscription.supplyUnits.toLocaleString()}세대
+                  {subscription.totalUnits.toLocaleString()}세대
                 </Typography>
               </Box>
             </GridItem>
@@ -290,11 +287,11 @@ export default function SubscriptionDetailPage() {
 // 청약 일정 타임라인
 function SubscriptionTimeline({
   startDate,
-  deadline,
+  endDate,
   schedule,
 }: {
   startDate: string;
-  deadline: string;
+  endDate: string;
   schedule?: SubscriptionSchedule;
 }) {
   const now = new Date();
@@ -307,7 +304,7 @@ function SubscriptionTimeline({
 
   const steps: Array<{ label: string; date: string | undefined; done: boolean }> = [
     { label: '청약 시작', date: startDate, done: !!startDate && new Date(startDate) <= now },
-    { label: '청약 마감', date: deadline, done: !!deadline && new Date(deadline) < now },
+    { label: '청약 마감', date: endDate, done: !!endDate && new Date(endDate) < now },
     { label: '당첨자 발표', date: schedule?.announceDate, done: !!schedule?.announceDate && new Date(schedule.announceDate) < now },
     { label: '계약 기간', date: contractDateLabel, done: !!schedule?.contractEndDate && new Date(schedule.contractEndDate) < now },
   ];

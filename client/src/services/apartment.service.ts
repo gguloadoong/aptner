@@ -1,10 +1,11 @@
 import api from './api';
-import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex } from '../types';
+import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex, HotApartment, RecordHighApartment } from '../types';
 import { getSubscriptions } from './subscription.service';
 import {
   MOCK_APARTMENTS,
   MOCK_TRADE_HISTORIES,
   MOCK_MAP_APARTMENTS,
+  MOCK_HOT_APARTMENTS,
 } from '../mocks/apartments.mock';
 
 // 개발 환경에서 Mock 데이터 사용 여부 (VITE_USE_MOCK=true, demo key, 또는 API URL 없는 경우)
@@ -79,15 +80,17 @@ export async function getApartmentsByBounds(
     console.warn('[getApartmentsByBounds] 핫 아파트 API 실패 (지도 마커는 정상 표시):', hotResult.reason);
   }
 
-  // aptCode 기준으로 hot 여부 및 최고가 경신 여부를 빠르게 조회
+  // 단지명 정규화 (공백·괄호 제거, 소문자) 기준으로 hot 여부 및 최고가 경신 여부 조회
+  // aptCode는 MOLIT 마커 id 포맷(11680-0)과 달라 이름 매칭을 사용
+  const normalizeApt = (s: string) => s.replace(/\s+/g, '').replace(/[()（）]/g, '').toLowerCase();
   const hotMap = new Map(
-    hotResponse?.data.data.map((h) => [h.aptCode, h]) ?? []
+    hotResponse?.data.data.map((h) => [normalizeApt(h.name ?? h.apartmentName ?? ''), h]) ?? []
   );
 
   const markers: MapApartment[] = mapResponse!.data.data.map((raw) => {
-    const hotData = hotMap.get(raw.id);
+    const hotData = hotMap.get(normalizeApt(raw.name));
     let markerType: MarkerType = 'price';
-    if (hotData?.isRecordHigh) markerType = 'allTimeHigh';
+    if (hotData?.isRecordHigh || raw.isRecordHigh) markerType = 'allTimeHigh';
     else if (hotData?.hotRank != null) markerType = 'hot';
 
     // BE 불리언 특성 필드 → FE ComplexFeature[] 변환
@@ -125,6 +128,46 @@ export async function getApartmentsByBounds(
   return [...markers, ...subInBounds];
 }
 
+// Kakao Geocoder 결과 캐시 (address → {lat, lng})
+const _geocodeCache = new Map<string, { lat: number; lng: number } | null>();
+
+// 주소 문자열 → 위경도 변환 (Kakao JS SDK Geocoder 사용)
+function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  if (_geocodeCache.has(address)) {
+    return Promise.resolve(_geocodeCache.get(address)!);
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const kakao = (window as unknown as { kakao?: { maps?: { services?: { Geocoder?: new () => unknown } } } }).kakao;
+      if (!kakao?.maps?.services?.Geocoder) {
+        _geocodeCache.set(address, null);
+        resolve(null);
+        return;
+      }
+      type GeoResult = { x: string; y: string };
+      type GeoStatus = string;
+      interface GeocoderInstance {
+        addressSearch(addr: string, cb: (result: GeoResult[], status: GeoStatus) => void): void;
+      }
+      const geocoder = new (kakao.maps.services.Geocoder as new () => GeocoderInstance)();
+      geocoder.addressSearch(address, (result, status) => {
+        if (status === 'OK' && result[0]) {
+          const coords = { lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) };
+          _geocodeCache.set(address, coords);
+          resolve(coords);
+        } else {
+          _geocodeCache.set(address, null);
+          resolve(null);
+        }
+      });
+    } catch {
+      _geocodeCache.set(address, null);
+      resolve(null);
+    }
+  });
+}
+
 // 청약 데이터를 MapApartment 배열로 변환 (TASK 7)
 async function getSubscriptionMapApartments(): Promise<MapApartment[]> {
   try {
@@ -133,41 +176,40 @@ async function getSubscriptionMapApartments(): Promise<MapApartment[]> {
       getSubscriptions({ status: 'upcoming' }),
     ]);
 
-    const ongoingApts: MapApartment[] = ongoingRes.data
+    const allSubs = [
+      ...ongoingRes.data.map((s) => ({ ...s, markerType: 'subOngoing' as MarkerType })),
+      ...upcomingRes.data.map((s) => ({ ...s, markerType: 'subUpcoming' as MarkerType })),
+    ];
+
+    // lat/lng 없는 청약은 address로 지오코딩 (최대 10개, 카카오 부하 방지)
+    const needGeocode = allSubs.filter((s) => (s.lat == null || s.lng == null) && s.address);
+    const geocodeBatch = needGeocode.slice(0, 10);
+    await Promise.all(
+      geocodeBatch.map(async (s) => {
+        const coords = await geocodeAddress(s.address!);
+        if (coords) {
+          s.lat = coords.lat;
+          s.lng = coords.lng;
+        }
+      })
+    );
+
+    return allSubs
       .filter((sub) => sub.lat != null && sub.lng != null)
       .map((sub) => ({
         id: `sub-${sub.id}`,
         name: sub.name,
         lat: sub.lat!,
         lng: sub.lng!,
-        price: sub.startPrice,
+        price: sub.supplyPrice ?? 0,
         area: sub.areas?.[0]?.area ?? '84',
         areas: sub.areas?.map((a) => a.area) ?? [],
         priceChangeType: 'flat' as const,
-        markerType: 'subOngoing' as MarkerType,
-        subDeadline: sub.deadline,
+        markerType: sub.markerType,
+        subDeadline: sub.endDate,
         subStartDate: sub.startDate,
         subId: sub.id,
       }));
-
-    const upcomingApts: MapApartment[] = upcomingRes.data
-      .filter((sub) => sub.lat != null && sub.lng != null)
-      .map((sub) => ({
-        id: `sub-${sub.id}`,
-        name: sub.name,
-        lat: sub.lat!,
-        lng: sub.lng!,
-        price: sub.startPrice,
-        area: sub.areas?.[0]?.area ?? '84',
-        areas: sub.areas?.map((a) => a.area) ?? [],
-        priceChangeType: 'flat' as const,
-        markerType: 'subUpcoming' as MarkerType,
-        subDeadline: sub.deadline,
-        subStartDate: sub.startDate,
-        subId: sub.id,
-      }));
-
-    return [...ongoingApts, ...upcomingApts];
   } catch (err) {
     // 청약 데이터 실패해도 지도 마커는 정상 표시
     console.warn('[getSubscriptionMapApartments] 청약 데이터 로드 실패:', err);
@@ -193,24 +235,31 @@ interface ApartmentMapMarker {
   isNewBuild?: boolean;
   isFlat?: boolean;
   hasElementarySchool?: boolean;
+  isRecordHigh?: boolean;
 }
 
 // BE HotApartment 타입 → FE Apartment 타입 변환 어댑터 (TASK 8)
 // isRecordHigh, hotRank 필드 반영
 interface RawHotApartment {
   aptCode: string;
-  apartmentName: string;
-  lawdNm: string;
+  // BE hot-ranking 신규 필드
+  name?: string;
+  location?: string;
+  tradeSurgeRate?: number;
+  tradeCount?: number;
+  rankChange?: number | null;
+  // BE 구 필드 (하위 호환)
+  apartmentName?: string;
+  lawdNm?: string;
   lat?: number;
   lng?: number;
-  area: number;
+  area?: number;
   recentPrice: number;
-  priceChangeRate: number;
-  priceChange: number;
+  priceChangeRate?: number;
+  priceChange?: number;
   rank?: number;
   isRecordHigh?: boolean;
   hotRank?: number;
-  // 아파트 상세 조회 시 추가 반환 필드
   totalUnits?: number;
   buildYear?: number;
   builder?: string;
@@ -220,19 +269,22 @@ interface RawHotApartment {
 }
 
 function adaptHotApartment(raw: RawHotApartment, index: number): Apartment {
+  // hot-ranking 신규 필드(name/location) 또는 구 필드(apartmentName/lawdNm) 모두 지원
+  const aptName = raw.name ?? raw.apartmentName ?? '';
+  const locationStr = raw.location ?? raw.lawdNm ?? '';
+
   // areas 배열: BE 상세 조회 시 면적별 요약 배열 제공, 없으면 기본 단일 면적
   const areaStrings: string[] =
     raw.areas && raw.areas.length > 0
       ? raw.areas.map((a) => String(Math.round(a.area)))
-      : [String(raw.area)];
+      : raw.area ? [String(raw.area)] : [];
 
   return {
     id: raw.aptCode,
-    name: raw.apartmentName,
-    // BE 상세 조회 시 address 필드 존재, 없으면 lawdNm으로 fallback
-    address: raw.address ?? raw.lawdNm,
-    district: raw.lawdNm.split(' ').slice(0, 2).join(' '),
-    dong: raw.lawdNm.split(' ')[2] || '',
+    name: aptName,
+    address: raw.address ?? locationStr,
+    district: locationStr.split(' ').slice(0, 2).join(' '),
+    dong: locationStr.split(' ')[2] || '',
     // M-3: || 연산자는 0이 falsy라 lat/lng=0인 경우 fallback으로 대체됨 → ?? 로 수정
     lat: raw.lat ?? 37.5665,
     lng: raw.lng ?? 126.978,
@@ -241,10 +293,10 @@ function adaptHotApartment(raw: RawHotApartment, index: number): Apartment {
     builtYear: raw.buildYear ?? 0,
     builder: raw.builder ?? '',
     areas: areaStrings,
-    recentPrice: raw.recentPrice,
-    recentPriceArea: String(raw.area),
-    priceChange: raw.priceChangeRate,
-    priceChangeType: raw.priceChange > 0 ? 'up' : raw.priceChange < 0 ? 'down' : 'flat',
+    recentPrice: raw.recentPrice ?? 0,
+    recentPriceArea: String(raw.area ?? 0),
+    priceChange: raw.priceChangeRate ?? 0,
+    priceChangeType: (raw.priceChangeRate ?? 0) > 0 ? 'up' : (raw.priceChangeRate ?? 0) < 0 ? 'down' : 'flat',
     weeklyRank: raw.rank ?? index + 1,
     weeklyRankChange: 0,
     // BE 추가 필드 매핑
@@ -309,22 +361,23 @@ export async function getApartmentHistory(
     const now = new Date();
     const cutoff = new Date(now.getFullYear(), now.getMonth() - months, 1);
     data = data.filter((t) => {
-      const [year, month] = t.date.split('-').map(Number);
+      const [year, month] = t.dealDate.split('-').map(Number);
       return new Date(year, month - 1, 1) >= cutoff;
     });
 
-    return data.sort((a, b) => a.date.localeCompare(b.date));
+    return data.sort((a, b) => a.dealDate.localeCompare(b.dealDate));
   }
 
   // MAJOR-07: BE는 ApartmentTradeHistory(dealDate, price, area, floor)를 반환하므로 FE TradeHistory로 변환
+  // MAJOR-06: area 파라미터는 반드시 String() 변환 후 전송
   const response = await api.get<{ success: true; data: Array<{ dealDate: string; price: number; area: number; floor: number }> }>(
     `/apartments/${aptId}/history`,
-    { params: { area, months } },
+    { params: { area: area != null ? String(area) : undefined, months } },
   );
   return response.data.data.map((raw, idx) => ({
     id: `${aptId}-${raw.dealDate}-${idx}`,
     apartmentId: aptId,
-    date: raw.dealDate.slice(0, 7), // YYYY-MM-DD → YYYY-MM
+    dealDate: raw.dealDate.slice(0, 7), // YYYY-MM-DD → YYYY-MM
     floor: raw.floor,
     area: String(Math.round(raw.area)),
     price: raw.price,
@@ -541,6 +594,154 @@ function generateMockSupply(region: string, months: number): SupplyDataPoint[] {
       monthNum: month,
     };
   });
+}
+
+// 전세가율 조회 (ComparePage 사용 — BE 미구현 시 null 반환)
+export async function getJeonseRate(aptId: string, lawdCd?: string): Promise<number | null> {
+  if (USE_MOCK) {
+    await delay(200);
+    // Mock: 50~75% 랜덤 전세가율
+    const seed = aptId.charCodeAt(aptId.length - 1);
+    return 50 + (seed % 26);
+  }
+  if (!lawdCd) return null;
+  try {
+    const response = await api.get<{ success: true; data: { jeonseRate: number } }>(
+      `/apartments/${aptId}/jeonse-rate`,
+      { params: { lawdCd } }
+    );
+    return response.data.data.jeonseRate;
+  } catch {
+    return null;
+  }
+}
+
+// 핫 아파트 랭킹 조회 (HotRankingPage 전용 — HotApartment[] 반환)
+// 기존 getHotApartments()는 지도 마커용 Apartment[] 반환이라 별도 함수로 분리
+export async function getHotApartmentRanking(
+  region?: string,
+  limit = 20
+): Promise<HotApartment[]> {
+  if (USE_MOCK) {
+    await delay(300);
+    let data = [...MOCK_HOT_APARTMENTS];
+    if (region && region !== '전국') {
+      data = data.filter((apt) => apt.location.includes(region));
+    }
+    return data.slice(0, limit);
+  }
+
+  const REGION_CODE_MAP: Record<string, string> = {
+    '서울': '11', '부산': '26', '대구': '27', '인천': '28',
+    '광주': '29', '대전': '30', '울산': '31', '세종': '36',
+    '경기': '41', '강원': '42', '충북': '43', '충남': '44',
+    '전북': '45', '전남': '46', '경북': '47', '경남': '48', '제주': '50',
+  };
+  const regionCode = region && region !== '전국' ? REGION_CODE_MAP[region] : undefined;
+
+  const response = await api.get<{ success: true; data: HotApartment[] }>(
+    '/apartments/hot',
+    { params: { region: regionCode, limit } }
+  );
+  return response.data.data;
+}
+
+// ────────────────────────────────────────────────────────────
+// 지도 가격 마커용 API (카카오 Places 연동)
+// ────────────────────────────────────────────────────────────
+
+// 단지별 최근 거래가 응답 타입
+export interface ApartmentMapPrice {
+  aptName: string;      // 단지명 (Places place_name과 매칭)
+  recentPrice: number;  // 최근 거래가 (만원) — BE 필드명과 일치
+  lawdCd: string;       // 법정동 코드
+  dealDate: string;     // 최근 거래일 YYYY-MM
+}
+
+// 좌표 → lawdCd 응답 타입 (BE: { lawdCd, sigungu } 필드명 그대로)
+export interface LawdCdResponse {
+  lawdCd: string;   // 5자리 시군구 코드
+  sigungu: string;  // 지역명 (예: 서울 강남구)
+}
+
+// 지역 내 단지별 최근 거래가 조회
+// BE: GET /api/apartments/map-prices?lawdCd=11200
+export async function getMapPrices(lawdCd: string): Promise<ApartmentMapPrice[]> {
+  if (USE_MOCK) {
+    await delay(200);
+    return MOCK_MAP_PRICES;
+  }
+
+  const response = await api.get<{ success: true; data: ApartmentMapPrice[] }>(
+    '/apartments/map-prices',
+    { params: { lawdCd } }
+  );
+  return response.data.data;
+}
+
+// 좌표 → 법정동 코드(lawdCd) 조회
+// BE: GET /api/regions/lawdCd?lat=37.5&lng=127.0
+export async function getLawdCdByCoords(lat: number, lng: number): Promise<LawdCdResponse | null> {
+  if (USE_MOCK) {
+    await delay(100);
+    // Mock: 서울 기본 반환
+    return { lawdCd: '11200', sigungu: '서울 성동구' };
+  }
+
+  try {
+    const response = await api.get<{ success: true; data: LawdCdResponse }>(
+      '/regions/lawdCd',
+      { params: { lat, lng } }
+    );
+    return response.data.data;
+  } catch {
+    return null;
+  }
+}
+
+// Mock 가격 데이터 (Places 매칭 테스트용)
+const MOCK_MAP_PRICES: ApartmentMapPrice[] = [
+  { aptName: '래미안 대치팰리스', recentPrice: 290000, lawdCd: '11680', dealDate: '2024-02' },
+  { aptName: '은마아파트', recentPrice: 195000, lawdCd: '11680', dealDate: '2024-02' },
+  { aptName: '도곡렉슬', recentPrice: 260000, lawdCd: '11680', dealDate: '2024-02' },
+  { aptName: '타워팰리스', recentPrice: 400000, lawdCd: '11680', dealDate: '2024-01' },
+  { aptName: '압구정현대아파트', recentPrice: 520000, lawdCd: '11680', dealDate: '2024-01' },
+  { aptName: '반포자이', recentPrice: 380000, lawdCd: '11650', dealDate: '2024-02' },
+  { aptName: '아크로리버파크', recentPrice: 460000, lawdCd: '11650', dealDate: '2024-02' },
+  { aptName: '헬리오시티', recentPrice: 185000, lawdCd: '11710', dealDate: '2024-02' },
+  { aptName: '잠실엘스', recentPrice: 230000, lawdCd: '11710', dealDate: '2024-02' },
+  { aptName: '롯데캐슬골드파크', recentPrice: 140000, lawdCd: '11500', dealDate: '2024-02' },
+];
+
+// 신고가 경신 단지 Mock 데이터 (홈 v2)
+const MOCK_RECORD_HIGHS: RecordHighApartment[] = [
+  { aptName: '아크로리버파크', location: '서울 서초구 반포동', area: 84, recentPrice: 460000, previousPrice: 430000, priceChangeRate: 6.98, dealDate: '2026-03', lawdCd: '11650' },
+  { aptName: '래미안 대치팰리스', location: '서울 강남구 대치동', area: 84, recentPrice: 295000, previousPrice: 278000, priceChangeRate: 6.12, dealDate: '2026-03', lawdCd: '11680' },
+  { aptName: '압구정현대아파트', location: '서울 강남구 압구정동', area: 176, recentPrice: 540000, previousPrice: 510000, priceChangeRate: 5.88, dealDate: '2026-03', lawdCd: '11680' },
+  { aptName: '반포자이', location: '서울 서초구 반포동', area: 84, recentPrice: 390000, previousPrice: 370000, priceChangeRate: 5.41, dealDate: '2026-03', lawdCd: '11650' },
+  { aptName: '타워팰리스', location: '서울 강남구 도곡동', area: 164, recentPrice: 415000, previousPrice: 395000, priceChangeRate: 5.06, dealDate: '2026-03', lawdCd: '11680' },
+];
+
+// 신고가 경신 단지 조회 (홈 v2 RecordHighSection)
+// GET /api/apartments/record-highs?region=수도권&limit=5
+// 실패 시 Mock 5건 반환
+export async function getRecordHighs(region = '수도권', limit = 5): Promise<RecordHighApartment[]> {
+  if (USE_MOCK) {
+    await delay(250);
+    return MOCK_RECORD_HIGHS.slice(0, limit);
+  }
+
+  try {
+    const response = await api.get<{ success: true; data: RecordHighApartment[] }>(
+      '/apartments/record-highs',
+      { params: { region, limit } }
+    );
+    return response.data.data;
+  } catch (err) {
+    console.warn('[getRecordHighs] API 호출 실패, Mock 데이터로 폴백:', err);
+    await delay(250);
+    return MOCK_RECORD_HIGHS.slice(0, limit);
+  }
 }
 
 // Mock 딜레이 헬퍼

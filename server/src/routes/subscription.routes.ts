@@ -20,10 +20,23 @@ const VALID_STATUSES: SubscriptionStatus[] = ['upcoming', 'ongoing', 'closed'];
  *   - limit: 페이지당 건수 (선택, 기본: 20, 최대: 50)
  *   - status: 청약 상태 필터 (선택: upcoming | ongoing | closed)
  *   - sido: 시도 필터 (선택, 예: "서울특별시")
+ *   - month: 월 필터 (선택, YYYY-MM 형식, 해당 월에 걸치는 청약 반환)
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { page, limit, status, sido, sort } = req.query as Partial<Record<string, string>>;
+    const { page, limit, status, sido, sort, month } = req.query as Partial<Record<string, string>>;
+
+    // month 검증 (YYYY-MM 형식)
+    if (month && !/^\d{4}-\d{2}$/.test(month)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_MONTH',
+          message: 'month는 YYYY-MM 형식이어야 합니다. (예: 2026-03)',
+        },
+      });
+      return;
+    }
 
     // status 검증
     if (status && !VALID_STATUSES.includes(status as SubscriptionStatus)) {
@@ -38,7 +51,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // sort 검증
-    const VALID_SORTS = ['deadline', 'price', 'latest'] as const;
+    const VALID_SORTS = ['dDay', 'units', 'price'] as const;
     type SortType = typeof VALID_SORTS[number];
     if (sort && !VALID_SORTS.includes(sort as SortType)) {
       res.status(400).json({
@@ -54,6 +67,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       status: status as SubscriptionStatus | undefined,
       sido,
       sort: sort as SortType | undefined,
+      month,
     };
 
     const { items, total } = await getSubscriptions(params);
