@@ -24,11 +24,11 @@ const RegionChip = React.memo<RegionChipProps>(({ trend }) => {
     boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
     cursor: 'pointer',
     transition: 'transform 150ms ease',
-    backgroundColor: isUp ? '#FFF3F3' : isDown ? '#EFF6FF' : 'var(--semantic-background-normal-normal)',
-    border: `1px solid ${isUp ? 'rgba(255,75,75,0.3)' : isDown ? 'rgba(59,130,246,0.25)' : 'var(--semantic-line-normal)'}`,
+    backgroundColor: isUp ? '#FFF3F3' : isDown ? '#E6FAF5' : 'var(--semantic-background-normal-normal)',
+    border: `1px solid ${isUp ? 'rgba(255,75,75,0.3)' : isDown ? 'rgba(0,200,150,0.25)' : 'var(--semantic-line-normal)'}`,
   };
 
-  const changeColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
+  const changeColor = isUp ? '#FF4B4B' : isDown ? '#00C896' : 'var(--semantic-label-assistive)';
 
   return (
     <div

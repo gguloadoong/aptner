@@ -24,9 +24,9 @@ const Button = React.memo<ButtonProps>(
 
     const variantStyles = {
       primary:
-        'bg-[#0066FF] text-white hover:bg-[#0052CC] focus:ring-[#0066FF] disabled:bg-gray-300',
+        'bg-[#1B64DA] text-white hover:bg-[#1558C0] focus:ring-[#1B64DA] disabled:bg-gray-300',
       secondary:
-        'bg-white text-[#0066FF] border border-[#0066FF] hover:bg-blue-50 focus:ring-[#0066FF] disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300',
+        'bg-white text-[#1B64DA] border border-[#1B64DA] hover:bg-blue-50 focus:ring-[#1B64DA] disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300',
       ghost:
         'bg-transparent text-[#8B95A1] hover:bg-gray-100 focus:ring-gray-400 disabled:opacity-50',
     };

@@ -72,7 +72,7 @@ const ApartmentCard = React.memo<ApartmentCardProps>(
       apartment.priceChangeType === 'up'
         ? '#FF4B4B'
         : apartment.priceChangeType === 'down'
-          ? '#3B82F6'
+          ? '#00C896'
           : 'var(--semantic-label-assistive)';
 
     const priceArrow =
@@ -245,7 +245,7 @@ function RankChangeBadge({ change }: { change: number | 'new' }) {
     return <span style={{ fontSize: '10px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
   }
   if (change < 0) {
-    return <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
+    return <span style={{ fontSize: '10px', fontWeight: 700, color: '#00C896' }}>▼{Math.abs(change)}</span>;
   }
   return <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--semantic-label-assistive)' }}>-</span>;
 }

@@ -201,7 +201,7 @@ function BookmarkUpdateSection({
 }) {
   return (
     <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
-      <FlexBox alignItems="center" gap="6px" style={{ marginBottom: '10px' }}>
+      <FlexBox alignItems="center" gap="6px" style={{ marginBottom: '8px' }}>
         <span
           style={{
             width: 8,
@@ -220,11 +220,11 @@ function BookmarkUpdateSection({
         {trades.map((trade) => {
           const changeAmt = trade.newPrice - trade.oldPrice;
           const changeRate = trade.oldPrice > 0
-            ? ((changeAmt / trade.oldPrice) * 100).toFixed(1)
+            ? (Math.abs(changeAmt / trade.oldPrice) * 100).toFixed(1)
             : '0.0';
           const isUp = changeAmt > 0;
-          const changeColor = isUp ? '#FF4B4B' : '#3B82F6';
-          const changeSign = isUp ? '+' : '';
+          const changeColor = isUp ? '#FF4B4B' : '#00C896';
+          const changeSign = isUp ? '+' : '-';
 
           return (
             <button
@@ -271,7 +271,7 @@ function BookmarkUpdateSection({
                   weight="bold"
                   sx={{ color: changeColor, display: 'block' }}
                 >
-                  {changeSign}{(changeAmt / 10000).toFixed(1)}억
+                  {changeSign}{Math.abs(changeAmt / 10000).toFixed(1)}억
                 </Typography>
                 <Typography
                   variant="caption1"
@@ -297,7 +297,7 @@ function MapBanner() {
       onClick={() => navigate('/map')}
       style={{
         width: '100%',
-        background: 'linear-gradient(135deg, #0066FF 0%, #3B82F6 100%)',
+        background: 'linear-gradient(135deg, #1B64DA 0%, #2E7DE9 100%)',
         borderRadius: '16px',
         padding: '20px',
         textAlign: 'left',

@@ -164,7 +164,7 @@ export default function RecordHighSection() {
           weight="bold"
           sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
         >
-          이달의 신고가 🔥
+          이달의 신고가
         </Typography>
         <Typography
           variant="caption2"

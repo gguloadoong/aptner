@@ -14,7 +14,7 @@ const HeroApartmentCard = React.memo<HeroApartmentCardProps>(({ apartment }) => 
 
   const isUp = apartment.priceChangeType === 'up';
   const isDown = apartment.priceChangeType === 'down';
-  const priceColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
+  const priceColor = isUp ? '#FF4B4B' : isDown ? '#00C896' : 'var(--semantic-label-assistive)';
   const changeArrow = isUp ? '▲' : isDown ? '▼' : '';
 
   // 순위 변동 뱃지
@@ -32,7 +32,7 @@ const HeroApartmentCard = React.memo<HeroApartmentCardProps>(({ apartment }) => 
       return <span style={{ fontSize: '12px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
     }
     if (typeof change === 'number' && change < 0) {
-      return <span style={{ fontSize: '12px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
+      return <span style={{ fontSize: '12px', fontWeight: 700, color: '#00C896' }}>▼{Math.abs(change)}</span>;
     }
     return <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--semantic-label-assistive)' }}>-</span>;
   };

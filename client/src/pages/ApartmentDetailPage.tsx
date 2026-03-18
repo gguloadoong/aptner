@@ -96,7 +96,7 @@ export default function ApartmentDetailPage() {
     apartment.priceChangeType === 'up'
       ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? '#3B82F6'
+        ? '#00C896'
         : 'var(--semantic-label-assistive)';
 
   const priceArrow =
@@ -449,7 +449,7 @@ function NearbyApartments({ currentId, district }: { currentId: string; district
               variant="caption1"
               weight="medium"
               sx={{
-                color: apt.priceChangeType === 'up' ? '#FF4B4B' : apt.priceChangeType === 'down' ? '#3B82F6' : 'var(--semantic-label-assistive)',
+                color: apt.priceChangeType === 'up' ? '#FF4B4B' : apt.priceChangeType === 'down' ? '#00C896' : 'var(--semantic-label-assistive)',
                 display: 'block',
               }}
             >

@@ -15,18 +15,36 @@ import {
 import { useBookmarkStore } from '../../stores/bookmarkStore';
 
 // WDS에 트렌드 전용 아이콘 없어 AppLayout 사이드바와 동일한 인라인 SVG 사용
-function TrendIcon() {
+function TrendIcon({ active }: { active?: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? 'var(--semantic-primary-normal)' : 'currentColor'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
     </svg>
   );
 }
 
 // 핫 랭킹 아이콘 (불꽃 모양 인라인 SVG)
-function HotIcon() {
+function HotIcon({ active }: { active?: boolean }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? 'var(--semantic-primary-normal)' : 'currentColor'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12 2C8 6 6 10 8 14c-2-1-3-3-3-5C3 14 5 20 12 22c7-2 9-8 7-13-1 2-3 3-5 2 2-2 2-6-2-9z" />
     </svg>
   );
@@ -75,17 +93,21 @@ export default function BottomNav() {
         <BottomNavigationItem
           value="/subscription"
           label="청약"
-          icon={<IconCalendar />}
+          icon={
+            <span style={{ color: pathname === '/subscription' ? 'var(--semantic-primary-normal)' : 'currentColor', display: 'inline-flex' }}>
+              <IconCalendar />
+            </span>
+          }
         />
         <BottomNavigationItem
           value="/trend"
           label="트렌드"
-          icon={<TrendIcon />}
+          icon={<TrendIcon active={pathname === '/trend'} />}
         />
         <BottomNavigationItem
           value="/hot"
           label="핫"
-          icon={<HotIcon />}
+          icon={<HotIcon active={pathname === '/hot'} />}
         />
       </BottomNavigation>
     </div>

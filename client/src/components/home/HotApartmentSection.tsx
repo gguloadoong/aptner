@@ -32,7 +32,7 @@ function RankChangeBadge({ change }: { change: number | null }) {
     return <span style={{ fontSize: '11px', fontWeight: 700, color: '#E53E3E' }}>▲{change}</span>;
   }
   if (change < 0) {
-    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
+    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#00C896' }}>▼{Math.abs(change)}</span>;
   }
   return <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--semantic-label-assistive)' }}>-</span>;
 }
@@ -95,7 +95,7 @@ function CompactHotCard({ apartment, isLast }: CompactHotCardProps) {
       {/* 단지명 + 위치 */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
-          variant="body2"
+          variant="title3"
           weight="bold"
           sx={{
             color: 'var(--semantic-label-normal)',
@@ -103,15 +103,13 @@ function CompactHotCard({ apartment, isLast }: CompactHotCardProps) {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
-            fontSize: '17px',
-            fontWeight: 600,
             lineHeight: 1.3,
           }}
         >
           {apartment.name}
         </Typography>
         <Typography
-          variant="caption1"
+          variant="body2"
           sx={{
             color: 'var(--semantic-label-assistive)',
             display: 'block',
@@ -119,7 +117,6 @@ function CompactHotCard({ apartment, isLast }: CompactHotCardProps) {
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             marginTop: '2px',
-            fontSize: '13px',
           }}
         >
           {apartment.location}

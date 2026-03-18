@@ -23,7 +23,7 @@ export default function RankChange({ change, className = '' }: RankChangeProps) 
   }
   // 하락
   return (
-    <span className={`text-[11px] text-[#3B82F6] font-bold ${className}`}>
+    <span className={`text-[11px] text-[#00C896] font-bold ${className}`}>
       ▼{Math.abs(change)}
     </span>
   );

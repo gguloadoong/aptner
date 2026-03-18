@@ -48,7 +48,7 @@ function BookmarkCard({ id }: { id: string }) {
     apartment.priceChangeType === 'up'
       ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? '#3B82F6'
+        ? '#00C896'
         : 'var(--semantic-label-assistive)';
   const priceArrow =
     apartment.priceChangeType === 'up' ? '▲' : apartment.priceChangeType === 'down' ? '▼' : '';

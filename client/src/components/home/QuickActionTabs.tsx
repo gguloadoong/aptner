@@ -1,16 +1,18 @@
 import { useNavigate } from 'react-router-dom';
 import { FlexBox, Typography } from '@wanteddev/wds';
+import { IconLocation, IconCalendar, IconFire } from '@wanteddev/wds-icon';
+import type { ComponentType, SVGProps } from 'react';
 
 interface QuickAction {
-  icon: string;
+  Icon: ComponentType<SVGProps<SVGSVGElement>>;
   label: string;
   path: string;
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
-  { icon: '🗺', label: '지도로 찾기', path: '/map' },
-  { icon: '📋', label: '청약 일정', path: '/subscription' },
-  { icon: '🔥', label: '이번 주 HOT', path: '/hot' },
+  { Icon: IconLocation, label: '지도로 찾기', path: '/map' },
+  { Icon: IconCalendar, label: '청약 일정', path: '/subscription' },
+  { Icon: IconFire, label: '이번 주 HOT', path: '/hot' },
 ];
 
 export default function QuickActionTabs() {
@@ -48,9 +50,7 @@ export default function QuickActionTabs() {
           aria-label={action.label}
         >
           <FlexBox flexDirection="column" alignItems="center" justifyContent="center" gap="6px" style={{ height: '100%' }}>
-            <Typography variant="body1" sx={{ fontSize: '32px', lineHeight: 1 }}>
-              {action.icon}
-            </Typography>
+            <action.Icon style={{ width: '28px', height: '28px', color: 'var(--semantic-primary-normal)' }} />
             <Typography
               variant="caption1"
               weight="bold"
