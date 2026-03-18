@@ -8,6 +8,13 @@ import AppLayout from './components/layout/AppLayout';
 import { RegionConfig, useToast } from '@wanteddev/wds';
 import { useAlertStore } from './stores/alertStore';
 import { getHotApartments } from './services/apartment.service';
+import { useBookmarkNotification } from './hooks/useBookmarkNotification';
+
+// 북마크 알림 초기화 — 앱 전체에서 한 번만 실행, 결과를 store에 저장
+function BookmarkNotificationInitializer() {
+  useBookmarkNotification();
+  return null;
+}
 
 // 페이지 lazy loading — 초기 번들 크기 축소
 const HomePage = lazy(() => import('./pages/HomePage'));
@@ -74,6 +81,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <BookmarkNotificationInitializer />
         <AppLayout>
           <div className="w-full relative bg-[#F5F6F8] min-h-screen">
             {/* 전역 에러 바운더리 - Suspense 내부 렌더링 에러 포착 */}
