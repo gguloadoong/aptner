@@ -83,6 +83,13 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
     return [Math.max(0, min - pad), max + pad];
   }, [chartData]);
 
+  // 평균가 기준선 계산 (early return 전에 위치해야 rules-of-hooks 준수)
+  const avgPrice = useMemo(() => {
+    const prices = chartData.filter((d) => d.price !== null).map((d) => d.price as number);
+    if (prices.length === 0) return null;
+    return Math.round(prices.reduce((s, v) => s + v, 0) / prices.length);
+  }, [chartData]);
+
   if (isLoading) {
     return (
       <FlexBox alignItems="center" justifyContent="center" style={{ height: '256px' }}>
@@ -109,13 +116,6 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
       </FlexBox>
     );
   }
-
-  // 평균가 기준선 계산
-  const avgPrice = useMemo(() => {
-    const prices = chartData.filter((d) => d.price !== null).map((d) => d.price as number);
-    if (prices.length === 0) return null;
-    return Math.round(prices.reduce((s, v) => s + v, 0) / prices.length);
-  }, [chartData]);
 
   return (
     <Box>
