@@ -136,13 +136,12 @@ function CompactHotCard({ apartment, isLast }: CompactHotCardProps) {
         >
           {formatPriceShort(priceManwon)}
         </Typography>
-        {apartment.tradeSurgeRate > 0 && (
+        {apartment.tradeCount != null && apartment.tradeCount > 0 && (
           <Typography
-            variant="caption2"
-            weight="bold"
-            sx={{ color: '#E53E3E', display: 'block', marginTop: '2px' }}
+            variant="caption1"
+            sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
           >
-            거래 +{apartment.tradeSurgeRate}%
+            이번 달 {apartment.tradeCount}건
           </Typography>
         )}
       </Box>

@@ -1,4 +1,6 @@
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
 import { getRecordHighs } from '../../services/apartment.service';
 import { formatPrice } from '../../utils/formatNumber';
@@ -19,14 +21,29 @@ interface RecordHighCardProps {
 
 function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
   const badgeStyle = RANK_COLORS[rank];
+  const navigate = useNavigate();
+
+  const priceDiffBillion =
+    apt.previousPrice && apt.previousPrice > 0
+      ? ((apt.recentPrice - apt.previousPrice) / 10000).toFixed(1)
+      : null;
 
   return (
     <FlexBox
       alignItems="center"
       gap="12px"
+      onClick={() => navigate(`/apartment/${apt.lawdCd}`)}
       style={{
         padding: '14px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
+        cursor: 'pointer',
+        transition: 'background-color 120ms ease',
+      }}
+      onMouseEnter={(e: React.MouseEvent) => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)';
+      }}
+      onMouseLeave={(e: React.MouseEvent) => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = '';
       }}
     >
       {/* 순위 배지 */}
@@ -94,13 +111,15 @@ function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
         >
           {formatPrice(apt.recentPrice)}
         </Typography>
-        <Typography
-          variant="caption2"
-          weight="bold"
-          sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
-        >
-          +{apt.priceChangeRate.toFixed(1)}%
-        </Typography>
+        {priceDiffBillion !== null && (
+          <Typography
+            variant="caption2"
+            weight="bold"
+            sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
+          >
+            +{priceDiffBillion}억
+          </Typography>
+        )}
       </Box>
     </FlexBox>
   );

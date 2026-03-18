@@ -75,7 +75,7 @@ export interface HotApartment {
   area: number;
   tradeCount: number;
   priceChange: number;
-  priceChangeRate: number;
+  previousPrice: number;
   /** 위도 (지도 마커용) */
   lat?: number | null;
   /** 경도 (지도 마커용) */

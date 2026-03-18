@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
 import type { Subscription } from '../../types';
 import SubscriptionCard from '../subscription/SubscriptionCard';
@@ -45,6 +46,7 @@ export default function WeeklySubscriptionTimeline({
   subscriptions,
   isLoading = false,
 }: WeeklySubscriptionTimelineProps) {
+  const navigate = useNavigate();
   const weekDays = useMemo(() => getWeekDays(), []);
   const today = useMemo(() => {
     const d = new Date();
@@ -256,6 +258,34 @@ export default function WeeklySubscriptionTimeline({
               외 {selectedSubs.length - 3}건 더 있음
             </Typography>
           )}
+          <button
+            onClick={() => navigate('/subscription')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              width: '100%',
+              marginTop: '8px',
+              padding: '4px 0',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              gap: '2px',
+            }}
+          >
+            <Typography
+              variant="caption1"
+              sx={{ color: 'var(--semantic-label-assistive)' }}
+            >
+              자세히 보기
+            </Typography>
+            <Typography
+              variant="caption1"
+              sx={{ color: 'var(--semantic-label-assistive)' }}
+            >
+              &gt;
+            </Typography>
+          </button>
         </Box>
       )}
 
