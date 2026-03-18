@@ -109,6 +109,8 @@ export async function getApartmentsByBounds(
       lng: raw.lng,
       price: raw.price,
       area: raw.area,
+      lawdNm: raw.lawdNm,
+      umdNm: raw.umdNm,
       priceChangeType: raw.priceChangeType,
       markerType,
       totalUnits: raw.unitCount,
@@ -226,6 +228,8 @@ interface ApartmentMapMarker {
   lng: number;
   price: number;
   area: string;
+  lawdNm?: string;
+  umdNm?: string;
   priceChangeType: 'up' | 'down' | 'flat';
   /** BE ApartmentMapMarker.unitCount → FE MapApartment.totalUnits */
   unitCount?: number;

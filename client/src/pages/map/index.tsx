@@ -7,11 +7,13 @@ import { useGeocoder } from '../../hooks/useGeocoder';
 import { useIsPC } from '../../hooks/useBreakpoint';
 import { Box, useToast } from '@wanteddev/wds';
 import type { MapApartment, ApartmentComplex } from '../../types';
-import { getApartmentsByBounds, getComplexesByBounds } from '../../services/apartment.service';
+import { getApartmentsByBounds, getComplexesByBounds, searchApartments } from '../../services/apartment.service';
 import { useMapApartments } from '../../hooks/useMapApartments';
 import type { PlaceMarkerData } from '../../hooks/useMapApartments';
 import ApartmentList from './ApartmentList';
 import MapCanvas from './MapCanvas';
+
+const normalizeAptName = (value: string) => value.replace(/\s+/g, '').replace(/[()（）]/g, '').toLowerCase();
 
 // 지도 페이지 - 모바일: 지도 전체 + 바텀시트, 데스크탑: 좌측 패널 + 우측 지도
 export default function MapPage() {
@@ -71,25 +73,41 @@ export default function MapPage() {
   }, [setSelectedApartment]);
 
   // 단지 마커 클릭 핸들러 (ApartmentComplex → selectedApartment 변환)
-  const handleComplexClick = useCallback((complex: ApartmentComplex) => {
+  const handleComplexClick = useCallback(async (complex: ApartmentComplex) => {
+    const normalizedComplexName = normalizeAptName(complex.name);
+    const matchedMapApt = mapApartments.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
+
+    let resolvedId = matchedMapApt?.id ?? complex.id;
+    if (!matchedMapApt) {
+      try {
+        const searchResults = await searchApartments(complex.name);
+        const matchedSearch = searchResults.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
+        if (matchedSearch?.id) {
+          resolvedId = matchedSearch.id;
+        }
+      } catch (err) {
+        console.warn('[handleComplexClick] 단지 상세 ID 탐색 실패:', err);
+      }
+    }
+
     setSelectedApartment({
-      id: complex.id,
+      id: resolvedId,
       name: complex.name,
       address: complex.address,
       district: complex.umdNm,
       dong: complex.umdNm,
       lat: complex.lat ?? 0,
       lng: complex.lng ?? 0,
-      totalUnits: 0,
+      totalUnits: matchedMapApt?.totalUnits ?? 0,
       builtYear: complex.buildYear ?? 0,
       builder: '',
-      areas: [String(complex.area)],
+      areas: matchedMapApt?.areas ?? [String(complex.area)],
       recentPrice: complex.latestPrice,
       recentPriceArea: String(complex.area),
       priceChange: complex.priceChange ?? 0,
       priceChangeType: complex.priceChangeType ?? 'flat',
     });
-  }, [setSelectedApartment]);
+  }, [mapApartments, setSelectedApartment]);
 
   // fetchPlaceMarkers를 ref로 안정화 — handleBoundsChange 선언 시점에
   // useMapApartments 훅이 아직 초기화되지 않으므로 ref를 통해 late-binding
@@ -113,8 +131,8 @@ export default function MapPage() {
         console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err);
       }
 
-      // 호갱노노 스타일 단지 데이터 갱신 (zoom 7~14 범위에서 — 구 단위부터 개별 단지 표시)
-      if (zoom >= 7 && zoom <= 14) {
+      // 충분히 줌인한 경우에만 단지/가격 마커를 조회합니다.
+      if (zoom <= 4) {
         setIsComplexLoading(true);
         try {
           const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
@@ -186,8 +204,7 @@ export default function MapPage() {
     if (!query) return;
     geocodeAddress(query).then((coords) => {
       if (coords) {
-        // level 5: 단지 수준에서 표시
-        moveToLocation(coords.lat, coords.lng, 5);
+        moveToLocation(coords.lat, coords.lng, 3);
       } else {
         addToast({ content: `'${query}' 위치를 찾을 수 없습니다.`, variant: 'cautionary', duration: 'short' });
       }
@@ -200,23 +217,20 @@ export default function MapPage() {
   // 현재 줌 레벨 상태 (구 단위 오버레이 표시 여부 판단용)
   const [currentZoom, setCurrentZoom] = useState<number>(7);
 
-  // 기존 마커 업데이트 — 히트맵 모드 또는 광역 줌(<=6)일 때 마커 숨김
+  // 기존 마커 업데이트 — 충분히 줌인한 경우에만 개별 마커 표시
   useEffect(() => {
     if (!isLoaded) return;
-    // 마커 모드이고 줌 레벨이 7 이상일 때 개별 마커 표시 (구 단위 뷰부터)
-    if (viewMode === 'marker' && currentZoom >= 7) {
+    if (viewMode === 'marker' && currentZoom <= 3) {
       updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
-      // 히트맵 모드 또는 줌아웃 시: 개별 마커 전부 제거 (구 단위 오버레이가 대신 표시)
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     }
   }, [isLoaded, viewMode, currentZoom, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures]);
 
-  // 호갱노노 스타일 단지 마커 업데이트 (히트맵 모드 또는 광역 줌 시 숨김)
+  // 호갱노노 스타일 단지 마커 업데이트
   useEffect(() => {
     if (!isLoaded) return;
-    // 마커 모드이고 줌 레벨이 7 이상일 때 단지 마커 표시 (구 단위 뷰부터)
-    if (viewMode === 'marker' && currentZoom >= 7) {
+    if (viewMode === 'marker' && currentZoom <= 3) {
       updateComplexMarkers(complexes, handleComplexClick);
     } else {
       updateComplexMarkers([], handleComplexClick);
@@ -232,10 +246,10 @@ export default function MapPage() {
     [navigate]
   );
 
-  // Places AT4 마커 업데이트 — 마커 모드이고 줌 7 이상일 때만 표시
+  // Places AT4 마커 업데이트 — 단지 뷰에서만 표시
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker' && currentZoom >= 7) {
+    if (viewMode === 'marker' && currentZoom <= 3) {
       updatePlaceMarkers(placeMarkers, handlePlaceMarkerClick);
     } else {
       updatePlaceMarkers([], handlePlaceMarkerClick);
@@ -252,13 +266,11 @@ export default function MapPage() {
     }
   }, [isLoaded, viewMode, mapApartments, updateHeatmapOverlays, clearHeatmapOverlays]);
 
-  // 구 단위 평균가 오버레이 업데이트 — 줌 레벨 <= 6 이고 마커 모드일 때
-  // zoom <= 6: 광역 뷰 → 구 단위 레이블 표시
-  // zoom >= 7: 개별 단지 뷰 → 구 오버레이 제거 (가격 마커가 대신 표시)
+  // 줌 단계별 평균가 오버레이 업데이트
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker' && currentZoom <= 6) {
-      updateDistrictOverlays(mapApartments);
+    if (viewMode === 'marker' && currentZoom >= 4) {
+      updateDistrictOverlays(mapApartments, currentZoom);
     } else {
       clearDistrictOverlays();
     }

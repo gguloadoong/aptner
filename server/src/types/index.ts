@@ -117,6 +117,10 @@ export interface ApartmentMapMarker {
   lng: number;
   price: number;
   area: string;
+  /** 시도/시군구/동 조합 위치 문자열 (예: 서울 강남구 대치동) */
+  lawdNm?: string;
+  /** 읍면동명 */
+  umdNm?: string;
   priceChangeType: 'up' | 'down' | 'flat';
   /** 세대수 */
   unitCount?: number;

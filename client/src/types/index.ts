@@ -101,6 +101,8 @@ export interface MapApartment {
   lng: number;
   price: number; // 만원
   area: string;
+  lawdNm?: string;          // 시도/시군구/동 조합 위치 문자열
+  umdNm?: string;           // 읍면동명
   areas?: string[];          // 평형 필터용 전체 평형 목록
   priceChangeType: 'up' | 'down' | 'flat';
   markerType?: MarkerType;   // 마커 렌더링 타입 결정

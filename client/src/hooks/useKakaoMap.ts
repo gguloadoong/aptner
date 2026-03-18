@@ -101,6 +101,94 @@ export interface MarkerFilterOptions {
   complexFeatures: Set<ComplexFeature>;
 }
 
+type RegionOverlayLevel = 'sido' | 'sigungu' | 'gu' | 'dong' | 'complex';
+
+const METROPOLITAN_SIDOS = new Set([
+  '서울',
+  '부산',
+  '대구',
+  '인천',
+  '광주',
+  '대전',
+  '울산',
+  '세종특별자치시',
+]);
+
+function getRegionOverlayLevel(zoom: number): RegionOverlayLevel {
+  if (zoom >= 9) return 'sido';
+  if (zoom >= 7) return 'sigungu';
+  if (zoom >= 5) return 'gu';
+  if (zoom >= 4) return 'dong';
+  return 'complex';
+}
+
+function parseLocationParts(apartment: MapApartment) {
+  const raw = apartment.lawdNm?.trim();
+  if (!raw) {
+    const guessedDistrict = findNearestDistrict(apartment.lat, apartment.lng);
+    return {
+      sido: '서울',
+      sigungu: guessedDistrict,
+      gu: guessedDistrict,
+      dong: apartment.umdNm,
+    };
+  }
+
+  const parts = raw.split(/\s+/).filter(Boolean);
+  const sido = parts[0] ?? '';
+  const second = parts[1] ?? '';
+  const third = parts[2] ?? '';
+  const fourth = parts[3] ?? '';
+  const isMetro = METROPOLITAN_SIDOS.has(sido);
+  const isGu = second.endsWith('구');
+  const sigungu = !second
+    ? sido
+    : isMetro && isGu
+      ? sido
+      : `${sido} ${second}`.trim();
+  const gu = third.endsWith('구')
+    ? `${sido} ${second} ${third}`.trim()
+    : isGu
+      ? `${sido} ${second}`.trim()
+      : sigungu;
+  const dong = (apartment.umdNm ?? fourth) || (!third.endsWith('구') ? third : '');
+
+  return { sido, sigungu, gu, dong };
+}
+
+function getRegionGroup(apartment: MapApartment, zoom: number) {
+  const level = getRegionOverlayLevel(zoom);
+  const location = parseLocationParts(apartment);
+
+  switch (level) {
+    case 'sido':
+      return {
+        key: location.sido || '기타',
+        label: location.sido || '기타',
+      };
+    case 'sigungu':
+      return {
+        key: location.sigungu || location.sido || '기타',
+        label: location.sigungu || location.sido || '기타',
+      };
+    case 'gu':
+      return {
+        key: location.gu || location.sigungu || location.sido || '기타',
+        label: location.gu || location.sigungu || location.sido || '기타',
+      };
+    case 'dong':
+      return {
+        key: `${location.gu || location.sigungu || location.sido || '기타'} ${location.dong || '생활권'}`.trim(),
+        label: location.dong || location.gu || location.sigungu || location.sido || '기타',
+      };
+    default:
+      return {
+        key: apartment.id,
+        label: apartment.name,
+      };
+  }
+}
+
 // 카카오맵 초기화 및 마커 관리 훅
 export function useKakaoMap(
   containerRef: React.RefObject<HTMLDivElement | null>,
@@ -186,12 +274,7 @@ export function useKakaoMap(
             level,
           }));
 
-          // 줌 레벨 기반 렌더링 전략
-          // level <= 5: 너무 멀리 줌아웃 → 마커 표시 안 함 (향후 구별 클러스터)
-          // level 6-14: 개별 단지 마커 표시
-          if (level >= 6 && level <= 14) {
-            onBoundsChangeRef.current?.(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng(), level);
-          }
+          onBoundsChangeRef.current?.(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng(), level);
         }, 300);
       };
       idleHandlerRef.current = idleHandler;
@@ -357,44 +440,42 @@ export function useKakaoMap(
     districtOverlaysRef.current = [];
   }, []);
 
-  // 구 단위 평균가 오버레이 업데이트 (줌 레벨 <= 9 시 호출)
-  // apartments 배열에서 구별 평균 가격을 계산하여 CustomOverlay로 표시 (호갱노노 스타일)
+  // 줌 단계별 지역 평균가 오버레이 업데이트
   const updateDistrictOverlays = useCallback(
-    (apartments: MapApartment[], onDistrictClick?: (districtName: string) => void) => {
+    (apartments: MapApartment[], zoom: number, onDistrictClick?: (districtName: string) => void) => {
       if (!mapRef.current || !isKakaoAvailable()) return;
       const { kakao } = window;
+      const overlayLevel = getRegionOverlayLevel(zoom);
 
       // 기존 구 오버레이 제거 후 재생성
       clearDistrictOverlays();
 
-      if (apartments.length === 0) return;
+      if (apartments.length === 0 || overlayLevel === 'complex') return;
 
-      // 1) 구(區)별 평균가 집계
-      const districtPriceMap = new Map<string, { lat: number; lng: number; totalPrice: number; count: number }>();
+      const regionPriceMap = new Map<string, { label: string; latSum: number; lngSum: number; totalPrice: number; count: number }>();
       for (const apt of apartments) {
-        const districtName = findNearestDistrict(apt.lat, apt.lng);
-        const center = SEOUL_DISTRICT_CENTERS.find((d) => d.name === districtName)!;
-        const existing = districtPriceMap.get(districtName);
+        const region = getRegionGroup(apt, zoom);
+        const existing = regionPriceMap.get(region.key);
         if (existing) {
+          existing.latSum += apt.lat;
+          existing.lngSum += apt.lng;
           existing.totalPrice += apt.price;
           existing.count += 1;
         } else {
-          districtPriceMap.set(districtName, {
-            lat: center.lat,
-            lng: center.lng,
+          regionPriceMap.set(region.key, {
+            label: region.label,
+            latSum: apt.lat,
+            lngSum: apt.lng,
             totalPrice: apt.price,
             count: 1,
           });
         }
       }
 
-      // 2) 각 구에 커스텀 오버레이 생성
-      districtPriceMap.forEach((data, name) => {
+      regionPriceMap.forEach((data, name) => {
         const avgPrice = Math.round(data.totalPrice / data.count);
         const avgEok = avgPrice / 10000;
-        // 평균가 구간별 색상 (가격 마커와 동일한 기준)
         const color = getDistrictPriceColor(avgPrice);
-        // 가격 텍스트 포맷 (억 단위)
         const priceText = avgEok >= 1
           ? `${avgEok % 1 === 0 ? avgEok : parseFloat(avgEok.toFixed(1))}억`
           : `${avgPrice.toLocaleString('ko-KR')}만`;
@@ -416,7 +497,7 @@ export function useKakaoMap(
           'color: #191F28',
         ].join(';');
         // innerHTML 대신 DOM API 사용 (컨벤션 준수)
-        const nameNode = document.createTextNode(name);
+        const nameNode = document.createTextNode(data.label);
         const br = document.createElement('br');
         const priceSpan = document.createElement('span');
         priceSpan.style.cssText = `color:${color};font-weight:700`;
@@ -433,7 +514,7 @@ export function useKakaoMap(
         }
 
         const overlay = new kakao.maps.CustomOverlay({
-          position: new kakao.maps.LatLng(data.lat, data.lng),
+          position: new kakao.maps.LatLng(data.latSum / data.count, data.lngSum / data.count),
           content: el,
           yAnchor: 0.5,
           zIndex: 10,
