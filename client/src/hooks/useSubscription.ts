@@ -8,6 +8,8 @@ export function useSubscriptions(params: {
   region?: string;
   sort?: SortOrder;
   page?: number;
+  pageSize?: number;
+  month?: string; // YYYY-MM (캘린더 월간 필터용)
 }) {
   return useQuery({
     queryKey: ['subscriptions', params],

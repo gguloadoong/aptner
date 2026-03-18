@@ -10,7 +10,7 @@ import {
   Select, Option,
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
-import { IconChevronLeft } from '@wanteddev/wds-icon';
+import { IconChevronLeft, IconCalendar } from '@wanteddev/wds-icon';
 import type { SubscriptionStatus, SortOrder } from '../types';
 
 const REGIONS = ['전국', '서울', '경기', '인천', '부산', '대구', '대전', '광주'];
@@ -49,6 +49,11 @@ export default function SubscriptionPage() {
               <IconChevronLeft />
             </TopNavigationButton>
           }
+          trailingContent={
+            <TopNavigationButton onClick={() => navigate('/subscription/calendar')} aria-label="캘린더 보기">
+              <IconCalendar />
+            </TopNavigationButton>
+          }
         >
           청약 정보
         </TopNavigation>
@@ -73,6 +78,15 @@ export default function SubscriptionPage() {
                   청약홈 공식 데이터 기준
                 </Typography>
               </div>
+              <Button
+                variant="outlined"
+                color="primary"
+                size="small"
+                onClick={() => navigate('/subscription/calendar')}
+              >
+                <IconCalendar />
+                캘린더 보기
+              </Button>
             </FlexBox>
 
             {/* 상태 탭 — WDS Tab (onValueChange + onClick 이중 바인딩으로 안정성 확보) */}
