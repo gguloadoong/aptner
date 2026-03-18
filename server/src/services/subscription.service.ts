@@ -208,16 +208,23 @@ function adaptLhItem(item: any, houseTypeMap: Map<string, any[]>): Subscription 
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
   const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
 
+  const totalSupply = Number(item.TOT_SUPLY_HSHLDCO) || 0;
+  // supplyPrice: minPrice 만원 단위 그대로 사용 (0이면 미확정 → undefined)
+  const supplyPrice = minPrice > 0 ? minPrice : undefined;
+
   return {
     id: houseManageNo || String(Math.random()),
     name: item.HOUSE_NM ?? '단지명 없음',
+    location: [sido, sigungu].filter(Boolean).join(' '),
     constructor: item.CNSTRCT_ENTRPS_NM ?? '',
     sido,
     sigungu,
     address,
+    supplyPrice,
     minPrice,
     maxPrice,
-    totalSupply: Number(item.TOT_SUPLY_HSHLDCO) || 0,
+    totalUnits: totalSupply,
+    totalSupply,
     startDate,
     endDate,
     announceDate,
@@ -304,10 +311,12 @@ function calcDDay(endDateStr: string): number {
  * 날짜 문자열을 기준으로 청약 상태를 계산합니다.
  */
 function calcStatus(startDate: string, endDate: string): SubscriptionStatus {
+  if (!startDate || !endDate) return 'upcoming';
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const start = new Date(startDate);
   const end = new Date(endDate);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'upcoming';
 
   if (now < start) return 'upcoming';
   if (now > end) return 'closed';
@@ -320,7 +329,7 @@ function calcStatus(startDate: string, endDate: string): SubscriptionStatus {
 // upcoming: startDate 미래
 // closed:   endDate 과거
 
-const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
+const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay' | 'location' | 'totalUnits' | 'supplyPrice'>[] = [
   // ---- 진행중(ongoing) 4개 이상 ----
   {
     id: 'sub-2024-001',
@@ -656,6 +665,9 @@ const MOCK_SUBSCRIPTIONS_RAW: Omit<Subscription, 'status' | 'dDay'>[] = [
 function buildSubscriptions(): Subscription[] {
   return MOCK_SUBSCRIPTIONS_RAW.map((raw) => ({
     ...raw,
+    location: [raw.sido, raw.sigungu].filter(Boolean).join(' '),
+    totalUnits: raw.totalSupply,
+    supplyPrice: raw.minPrice > 0 ? raw.minPrice * 10000 : undefined,
     status: calcStatus(raw.startDate, raw.endDate),
     dDay: calcDDay(raw.endDate),
   }));
@@ -681,7 +693,7 @@ export async function getSubscriptions(
     return cached;
   }
 
-  const { page = 1, limit = 20, status, sido, sort } = params;
+  const { page = 1, limit = 20, status, sido, sort, month } = params;
 
   // 실 API 사용 가능하면 LH 데이터 사용
   let list: Subscription[];
@@ -694,6 +706,11 @@ export async function getSubscriptions(
       ]);
       list = rawItems.map((item) => adaptLhItem(item, houseTypeMap));
       console.log(`[Subscription] 실 API 데이터 ${list.length}건 사용 (주택형 그룹 ${houseTypeMap.size}개)`);
+      // 실 API가 0건이면 API deprecated 또는 공고 없음 → Mock fallback
+      if (list.length === 0) {
+        console.warn('[Subscription] 실 API 0건 → Mock fallback 사용');
+        list = buildSubscriptions();
+      }
     } catch (err) {
       console.error('[Subscription] 실 API 실패 → Mock fallback:', err);
       list = buildSubscriptions();
@@ -713,14 +730,35 @@ export async function getSubscriptions(
     list = list.filter((s) => s.sido === sido || s.sido.startsWith(sido));
   }
 
-  // 정렬 (MAJOR-04 추가)
-  if (sort === 'price') {
-    list.sort((a, b) => a.minPrice - b.minPrice);
-  } else if (sort === 'latest') {
-    list.sort((a, b) => b.startDate.localeCompare(a.startDate));
+  // 월 필터 (YYYY-MM): 해당 월에 startDate 또는 endDate가 걸치는 청약 반환
+  // 조건: startDate <= 해당 월 말일 AND endDate >= 해당 월 1일
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    const [yearStr, monthStr] = month.split('-');
+    const monthStart = `${yearStr}-${monthStr}-01`;
+    // 해당 월의 마지막 날 계산
+    const lastDay = new Date(Number(yearStr), Number(monthStr), 0).getDate();
+    const monthEnd = `${yearStr}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+    list = list.filter((s) => {
+      if (!s.startDate || !s.endDate) return false;
+      // startDate <= monthEnd AND endDate >= monthStart
+      return s.startDate <= monthEnd && s.endDate >= monthStart;
+    });
+  }
+
+  // 정렬 (MAJOR-04)
+  if (sort === 'units') {
+    // 총 세대수 내림차순
+    list.sort((a, b) => b.totalUnits - a.totalUnits);
+  } else if (sort === 'price') {
+    // 분양가 내림차순 (supplyPrice null인 경우 맨 뒤)
+    list.sort((a, b) => {
+      const pa = a.supplyPrice ?? -1;
+      const pb = b.supplyPrice ?? -1;
+      return pb - pa;
+    });
   } else {
-    // 기본: 마감일 오름차순
-    list.sort((a, b) => a.endDate.localeCompare(b.endDate));
+    // dDay 오름차순 (기본 포함)
+    list.sort((a, b) => a.dDay - b.dDay);
   }
 
   const total = list.length;

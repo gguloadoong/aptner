@@ -9,3 +9,4 @@ server/.env
 *.local
 .DS_Store
 client/.npmrc
+server/deploy-railway.sh

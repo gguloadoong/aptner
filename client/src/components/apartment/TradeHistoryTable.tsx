@@ -12,7 +12,7 @@ interface TradeHistoryTableProps {
 const TradeHistoryTable = React.memo<TradeHistoryTableProps>(
   ({ trades, limit = 20 }) => {
     const displayTrades = [...trades]
-      .sort((a, b) => b.date.localeCompare(a.date))
+      .sort((a, b) => b.dealDate.localeCompare(a.dealDate))
       .slice(0, limit);
 
     if (displayTrades.length === 0) {
@@ -66,7 +66,7 @@ const TradeHistoryTable = React.memo<TradeHistoryTableProps>(
               }}
             >
               <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>
-                {formatYearMonth(trade.date)}
+                {formatYearMonth(trade.dealDate)}
               </Typography>
               <Typography variant="caption1" weight="medium" sx={{ color: 'var(--semantic-label-normal)', textAlign: 'center' }}>
                 {trade.area}㎡

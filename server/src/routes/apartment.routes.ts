@@ -8,18 +8,118 @@ import { Router, Request, Response, NextFunction } from 'express';
 import {
   getApartmentTrades,
   getApartmentHistory,
-  getHotApartments,
   getApartmentMapMarkers,
   getApartmentById,
   searchApartments,
   getJeonseRate,
   getNearbyApartments,
+  getMapPrices,
+  getRecordHighApartments,
 } from '../services/molit.service';
+import { getHotApartmentRanking } from '../services/hot-ranking.service';
 import { getComplexesByViewport } from '../services/complex.service';
 import { apiRateLimiter } from '../middleware/security';
 import { ComplexFilter, TradeQueryParams } from '../types';
 
 const router = Router();
+
+/**
+ * GET /api/apartments/map-prices
+ * 지도 마커용 단지별 최근 거래가 요약
+ *
+ * Query params:
+ *   - lawdCd: 법정동 코드 앞 5자리 (필수, 예: 11200 = 성동구)
+ *   - year:   조회 년도 (선택, 미지정 시 최근 3개월 자동 조회)
+ *   - month:  조회 월  (선택, year와 함께 사용)
+ *
+ * 응답:
+ *   { success: true, data: ApartmentPrice[], cached: boolean }
+ *   - 동일 단지(aptName) 중 가장 최근 거래 1건만 포함
+ *   - API 키 없거나 결과 0건이면 Mock fallback(12개) 반환
+ */
+router.get('/map-prices', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lawdCd, year, month } = req.query as Partial<Record<string, string>>;
+
+    // lawdCd 필수 검증
+    if (!lawdCd) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_PARAMS',
+          message: 'lawdCd(지역코드)는 필수 파라미터입니다.',
+        },
+      });
+      return;
+    }
+
+    // lawdCd 형식 검증 (5자리 숫자)
+    if (!/^\d{5}$/.test(lawdCd)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_LAWD_CD',
+          message: 'lawdCd는 5자리 숫자여야 합니다. (예: 11200)',
+        },
+      });
+      return;
+    }
+
+    // year/month 파싱 및 유효성 검증
+    let yearNum: number | undefined;
+    let monthNum: number | undefined;
+
+    if (year !== undefined) {
+      yearNum = parseInt(year, 10);
+      if (isNaN(yearNum) || yearNum < 2006 || yearNum > 2100) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_YEAR',
+            message: 'year는 2006~2100 사이의 숫자여야 합니다.',
+          },
+        });
+        return;
+      }
+    }
+
+    if (month !== undefined) {
+      monthNum = parseInt(month, 10);
+      if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_MONTH',
+            message: 'month는 1~12 사이의 숫자여야 합니다.',
+          },
+        });
+        return;
+      }
+    }
+
+    // year만 있고 month가 없는 경우는 허용하지 않음 (둘 다 있거나 둘 다 없어야)
+    if ((yearNum !== undefined) !== (monthNum !== undefined)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_PARAMS',
+          message: 'year와 month는 함께 지정하거나 둘 다 생략해야 합니다.',
+        },
+      });
+      return;
+    }
+
+    const { data, cached } = await getMapPrices(lawdCd, yearNum, monthNum);
+
+    res.json({
+      success: true,
+      data,
+      cached,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * GET /api/apartments/trades
@@ -216,44 +316,114 @@ router.get('/nearby', apiRateLimiter, async (req: Request, res: Response, next: 
 });
 
 /**
- * GET /api/apartments/hot
- * 핫한 아파트 랭킹 (거래량 기준)
+ * GET /api/apartments/record-highs
+ * 신고가 경신 단지 조회
  *
  * Query params:
- *   - region: 시도 코드 2자리(예: 11 = 서울) 또는 한글 시도명(예: '서울', '경기')
- *             '전국' 또는 미지정 시 전체 반환
- *   - limit: 랭킹 개수 (선택, 기본: 10, 최대: 20)
+ *   - region: '수도권' | '전국' (기본: '수도권')
+ *   - limit:  반환 건수 (기본: 5, 최대: 10)
+ *
+ * 응답:
+ *   { success: true, data: RecordHighItem[], meta: { baseMonth, region } }
+ *   실 데이터 없거나 API 실패 시 Mock fallback 반환 (ADR-006 준수)
+ */
+router.get('/record-highs', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { region, limit } = req.query as Partial<Record<string, string>>;
+
+    // region 검증
+    const VALID_REGIONS = ['수도권', '전국'] as const;
+    type RegionType = typeof VALID_REGIONS[number];
+    if (region && !VALID_REGIONS.includes(region as RegionType)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REGION',
+          message: `region은 '수도권' 또는 '전국' 중 하나여야 합니다.`,
+        },
+      });
+      return;
+    }
+
+    // limit 검증 (1~10)
+    let limitNum = 5;
+    if (limit !== undefined) {
+      limitNum = parseInt(limit, 10);
+      if (isNaN(limitNum) || limitNum < 1 || limitNum > 10) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_LIMIT',
+            message: 'limit은 1~10 사이의 정수여야 합니다.',
+          },
+        });
+        return;
+      }
+    }
+
+    const regionVal = (region as RegionType | undefined) ?? '수도권';
+    const { data, meta } = await getRecordHighApartments(regionVal, limitNum);
+
+    res.json({
+      success: true,
+      data,
+      meta,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/apartments/hot
+ * 핫 아파트 랭킹 — 거래량 급등률 기반 (P1)
+ *
+ * Query params:
+ *   - region: 시도 코드 2자리 (예: 11=서울, 41=경기, 26=부산)
+ *             미지정 또는 '전국' 시 전국 반환
+ *   - limit:  반환 개수 (기본: 20, 최대: 50)
+ *
+ * 응답:
+ *   { success: true, data: HotApartmentRanking[], meta: { total, updatedAt } }
  */
 router.get('/hot', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { region, limit } = req.query as Partial<Record<string, string>>;
 
-    const limitNum = limit ? Math.min(20, Math.max(1, parseInt(limit, 10))) : 10;
+    // limit: 기본 20, 최대 50
+    const limitNum = limit ? Math.min(50, Math.max(1, parseInt(limit, 10))) : 20;
+    if (limit && isNaN(parseInt(limit, 10))) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_LIMIT', message: 'limit은 숫자여야 합니다.' },
+      });
+      return;
+    }
 
-    // region 파라미터 정규화:
-    // - 한글(서울, 경기 등): lawdNm 기준 필터용 한글 키워드로 전달
-    // - 숫자 코드(11, 41 등): 기존 법정동 코드 방식으로 전달
-    // - '전국' 또는 미지정: 전체 반환 (regionCode = undefined)
-    const isKorean = region && /[가-힣]/.test(region);
+    // region 정규화: 숫자 2자리 코드만 허용, 전국/미지정은 undefined
     const isNationwide = !region || region === '전국';
+    const regionCode = isNationwide ? undefined : region;
 
-    // 서비스에 전달할 regionCode: 숫자 코드이거나 미지정이면 기존 방식
-    const regionCode = isNationwide ? undefined : isKorean ? undefined : region;
+    // 숫자 코드 형식 검증 (전달된 경우만)
+    if (regionCode && !/^\d{2}$/.test(regionCode)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REGION',
+          message: 'region은 시도 코드 2자리 숫자여야 합니다. (예: 11=서울, 41=경기)',
+        },
+      });
+      return;
+    }
 
-    // 한글 region이면 lawdNm 필터 키워드로 사용
-    const regionFilter = isKorean ? region : undefined;
-
-    const data = await getHotApartments(regionCode ?? '11', limitNum, regionFilter);
+    const data = await getHotApartmentRanking(regionCode, limitNum);
 
     res.json({
       success: true,
       data,
       meta: {
         total: data.length,
-        page: 1,
-        limit: limitNum,
-        totalPages: 1,
-        regionFilter: regionFilter ?? regionCode ?? '전국',
+        updatedAt: new Date().toISOString(),
       },
     });
   } catch (error) {
@@ -390,11 +560,12 @@ router.get('/map', apiRateLimiter, async (req: Request, res: Response, next: Nex
       return;
     }
 
-    // 문자열 enum을 숫자 상한값으로 변환 (under5, 5to10, over10 처리)
+    // 문자열 enum을 숫자 범위로 변환 (under5, 5to10, over10 처리)
     let maxPrice: number | undefined;
+    let minPrice: number | undefined;
     if (priceFilter === 'under5') maxPrice = 50000;
-    else if (priceFilter === '5to10') maxPrice = 100000;
-    else if (priceFilter === 'over10') maxPrice = undefined; // 하한만 있음 (필터 없이 전체 반환)
+    else if (priceFilter === '5to10') { minPrice = 50000; maxPrice = 100000; }
+    else if (priceFilter === 'over10') minPrice = 100000;
     else if (priceFilter && !isNaN(Number(priceFilter))) maxPrice = Number(priceFilter);
 
     // 불리언 쿼리파라미터 파서 (문자열 'true'/'false' → boolean)
@@ -415,7 +586,7 @@ router.get('/map', apiRateLimiter, async (req: Request, res: Response, next: Nex
     // 모든 필드가 undefined이면 필터 객체 자체를 전달하지 않음 (불필요한 캐시 키 증가 방지)
     const hasAnyComplexFilter = Object.values(complexFilter).some((v) => v !== undefined);
 
-    const data = await getApartmentMapMarkers(
+    let data = await getApartmentMapMarkers(
       swLatNum,
       swLngNum,
       neLatNum,
@@ -423,6 +594,11 @@ router.get('/map', apiRateLimiter, async (req: Request, res: Response, next: Nex
       maxPrice,
       hasAnyComplexFilter ? complexFilter : undefined,
     );
+
+    // over10 / 5to10 하한 필터 적용 (서비스 레이어는 maxPrice만 처리)
+    if (minPrice !== undefined) {
+      data = data.filter((m) => m.price >= minPrice!);
+    }
 
     res.json({
       success: true,

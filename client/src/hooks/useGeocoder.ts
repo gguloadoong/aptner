@@ -142,41 +142,41 @@ export function useGeocoder() {
   // lat/lng 없는 단지만 처리하고, 이미 좌표가 있으면 그대로 유지
   const batchGeocode = useCallback(
     async (complexes: ApartmentComplex[]): Promise<ApartmentComplex[]> => {
-      // 좌표 없는 단지만 추출
-      const needGeocode = complexes.filter((c) => c.lat == null || c.lng == null);
-      const alreadyHasCoords = complexes.filter((c) => c.lat != null && c.lng != null);
+      // 원본 순서 보존을 위해 결과 배열을 원본 복사본으로 초기화
+      const result = [...complexes];
+      const needGeocodeIndices = complexes
+        .map((c, i) => ({ c, i }))
+        .filter(({ c }) => c.lat == null || c.lng == null);
 
-      if (needGeocode.length === 0) {
+      if (needGeocodeIndices.length === 0) {
         return complexes;
       }
 
-      const results: ApartmentComplex[] = [...alreadyHasCoords];
-
-      // BATCH_SIZE씩 나눠서 처리
-      for (let i = 0; i < needGeocode.length; i += BATCH_SIZE) {
-        const batch = needGeocode.slice(i, i + BATCH_SIZE);
+      // BATCH_SIZE씩 나눠서 처리 (원본 인덱스 추적)
+      for (let b = 0; b < needGeocodeIndices.length; b += BATCH_SIZE) {
+        const batch = needGeocodeIndices.slice(b, b + BATCH_SIZE);
 
         const batchResults = await Promise.all(
-          batch.map(async (complex) => {
+          batch.map(async ({ c: complex, i: originalIndex }) => {
             // fallback: "읍면동명 단지명" 형식
             const fallback = `${complex.umdNm} ${complex.name}`;
             const coords = await geocodeAddress(complex.address, fallback);
-            if (coords) {
-              return { ...complex, lat: coords.lat, lng: coords.lng };
-            }
-            return complex; // 좌표 없으면 원본 유지 (마커 미표시)
+            return { originalIndex, geocoded: coords ? { ...complex, lat: coords.lat, lng: coords.lng } : complex };
           })
         );
 
-        results.push(...batchResults);
+        // 원본 인덱스 위치에 결과 삽입
+        for (const { originalIndex, geocoded } of batchResults) {
+          result[originalIndex] = geocoded;
+        }
 
         // 배치 간 딜레이 (마지막 배치 제외)
-        if (i + BATCH_SIZE < needGeocode.length) {
+        if (b + BATCH_SIZE < needGeocodeIndices.length) {
           await sleep(BATCH_DELAY_MS);
         }
       }
 
-      return results;
+      return result;
     },
     [geocodeAddress]
   );

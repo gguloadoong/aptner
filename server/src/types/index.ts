@@ -132,6 +132,8 @@ export interface ApartmentMapMarker {
   isFlat?: boolean;
   /** 초품아 여부 (초등학교 인접) */
   hasElementarySchool?: boolean;
+  /** 신고가 여부 (지역 중앙값 대비 30% 이상 고가 거래) */
+  isRecordHigh?: boolean;
 }
 
 /** 단지 필터 조건 */
@@ -153,6 +155,8 @@ export interface Subscription {
   id: string;
   /** 단지명 */
   name: string;
+  /** 공급 지역 (시도 + 시군구, FE 계약 필드: location) */
+  location: string;
   /** 건설사 */
   constructor: string;
   /** 위치 (시도) */
@@ -161,23 +165,27 @@ export interface Subscription {
   sigungu: string;
   /** 상세 주소 */
   address: string;
+  /** 분양가 (원, FE 계약 필드: supplyPrice) — minPrice 기준, 미확정 시 undefined */
+  supplyPrice?: number;
   /** 분양가 시작 (만원) */
   minPrice: number;
   /** 분양가 최대 (만원) */
   maxPrice: number;
-  /** 총 공급 세대수 */
+  /** 총 공급 세대수 (FE 계약 필드: totalUnits) */
+  totalUnits: number;
+  /** 총 공급 세대수 (하위 호환 유지) */
   totalSupply: number;
   /** 청약 상태 */
   status: SubscriptionStatus;
-  /** 접수 시작일 (YYYY-MM-DD) */
+  /** 접수 시작일 (YYYY-MM-DD, ISO 8601) */
   startDate: string;
-  /** 접수 마감일 (YYYY-MM-DD) */
+  /** 접수 마감일 (YYYY-MM-DD, ISO 8601) */
   endDate: string;
   /** 당첨자 발표일 (YYYY-MM-DD) */
   announceDate: string;
   /** 청약 유형 (일반/특별/기관추천) */
   type: string;
-  /** 마감까지 남은 일수 */
+  /** 마감까지 남은 일수 (음수면 마감) */
   dDay: number;
   /** 평형 목록 */
   areas: SubscriptionArea[];
@@ -332,6 +340,27 @@ export interface ApartmentComplex {
   buildYear?: number;
 }
 
+// ---- 핫 아파트 랭킹 (거래량 급등률 기반, FE 합의 계약) ----
+
+export interface HotApartmentRanking {
+  /** 현재 순위 */
+  rank: number;
+  /** 순위 변동: 양수=상승, 음수=하락, 0=유지, null=신규 진입 */
+  rankChange: number | null;
+  /** 단지 코드 */
+  aptCode: string;
+  /** 단지명 */
+  name: string;
+  /** 시군구 위치 */
+  location: string;
+  /** 최근 거래가 (원) */
+  recentPrice: number;
+  /** 이번 달 거래량 */
+  tradeCount: number;
+  /** 거래량 급등률 (%, 전월 대비) */
+  tradeSurgeRate: number;
+}
+
 // ---- 거래량 급등 단지 ----
 
 export interface HotTradeApartment {
@@ -349,6 +378,21 @@ export interface HotTradeApartment {
   /** 최근 거래가 (만원) */
   recentPrice: number;
   priceChangeType: 'up' | 'down' | 'flat';
+}
+
+// ---- 지도 마커용 단지별 최근 거래가 요약 ----
+
+export interface ApartmentPrice {
+  /** 아파트명 (FE 카카오 Places 매칭 키) */
+  aptName: string;
+  /** 최근 거래가 (만원) */
+  recentPrice: number;
+  /** 거래일 (YYYY-MM-DD) */
+  dealDate: string;
+  /** 층 */
+  floor: number;
+  /** 전용면적 (m²) */
+  area: number;
 }
 
 // ---- 요청 파라미터 ----
@@ -370,7 +414,9 @@ export interface SubscriptionQueryParams {
   limit?: number;
   status?: SubscriptionStatus;
   sido?: string;
-  sort?: 'deadline' | 'price' | 'latest'; // MAJOR-04 추가
+  sort?: 'dDay' | 'units' | 'price'; // MAJOR-04: dDay|units|price
+  /** 월 필터 (YYYY-MM): 해당 월에 startDate 또는 endDate가 걸치는 청약만 반환 */
+  month?: string;
 }
 
 export interface TrendQueryParams {

@@ -115,6 +115,11 @@ export function useKakaoMap(
   } = options;
 
   const mapRef = useRef<unknown>(null);
+  // onBoundsChange를 ref에 저장하여 initMap이 재생성되지 않도록 함
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  // idle 핸들러 ref — cleanup 시 removeListener에 동일 참조 필요
+  const idleHandlerRef = useRef<(() => void) | null>(null);
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange; }, [onBoundsChange]);
   // 차분 업데이트를 위해 Map<id, overlay> 구조로 변경 (DOM 조작 최소화)
   const overlaysRef = useRef<Map<string, { setMap: (m: unknown) => void }>>(new Map());
   // 히트맵 원형 오버레이 목록 (구별 Circle 인스턴스)
@@ -150,7 +155,8 @@ export function useKakaoMap(
       mapRef.current = map;
 
       // 지도 이동/줌 이벤트 리스너 (300ms debounce - 드래그 중 과도한 API 호출 방지)
-      kakao.maps.event.addListener(map, 'idle', () => {
+      // 이름 있는 함수로 추출 — cleanup 시 removeListener에 동일 참조 전달을 위해
+      const idleHandler = () => {
         if (!mapRef.current) return;
 
         // 기존 타이머 취소
@@ -184,17 +190,19 @@ export function useKakaoMap(
           // level <= 5: 너무 멀리 줌아웃 → 마커 표시 안 함 (향후 구별 클러스터)
           // level 6-14: 개별 단지 마커 표시
           if (level >= 6 && level <= 14) {
-            onBoundsChange?.(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng(), level);
+            onBoundsChangeRef.current?.(sw.getLat(), sw.getLng(), ne.getLat(), ne.getLng(), level);
           }
         }, 300);
-      });
+      };
+      idleHandlerRef.current = idleHandler;
+      kakao.maps.event.addListener(map, 'idle', idleHandler);
 
       setState((prev) => ({ ...prev, isLoaded: true }));
     } catch (err) {
       console.error('[KakaoMap] 초기화 실패:', err);
       setState((prev) => ({ ...prev, isError: true }));
     }
-  }, [containerRef, initialLat, initialLng, initialLevel, onBoundsChange]);
+  }, [containerRef, initialLat, initialLng, initialLevel]);
 
   // 카카오맵 SDK 로드 후 초기화
   useEffect(() => {
@@ -220,6 +228,11 @@ export function useKakaoMap(
 
     return () => {
       if (timer !== undefined) clearInterval(timer);
+      // idle 리스너 제거 (누적 방지)
+      if (mapRef.current && isKakaoAvailable() && idleHandlerRef.current) {
+        window.kakao.maps.event.removeListener(mapRef.current, 'idle', idleHandlerRef.current);
+        idleHandlerRef.current = null;
+      }
       // debounce 타이머 정리
       if (debounceTimerRef.current !== null) {
         clearTimeout(debounceTimerRef.current);
@@ -513,6 +526,57 @@ export function useKakaoMap(
     });
   }, [clearHeatmapOverlays]);
 
+  // Places AT4 검색 결과 마커 업데이트
+  // PlaceMarkerData 배열을 받아 가격 pill 마커 또는 단지명 점 마커로 렌더링
+  const updatePlaceMarkers = useCallback(
+    (
+      places: Array<{
+        id: string;
+        placeName: string;
+        lat: number;
+        lng: number;
+        price: number | null;
+        dealDate: string | null;
+      }>,
+      onPlaceClick?: (id: string, placeName: string) => void
+    ) => {
+      if (!mapRef.current || !isKakaoAvailable()) return;
+      const { kakao } = window;
+
+      const validIds = new Set(places.map((p) => `place-${p.id}`));
+
+      // 기존 place 마커 중 더 이상 필요 없는 것 제거
+      overlaysRef.current.forEach((overlay, id) => {
+        if (id.startsWith('place-') && !validIds.has(id)) {
+          overlay.setMap(null);
+          overlaysRef.current.delete(id);
+        }
+      });
+
+      // 신규 마커 생성
+      places.forEach((place) => {
+        const markerId = `place-${place.id}`;
+        if (overlaysRef.current.has(markerId)) return;
+
+        const content = createPlacePriceMarker(place, onPlaceClick);
+        const overlay = new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(place.lat, place.lng),
+          content,
+          yAnchor: 1,
+          zIndex: 15,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        overlay.setMap(mapRef.current as any);
+        overlaysRef.current.set(
+          markerId,
+          overlay as unknown as { setMap: (m: unknown) => void }
+        );
+      });
+    },
+    []
+  );
+
   return {
     // ESLint react-hooks/exhaustive-deps 규칙 준수:
     // ref.current를 렌더 중 직접 반환하지 않고 getter 함수로 감싸서 반환
@@ -523,6 +587,7 @@ export function useKakaoMap(
     level: state.level,
     updateMarkers,
     updateComplexMarkers,
+    updatePlaceMarkers,
     moveToLocation,
     updateHeatmapOverlays,
     clearHeatmapOverlays,
@@ -953,6 +1018,131 @@ function formatMonthDay(dateStr: string): string {
 }
 
 // ────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────
+// Places AT4 검색 결과 가격 마커 팩토리
+// 지수 디자인 스펙: 가격 pill + 삼각형 꼬리, 색상 #1B64DA(MVP 단색)
+// 가격 없는 단지: 작은 점 마커(단지명 툴팁)
+// ────────────────────────────────────────────────────────────
+
+function createPlacePriceMarker(
+  place: {
+    id: string;
+    placeName: string;
+    lat: number;
+    lng: number;
+    price: number | null;
+    dealDate: string | null;
+  },
+  onClick?: (id: string, placeName: string) => void
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:relative; display:inline-block; cursor:pointer;';
+
+  if (place.price !== null) {
+    // 가격 pill 마커
+    const pill = document.createElement('div');
+    pill.style.cssText = [
+      'display: inline-flex',
+      'align-items: center',
+      'justify-content: center',
+      'padding: 5px 10px',
+      'border-radius: 14px',
+      'background-color: #1B64DA',
+      'color: #FFFFFF',
+      'border: 1px solid #FFFFFF',
+      'box-shadow: 0 2px 6px rgba(0,0,0,0.2)',
+      'font-size: 13px',
+      'font-weight: 700',
+      'white-space: nowrap',
+      'font-family: "JetBrains Mono", "Nanum Gothic Coding", monospace',
+      'transition: transform 0.15s ease',
+    ].join(';');
+    pill.textContent = formatPlacePrice(place.price);
+
+    // 삼각형 꼬리
+    const tail = document.createElement('div');
+    tail.style.cssText = [
+      'position: absolute',
+      'bottom: -5px',
+      'left: 50%',
+      'transform: translateX(-50%)',
+      'width: 0',
+      'height: 0',
+      'border-left: 5px solid transparent',
+      'border-right: 5px solid transparent',
+      'border-top: 5px solid #1B64DA',
+    ].join(';');
+
+    pill.appendChild(tail);
+    wrapper.appendChild(pill);
+
+    // 호버 효과
+    wrapper.addEventListener('mouseenter', () => {
+      pill.style.transform = 'scale(1.06)';
+    });
+    wrapper.addEventListener('mouseleave', () => {
+      pill.style.transform = 'scale(1)';
+    });
+  } else {
+    // 가격 없는 단지 — 작은 점 마커 + 단지명 표시
+    const dot = document.createElement('div');
+    dot.style.cssText = [
+      'width: 8px',
+      'height: 8px',
+      'border-radius: 50%',
+      'background-color: #8B95A1',
+      'border: 1.5px solid #FFFFFF',
+      'box-shadow: 0 1px 3px rgba(0,0,0,0.2)',
+      'transition: transform 0.15s ease',
+    ].join(';');
+
+    // 단지명 레이블 (점 아래)
+    const label = document.createElement('div');
+    label.style.cssText = [
+      'position: absolute',
+      'top: 12px',
+      'left: 50%',
+      'transform: translateX(-50%)',
+      'background: rgba(255,255,255,0.9)',
+      'border-radius: 4px',
+      'padding: 2px 5px',
+      'font-size: 10px',
+      'font-weight: 500',
+      'color: #4E5968',
+      'white-space: nowrap',
+      'pointer-events: none',
+      'box-shadow: 0 1px 3px rgba(0,0,0,0.12)',
+    ].join(';');
+    label.textContent = place.placeName;
+
+    wrapper.appendChild(dot);
+    wrapper.appendChild(label);
+
+    wrapper.addEventListener('mouseenter', () => {
+      dot.style.transform = 'scale(1.3)';
+    });
+    wrapper.addEventListener('mouseleave', () => {
+      dot.style.transform = 'scale(1)';
+    });
+  }
+
+  wrapper.addEventListener('click', () => {
+    onClick?.(place.id, place.placeName);
+  });
+
+  return wrapper;
+}
+
+// 가격 pill 텍스트 포맷 (만원 단위 입력 → 억/만 표시)
+function formatPlacePrice(manwon: number): string {
+  const eok = manwon / 10000;
+  if (eok >= 1) {
+    const rounded = Math.round(eok * 10) / 10;
+    return `${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}억`;
+  }
+  return `${manwon.toLocaleString('ko-KR')}만`;
+}
+
 // 호갱노노 스타일 단지 마커 팩토리 (ApartmentComplex용)
 // ────────────────────────────────────────────────────────────
 

@@ -1,0 +1,24 @@
+# Render.com 배포 설정 (Railway 대안)
+# 사용법: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: bomzip-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: NODE_ENV
+        value: production
+      - key: MOLIT_API_KEY
+        sync: false
+      - key: LH_SUBSCRIPTION_API_KEY
+        sync: false
+      - key: LH_COMPETITION_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "https://client-steel-rho.vercel.app,*.vercel.app"

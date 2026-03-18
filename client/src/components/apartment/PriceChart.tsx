@@ -42,14 +42,14 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
     const cutoff = new Date(now.getFullYear(), now.getMonth() - dateRange, 1);
 
     const filtered = data.filter((t) => {
-      const [year, month] = t.date.split('-').map(Number);
+      const [year, month] = t.dealDate.split('-').map(Number);
       return new Date(year, month - 1, 1) >= cutoff;
     });
 
     const byMonth: Record<string, number[]> = {};
     filtered.forEach((t) => {
-      if (!byMonth[t.date]) byMonth[t.date] = [];
-      byMonth[t.date].push(t.price);
+      if (!byMonth[t.dealDate]) byMonth[t.dealDate] = [];
+      byMonth[t.dealDate].push(t.price);
     });
 
     const result: ChartPoint[] = [];
@@ -192,7 +192,7 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
               strokeDasharray="4 3"
               strokeWidth={1}
               label={{
-                value: `평균 ${Math.floor(avgPrice / 10000)}억`,
+                value: `평균 ${avgPrice / 10000 % 1 === 0 ? avgPrice / 10000 : (avgPrice / 10000).toFixed(1)}억`,
                 fill: '#8B95A1',
                 fontSize: 10,
                 position: 'insideTopRight',

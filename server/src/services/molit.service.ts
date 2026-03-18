@@ -9,6 +9,7 @@ import {
   ApartmentTrade,
   ApartmentTradeHistory,
   ApartmentMapMarker,
+  ApartmentPrice,
   ComplexFilter,
   HotApartment,
   MolitApiResponse,
@@ -1500,11 +1501,101 @@ export async function getHotApartments(
   }
 }
 
+// 뷰포트 범위 안에 있는 구(lawdCd) 목록을 추출하기 위한 배열
+// LAWD_CD_COORDS의 키/값을 순회 가능한 형태로 정리
+const LAWD_CD_LIST = Object.entries(LAWD_CD_COORDS).map(([lawdCd, coords]) => ({
+  lawdCd,
+  lat: coords.lat,
+  lng: coords.lng,
+}));
+
+// 뷰포트당 반환할 마커 최대 수
+const MAP_MARKERS_MAX = 200;
+
+/**
+ * 실거래 ApartmentTrade 배열을 단지별로 집계해 ApartmentMapMarker[] 를 생성합니다.
+ *
+ * 국토부 API는 좌표를 제공하지 않으므로, 구 중심 좌표 + 단지 인덱스 기반 오프셋으로
+ * 마커를 분산 배치합니다. aptCode(아파트 일련번호)를 시드로 사용해 오프셋이
+ * 재실행 시에도 동일하게 유지됩니다.
+ *
+ * @param trades - 실거래 목록
+ * @param lawdCd - 조회 대상 시군구 코드 (좌표 추정에 사용)
+ */
+function tradesToMapMarkers(trades: ApartmentTrade[], lawdCd: string): ApartmentMapMarker[] {
+  const baseCoords = LAWD_CD_COORDS[lawdCd];
+  if (!baseCoords) return [];
+
+  // aptCode(없으면 아파트명+동 조합) 기준으로 단지 집계
+  // key: 단지 식별자, value: 해당 단지의 거래 목록
+  const aptMap = new Map<string, ApartmentTrade[]>();
+
+  for (const trade of trades) {
+    // 단지 식별자: aptCode 있으면 사용, 없으면 아파트명으로 대체
+    const key = trade.aptCode ?? trade.apartmentName;
+    const list = aptMap.get(key) ?? [];
+    list.push(trade);
+    aptMap.set(key, list);
+  }
+
+  // 지역 중앙값 가격 계산 (신고가 판정 기준)
+  const allPrices = trades.map((t) => t.price).sort((a, b) => a - b);
+  const districtMedian = allPrices.length > 0 ? (allPrices[Math.floor(allPrices.length / 2)] ?? 0) : 0;
+
+  const markers: ApartmentMapMarker[] = [];
+  let idx = 0;
+
+  for (const [key, aptTrades] of aptMap) {
+    // 가장 최근 거래 기준으로 대표 가격 결정 (dealDate 내림차순 정렬)
+    const sorted = [...aptTrades].sort((a, b) => b.dealDate.localeCompare(a.dealDate));
+    const latest = sorted[0];
+    const oldest = sorted[sorted.length - 1];
+
+    // 가격 변화 방향 계산 (최신 vs 가장 오래된 거래)
+    const priceDiff = latest.price - oldest.price;
+    const priceChangeType: 'up' | 'down' | 'flat' =
+      priceDiff > 0 ? 'up' : priceDiff < 0 ? 'down' : 'flat';
+
+    // 신고가 여부: 지역 중앙값 대비 30% 이상 고가 거래
+    const isRecordHigh = districtMedian > 0 && latest.price >= districtMedian * 1.3;
+
+    // 단지 식별자 문자열을 간단한 해시값으로 변환 (좌표 오프셋 시드)
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+    }
+    // 오프셋 범위: ±0.03도 (약 ±3km) 내에서 분산 배치
+    const latOffset = ((Math.abs(hash) % 60) - 30) * 0.001;
+    const lngOffset = (((Math.abs(hash) >> 4) % 60) - 30) * 0.001;
+
+    markers.push({
+      id: latest.aptCode ? `${lawdCd}-${latest.aptCode}` : `${lawdCd}-${idx}`,
+      name: latest.apartmentName,
+      lat: baseCoords.lat + latOffset,
+      lng: baseCoords.lng + lngOffset,
+      price: latest.price,
+      area: String(Math.round(latest.area)),
+      priceChangeType,
+      isRecordHigh,
+    });
+
+    idx++;
+  }
+
+  return markers;
+}
+
 /**
  * 지도 뷰포트 내 아파트 마커를 조회합니다.
- * TODO: 실 API 연동 시 이 함수 교체
- * - Mock: 사전 정의된 40개 아파트에서 뷰포트 및 단지 특성 필터링
- * - 실 API: DB 또는 API에서 좌표 기반 조회
+ *
+ * MOLIT_API_KEY 환경변수가 설정된 경우 실 국토부 API 데이터를 사용하고,
+ * 없거나 API 호출 실패 시 Mock 데이터(40개 고정 단지)로 자동 폴백합니다.
+ *
+ * 실 API 흐름:
+ * 1. 뷰포트 범위 안에 있는 구(lawdCd) 목록 추출 (LAWD_CD_LIST 활용)
+ * 2. 최대 5개 구를 병렬로 실거래 조회 (이번 달 기준)
+ * 3. 거래 데이터를 단지별로 집계해 ApartmentMapMarker 형태로 변환
+ * 4. 필터 적용 후 최대 200개 마커 반환
  *
  * @param swLat - 남서쪽 위도
  * @param swLng - 남서쪽 경도
@@ -1530,6 +1621,160 @@ export async function getApartmentMapMarkers(
     return cached;
   }
 
+  // ── 실 API 경로 ──────────────────────────────────────────────
+  if (isRealApiKey(process.env.MOLIT_API_KEY)) {
+    try {
+      // 1. 뷰포트 안에 중심 좌표가 들어오는 구 목록 추출
+      const inBoundsLawdCds = LAWD_CD_LIST.filter(
+        (d) => d.lat >= swLat && d.lat <= neLat && d.lng >= swLng && d.lng <= neLng,
+      );
+
+      if (inBoundsLawdCds.length === 0) {
+        console.log('[Molit] 지도 마커: 뷰포트 내 구 없음 → Mock 폴백');
+        return getMockMarkersWithFilter(swLat, swLng, neLat, neLng, priceFilter, complexFilter);
+      }
+
+      // 2. 최대 5개 구를 병렬 조회 (API quota 보호)
+      const targetLawdCds = inBoundsLawdCds.slice(0, 5);
+      // 현재 연월 (YYYYMM 형식)
+      const now = new Date();
+      const currentYm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      console.log(
+        `[Molit] 지도 마커 실 API 조회: ${targetLawdCds.map((d) => d.lawdCd).join(', ')} (${currentYm})`,
+      );
+
+      const results = await Promise.allSettled(
+        targetLawdCds.map((d) =>
+          getApartmentTrades(d.lawdCd, currentYm, 1, 100),
+        ),
+      );
+
+      // 3. 성공한 구의 거래 데이터를 마커로 변환
+      let allMarkers: ApartmentMapMarker[] = [];
+
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          const { items } = result.value;
+          const lawdCd = targetLawdCds[i].lawdCd;
+          const converted = tradesToMapMarkers(items, lawdCd);
+          allMarkers = allMarkers.concat(converted);
+        } else {
+          console.warn(
+            `[Molit] 구 ${targetLawdCds[i].lawdCd} 조회 실패:`,
+            result.reason,
+          );
+        }
+      });
+
+      // 이번 달 데이터 없으면 전달도 조회 (신고 지연 대응)
+      if (allMarkers.length === 0) {
+        const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevYm = `${prevDate.getFullYear()}${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+        console.log(`[Molit] 이번 달 데이터 없음 → 전달(${prevYm}) 재조회`);
+        const prevResults = await Promise.allSettled(
+          targetLawdCds.map((d) => getApartmentTrades(d.lawdCd, prevYm, 1, 100)),
+        );
+        prevResults.forEach((result, i) => {
+          if (result.status === 'fulfilled') {
+            const { items } = result.value;
+            const converted = tradesToMapMarkers(items, targetLawdCds[i].lawdCd);
+            allMarkers = allMarkers.concat(converted);
+          }
+        });
+      }
+
+      // 여전히 없으면 Mock 폴백
+      if (allMarkers.length === 0) {
+        console.warn('[Molit] 지도 마커: 실 API 결과 없음 → Mock 폴백');
+        return getMockMarkersWithFilter(swLat, swLng, neLat, neLng, priceFilter, complexFilter);
+      }
+
+      // 4. 필터 적용
+      let markers = allMarkers;
+
+      if (priceFilter !== undefined && priceFilter > 0) {
+        markers = markers.filter((apt) => apt.price <= priceFilter);
+      }
+
+      // 단지 특성 필터: 실 API 데이터에는 특성 정보가 없으므로 undefined 필드는 필터 제외
+      if (complexFilter) {
+        if (complexFilter.minUnit !== undefined) {
+          markers = markers.filter(
+            (apt) => apt.unitCount !== undefined && apt.unitCount >= complexFilter.minUnit!,
+          );
+        }
+        if (complexFilter.isBrand !== undefined) {
+          markers = markers.filter(
+            (apt) => apt.isBrand === undefined || apt.isBrand === complexFilter.isBrand,
+          );
+        }
+        if (complexFilter.isWalkSubway !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.isWalkSubway === undefined || apt.isWalkSubway === complexFilter.isWalkSubway,
+          );
+        }
+        if (complexFilter.isLargeComplex !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.isLargeComplex === undefined ||
+              apt.isLargeComplex === complexFilter.isLargeComplex,
+          );
+        }
+        if (complexFilter.isNewBuild !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.isNewBuild === undefined || apt.isNewBuild === complexFilter.isNewBuild,
+          );
+        }
+        if (complexFilter.isFlat !== undefined) {
+          markers = markers.filter(
+            (apt) => apt.isFlat === undefined || apt.isFlat === complexFilter.isFlat,
+          );
+        }
+        if (complexFilter.hasElementarySchool !== undefined) {
+          markers = markers.filter(
+            (apt) =>
+              apt.hasElementarySchool === undefined ||
+              apt.hasElementarySchool === complexFilter.hasElementarySchool,
+          );
+        }
+      }
+
+      // 최대 200개 제한
+      const limited = markers.slice(0, MAP_MARKERS_MAX);
+
+      console.log(
+        `[Molit] 지도 마커 실 API: 전체 ${allMarkers.length}개 → 필터 후 ${markers.length}개 → 반환 ${limited.length}개`,
+      );
+
+      // 캐시 저장 (5분 - 실 API 데이터)
+      cacheService.set(cacheKey, limited, 300);
+      return limited;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`[Molit] 지도 마커 실 API 실패 → Mock 폴백: ${msg}`);
+      // 실패 시 Mock 폴백으로 계속 진행
+    }
+  }
+
+  // ── Mock 경로 (API 키 없음 또는 실 API 실패) ─────────────────
+  return getMockMarkersWithFilter(swLat, swLng, neLat, neLng, priceFilter, complexFilter);
+}
+
+/**
+ * Mock 데이터에서 뷰포트 및 필터를 적용해 마커 목록을 반환합니다.
+ * getApartmentMapMarkers 의 Mock 폴백 경로에서 공통으로 사용합니다.
+ */
+function getMockMarkersWithFilter(
+  swLat: number,
+  swLng: number,
+  neLat: number,
+  neLng: number,
+  priceFilter?: number,
+  complexFilter?: ComplexFilter,
+): ApartmentMapMarker[] {
   // 뷰포트 내 아파트 필터링
   let markers = MAP_MARKERS_MOCK.filter(
     (apt) =>
@@ -1580,9 +1825,11 @@ export async function getApartmentMapMarkers(
     }
   }
 
-  console.log(`[Molit] 지도 마커 조회: 뷰포트 내 ${markers.length}개 반환`);
+  console.log(`[Molit] 지도 마커 Mock: 뷰포트 내 ${markers.length}개 반환`);
 
-  // 캐시 저장 (30초 - 지도는 자주 갱신)
+  // 캐시 저장 (30초 - Mock 데이터는 짧게)
+  const filterKey = complexFilter ? JSON.stringify(complexFilter) : 'none';
+  const cacheKey = `map:${swLat}:${swLng}:${neLat}:${neLng}:${priceFilter ?? 'all'}:${filterKey}`;
   cacheService.set(cacheKey, markers, 30);
 
   return markers;
@@ -2086,4 +2333,314 @@ export async function getNearbyApartments(
   cacheService.set(cacheKey, nearby, 30);
 
   return nearby;
+}
+
+// ============================================================
+// 지도 마커용 단지별 최근 거래가 요약 Mock 데이터
+// 실 API 키 없을 때 또는 조회 결과 0건일 때 fallback으로 사용
+// ============================================================
+const MAP_PRICES_MOCK: ApartmentPrice[] = [
+  { aptName: '래미안 원베일리',      recentPrice: 280000, dealDate: '2025-02-15', floor: 12, area: 84.9 },
+  { aptName: '아크로리버파크',        recentPrice: 310000, dealDate: '2025-02-10', floor: 20, area: 84.9 },
+  { aptName: '헬리오시티',           recentPrice: 175000, dealDate: '2025-02-20', floor: 8,  area: 84.9 },
+  { aptName: '잠실엘스',             recentPrice: 195000, dealDate: '2025-02-18', floor: 15, area: 84.9 },
+  { aptName: '디에이치아너힐즈',      recentPrice: 235000, dealDate: '2025-02-05', floor: 10, area: 84.9 },
+  { aptName: '반포자이',             recentPrice: 260000, dealDate: '2025-02-12', floor: 7,  area: 84.9 },
+  { aptName: '도곡렉슬',             recentPrice: 210000, dealDate: '2025-02-08', floor: 18, area: 84.9 },
+  { aptName: '타워팰리스',           recentPrice: 190000, dealDate: '2025-02-22', floor: 35, area: 84.9 },
+  { aptName: '은마아파트',            recentPrice: 160000, dealDate: '2025-02-14', floor: 5,  area: 76.8 },
+  { aptName: '마포래미안푸르지오',    recentPrice: 155000, dealDate: '2025-02-17', floor: 9,  area: 84.9 },
+  { aptName: '성수동 트리마제',       recentPrice: 245000, dealDate: '2025-02-03', floor: 22, area: 84.9 },
+  { aptName: '올림픽파크 포레온',     recentPrice: 168000, dealDate: '2025-02-25', floor: 11, area: 84.9 },
+];
+
+/**
+ * 지도 마커용 단지별 최근 거래가 요약을 조회합니다.
+ *
+ * - 동일 lawdCd + 동일 아파트명 중 가장 최근 거래 1건만 반환합니다.
+ * - dealYmd 미지정 시 현재 달부터 최대 3개월 전까지 자동 조회합니다.
+ * - 실 API 키 없거나 결과 0건 시 Mock fallback을 반환합니다.
+ * - 캐시 TTL: 1시간
+ *
+ * @param lawdCd  법정동 코드 5자리
+ * @param year    조회 년도 (미지정 시 현재 년도)
+ * @param month   조회 월 (미지정 시 현재 월부터 3개월 전까지 순차 시도)
+ */
+export async function getMapPrices(
+  lawdCd: string,
+  year?: number,
+  month?: number,
+): Promise<{ data: ApartmentPrice[]; cached: boolean }> {
+  const cacheKey = `map-prices:${lawdCd}:${year ?? 'auto'}:${month ?? 'auto'}`;
+
+  const cachedResult = cacheService.get<ApartmentPrice[]>(cacheKey);
+  if (cachedResult) {
+    console.log(`[Molit] map-prices 캐시 히트: ${cacheKey}`);
+    return { data: cachedResult, cached: true };
+  }
+
+  // 실 API 키 없으면 즉시 Mock 반환
+  if (!isRealApiKey(process.env.MOLIT_API_KEY)) {
+    console.warn('[Molit] map-prices: API 키 없음 → Mock fallback 반환');
+    cacheService.set(cacheKey, MAP_PRICES_MOCK, CACHE_TTL.MAP_PRICES);
+    return { data: MAP_PRICES_MOCK, cached: false };
+  }
+
+  // 조회할 년월 목록 결정
+  // year/month 지정 시 해당 월만, 미지정 시 현재 달 포함 최근 3개월
+  const now = new Date();
+  let yearMonths: string[];
+
+  if (year !== undefined && month !== undefined) {
+    yearMonths = [`${year}${String(month).padStart(2, '0')}`];
+  } else {
+    yearMonths = [0, 1, 2].map((offset) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+      return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+  }
+
+  // 월별 병렬 조회 (최대 1000건/월)
+  const allTrades: ApartmentTrade[] = [];
+
+  const results = await Promise.allSettled(
+    yearMonths.map((ym) => fetchMolitApi(lawdCd, ym, 1, 1000)),
+  );
+
+  results.forEach((result, idx) => {
+    if (result.status === 'fulfilled') {
+      allTrades.push(...result.value.items);
+    } else {
+      console.warn(`[Molit] map-prices ${yearMonths[idx]} 조회 실패:`, result.reason);
+    }
+  });
+
+  // 결과 없으면 Mock fallback
+  if (allTrades.length === 0) {
+    console.warn(`[Molit] map-prices: 실 데이터 0건 → Mock fallback (lawdCd=${lawdCd})`);
+    cacheService.set(cacheKey, MAP_PRICES_MOCK, CACHE_TTL.MAP_PRICES);
+    return { data: MAP_PRICES_MOCK, cached: false };
+  }
+
+  // 아파트명별로 그룹핑해 가장 최근 거래 1건만 추출
+  const latestByName = new Map<string, ApartmentTrade>();
+
+  for (const trade of allTrades) {
+    const name = trade.apartmentName.trim();
+    const existing = latestByName.get(name);
+    if (!existing || trade.dealDate > existing.dealDate) {
+      latestByName.set(name, trade);
+    }
+  }
+
+  const data: ApartmentPrice[] = Array.from(latestByName.values()).map((trade) => ({
+    aptName:     trade.apartmentName.trim(),
+    recentPrice: trade.price,
+    dealDate:    trade.dealDate,
+    floor:       trade.floor,
+    area:        trade.area,
+  }));
+
+  // 거래일 내림차순 정렬 (최신 거래 먼저)
+  data.sort((a, b) => b.dealDate.localeCompare(a.dealDate));
+
+  console.log(`[Molit] map-prices 조회 완료: lawdCd=${lawdCd}, 단지수=${data.length}건`);
+  cacheService.set(cacheKey, data, CACHE_TTL.MAP_PRICES);
+
+  return { data, cached: false };
+}
+
+// ============================================================
+// 신고가 경신 단지 API — getRecordHighApartments
+// ============================================================
+
+/** 신고가 경신 단지 응답 항목 */
+export interface RecordHighItem {
+  aptName: string;
+  location: string;
+  area: number;
+  recentPrice: number;
+  previousPrice: number;
+  priceChangeRate: number;
+  dealDate: string;
+  lawdCd: string;
+}
+
+/** 수도권 주요 lawdCd 목록 */
+const METROPOLITAN_LAWD_CODES = [
+  '11110', '11140', '11170', '11200', '11215', '11230', '11260', '11290',
+  '11305', '11320', '11350', '11380', '11410', '11440', '11470', '11500',
+  '11530', '11545', '11560', '11590', '11620', '11650', '11680', '11710',
+  '41135', '41171', '41281', '41461', '41463',
+];
+
+/** 전국 추가 주요 lawdCd 목록 (수도권 외) */
+const NATIONWIDE_EXTRA_LAWD_CODES = [
+  '26110', '26140', '26170', '26200', '26230', '26260', '26290', '26320',
+  '26350', '26380', '26410', '26440', '26470', '26500', '26530',
+  '27110', '27140', '27170', '27200', '27230', '27260', '27290',
+  '28110', '28140', '28170', '28200', '28237', '28245', '28260', '28710',
+];
+
+/** Mock 데이터 (실 API 실패 시 fallback) */
+const RECORD_HIGH_MOCK: RecordHighItem[] = [
+  { aptName: '래미안원베일리', location: '서울 서초구', area: 84, recentPrice: 150000, previousPrice: 138000, priceChangeRate: 8.7, dealDate: '2026-03', lawdCd: '11650' },
+  { aptName: '아크로리버파크', location: '서울 서초구', area: 59, recentPrice: 135000, previousPrice: 128000, priceChangeRate: 5.5, dealDate: '2026-03', lawdCd: '11650' },
+  { aptName: '헬리오시티', location: '서울 송파구', area: 84, recentPrice: 105000, previousPrice: 98000, priceChangeRate: 7.1, dealDate: '2026-03', lawdCd: '11710' },
+  { aptName: '디에이치자이개포', location: '서울 강남구', area: 84, recentPrice: 145000, previousPrice: 140000, priceChangeRate: 3.6, dealDate: '2026-03', lawdCd: '11680' },
+  { aptName: '레미안퍼스티지', location: '서울 서초구', area: 115, recentPrice: 180000, previousPrice: 170000, priceChangeRate: 5.9, dealDate: '2026-03', lawdCd: '11650' },
+];
+
+/** lawdCd → 지역명 매핑 (신고가 응답 location 필드용) */
+const LAWD_CD_TO_LOCATION: Record<string, string> = {
+  '11110': '서울 종로구', '11140': '서울 중구', '11170': '서울 용산구',
+  '11200': '서울 성동구', '11215': '서울 광진구', '11230': '서울 동대문구',
+  '11260': '서울 중랑구', '11290': '서울 성북구', '11305': '서울 강북구',
+  '11320': '서울 도봉구', '11350': '서울 노원구', '11380': '서울 은평구',
+  '11410': '서울 서대문구', '11440': '서울 마포구', '11470': '서울 양천구',
+  '11500': '서울 강서구', '11530': '서울 구로구', '11545': '서울 금천구',
+  '11560': '서울 영등포구', '11590': '서울 동작구', '11620': '서울 관악구',
+  '11650': '서울 서초구', '11680': '서울 강남구', '11710': '서울 송파구',
+  '41135': '경기 성남시 분당구', '41171': '경기 수원시 영통구',
+  '41281': '경기 용인시 수지구', '41461': '경기 화성시',
+  '41463': '경기 화성시 동탄',
+};
+
+/**
+ * 수도권/전국 신고가 경신 단지를 조회합니다.
+ *
+ * 로직:
+ * 1. 이번 달(baseMonth)과 이전 달(prevMonth) 실거래가를 병렬 조회
+ * 2. 단지명+면적 기준으로 그룹화
+ * 3. 이번 달 최고가 > 이전 달 최고가인 항목 = 신고가 경신으로 판단
+ * 4. priceChangeRate 내림차순 정렬 후 limit 건 반환
+ * 5. 실 데이터 없으면 Mock fallback (ADR-006 준수)
+ *
+ * @param region  '수도권' | '전국' (기본: '수도권')
+ * @param limit   반환 건수 (기본: 5, 최대: 10)
+ */
+export async function getRecordHighApartments(
+  region: '수도권' | '전국' = '수도권',
+  limit: number = 5,
+): Promise<{ data: RecordHighItem[]; meta: { baseMonth: string; region: string } }> {
+  const now = new Date();
+  const baseYear = now.getFullYear();
+  const baseMonth = now.getMonth() + 1; // 1-based
+
+  const baseYm = `${baseYear}${String(baseMonth).padStart(2, '0')}`;
+  const prevDate = new Date(baseYear, baseMonth - 2, 1); // 이전 달
+  const prevYm = `${prevDate.getFullYear()}${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+  const baseMonthStr = `${baseYear}-${String(baseMonth).padStart(2, '0')}`;
+
+  const cacheKey = `record-highs:${region}:${baseYm}:${limit}`;
+  const cached = cacheService.get<RecordHighItem[]>(cacheKey);
+  if (cached) {
+    console.log(`[Molit] record-highs 캐시 히트: ${cacheKey}`);
+    return { data: cached, meta: { baseMonth: baseMonthStr, region } };
+  }
+
+  // 실 API 키 없으면 Mock 반환
+  if (!isRealApiKey(process.env.MOLIT_API_KEY)) {
+    console.warn('[Molit] record-highs: API 키 없음 → Mock fallback 반환');
+    const mockSlice = RECORD_HIGH_MOCK.slice(0, limit);
+    cacheService.set(cacheKey, mockSlice, CACHE_TTL.MAP_PRICES);
+    return { data: mockSlice, meta: { baseMonth: baseMonthStr, region } };
+  }
+
+  const lawdCodes = region === '전국'
+    ? [...METROPOLITAN_LAWD_CODES, ...NATIONWIDE_EXTRA_LAWD_CODES]
+    : METROPOLITAN_LAWD_CODES;
+
+  try {
+    // 이번 달 + 이전 달 데이터를 모든 lawdCd에 대해 병렬 조회
+    const fetchAll = async (ym: string): Promise<ApartmentTrade[]> => {
+      const results = await Promise.allSettled(
+        lawdCodes.map((cd) => fetchMolitApi(cd, ym, 1, 1000)),
+      );
+      const trades: ApartmentTrade[] = [];
+      results.forEach((r) => {
+        if (r.status === 'fulfilled') trades.push(...r.value.items);
+      });
+      return trades;
+    };
+
+    const [baseTrades, prevTrades] = await Promise.all([
+      fetchAll(baseYm),
+      fetchAll(prevYm),
+    ]);
+
+    // 실 데이터 없으면 Mock fallback
+    if (baseTrades.length === 0) {
+      console.warn('[Molit] record-highs: 이번 달 실 데이터 0건 → Mock fallback');
+      const mockSlice = RECORD_HIGH_MOCK.slice(0, limit);
+      cacheService.set(cacheKey, mockSlice, CACHE_TTL.MAP_PRICES);
+      return { data: mockSlice, meta: { baseMonth: baseMonthStr, region } };
+    }
+
+    // 단지명 + 면적(반올림) 기준 키 생성 헬퍼
+    const makeKey = (aptName: string, area: number) =>
+      `${aptName.trim()}::${Math.round(area)}`;
+
+    // 이번 달: 단지+면적 기준 최고가 추출
+    const baseMaxMap = new Map<string, { price: number; trade: ApartmentTrade }>();
+    for (const t of baseTrades) {
+      const key = makeKey(t.apartmentName, t.area);
+      const existing = baseMaxMap.get(key);
+      if (!existing || t.price > existing.price) {
+        baseMaxMap.set(key, { price: t.price, trade: t });
+      }
+    }
+
+    // 이전 달: 단지+면적 기준 최고가 추출
+    const prevMaxMap = new Map<string, number>();
+    for (const t of prevTrades) {
+      const key = makeKey(t.apartmentName, t.area);
+      const existing = prevMaxMap.get(key) ?? 0;
+      if (t.price > existing) prevMaxMap.set(key, t.price);
+    }
+
+    // 신고가 경신 판별: 이번 달 최고가 > 이전 달 최고가
+    const recordHighs: RecordHighItem[] = [];
+
+    for (const [key, { price: recentPrice, trade }] of baseMaxMap.entries()) {
+      const previousPrice = prevMaxMap.get(key);
+      if (!previousPrice || recentPrice <= previousPrice) continue;
+
+      const changeRate = Math.round(((recentPrice - previousPrice) / previousPrice) * 1000) / 10;
+
+      recordHighs.push({
+        aptName: trade.apartmentName.trim(),
+        location: LAWD_CD_TO_LOCATION[trade.lawdCd] ?? trade.lawdNm,
+        area: Math.round(trade.area),
+        recentPrice,
+        previousPrice,
+        priceChangeRate: changeRate,
+        dealDate: baseMonthStr,
+        lawdCd: trade.lawdCd,
+      });
+    }
+
+    // priceChangeRate 내림차순 정렬
+    recordHighs.sort((a, b) => b.priceChangeRate - a.priceChangeRate);
+
+    const result = recordHighs.slice(0, limit);
+
+    // 신고가 경신 단지가 없으면 Mock fallback
+    if (result.length === 0) {
+      console.warn('[Molit] record-highs: 신고가 경신 단지 없음 → Mock fallback');
+      const mockSlice = RECORD_HIGH_MOCK.slice(0, limit);
+      cacheService.set(cacheKey, mockSlice, CACHE_TTL.MAP_PRICES);
+      return { data: mockSlice, meta: { baseMonth: baseMonthStr, region } };
+    }
+
+    console.log(`[Molit] record-highs 조회 완료: region=${region}, 경신 단지=${result.length}건`);
+    cacheService.set(cacheKey, result, CACHE_TTL.MAP_PRICES);
+    return { data: result, meta: { baseMonth: baseMonthStr, region } };
+
+  } catch (err) {
+    console.error('[Molit] record-highs 조회 실패 → Mock fallback:', err);
+    const mockSlice = RECORD_HIGH_MOCK.slice(0, limit);
+    cacheService.set(cacheKey, mockSlice, CACHE_TTL.MAP_PRICES);
+    return { data: mockSlice, meta: { baseMonth: baseMonthStr, region } };
+  }
 }

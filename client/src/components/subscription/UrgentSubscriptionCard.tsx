@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Subscription } from '../../types';
-import { formatPrice, calcDday } from '../../utils/formatNumber';
+import { formatPrice } from '../../utils/formatNumber';
 import { Box, FlexBox, Typography } from '@wanteddev/wds';
 import DdayBadge from './DdayBadge';
 
@@ -14,14 +14,7 @@ const UrgentSubscriptionCard = React.memo<UrgentSubscriptionCardProps>(
   ({ subscription }) => {
     const navigate = useNavigate();
 
-    const ddayStr = calcDday(subscription.deadline);
-    const dDay =
-      ddayStr === '마감'
-        ? -1
-        : ddayStr === 'D-day'
-          ? 0
-          : parseInt(ddayStr.replace('D-', ''), 10);
-
+    const dDay = subscription.dDay;
     const isUrgent = dDay >= 0 && dDay <= 3;
 
     const handleMapLinkClick = (e: React.MouseEvent) => {
@@ -70,7 +63,7 @@ const UrgentSubscriptionCard = React.memo<UrgentSubscriptionCardProps>(
               variant="caption1"
               sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             >
-              {subscription.location} · {subscription.type === 'special' ? '특별공급' : '일반공급'}
+              {subscription.location}
             </Typography>
           </Box>
 
@@ -81,13 +74,13 @@ const UrgentSubscriptionCard = React.memo<UrgentSubscriptionCardProps>(
               weight="bold"
               sx={{ color: 'var(--semantic-primary-normal)', fontFamily: 'var(--font-jetbrains, monospace)' }}
             >
-              {subscription.startPrice ? formatPrice(subscription.startPrice) : '분양가 미정'}
+              {subscription.supplyPrice != null ? formatPrice(subscription.supplyPrice) : '분양가 미정'}
             </Typography>
             <Typography
               variant="caption1"
               sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
             >
-              {subscription.supplyUnits ? subscription.supplyUnits.toLocaleString() : '--'}세대
+              {subscription.totalUnits ? subscription.totalUnits.toLocaleString() : '--'}세대
             </Typography>
           </Box>
         </FlexBox>

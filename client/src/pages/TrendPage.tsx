@@ -23,6 +23,7 @@ import { useIsPC } from '../hooks/useBreakpoint';
 import { IconChevronLeft } from '@wanteddev/wds-icon';
 
 const REGIONS = ['전국', '서울', '경기', '인천', '부산'];
+const CHART_REGIONS = ['서울', '경기', '인천', '부산'];
 
 // 지역 코드 맵 — BE /trends/region API 쿼리 파라미터용
 const REGION_CODE_MAP: Record<string, string> = {
@@ -50,28 +51,32 @@ export default function TrendPage() {
       : MOCK_WEEKLY_RANKING.filter((apt) => apt.address.includes(selectedRegion))
     : rankingSource;
 
-  const { data: supplyData = [] } = useSupplyData(supplyRegion, 12);
+  const { data: supplyData = [], isLoading: isSupplyLoading } = useSupplyData(supplyRegion, 12);
 
-  // 지역별 가격 변동률 — 실 API 연동 (BE /trends/region)
+  // 지역별 가격 변동률 — 주요 지역 병렬 조회 후 비교 차트 표시
   const {
     data: regionTrends,
     isLoading: isRegionLoading,
     isError: isRegionError,
   } = useQuery({
-    queryKey: ['trends', 'region', selectedRegion],
+    queryKey: ['trends', 'regions', 'chart'],
     queryFn: () =>
-      api
-        .get<{ success: true; data: Array<{ region: string; priceChange: number; avgPrice: number }> }>(
-          `/trends/region?regionCode=${REGION_CODE_MAP[selectedRegion] ?? '00'}`
+      Promise.all(
+        CHART_REGIONS.map((r) =>
+          api
+            .get<{ success: true; data: { regionName: string; priceChangeRate: number; avgPrice: number } }>(
+              `/trends/region?regionCode=${REGION_CODE_MAP[r] ?? '00'}`
+            )
+            .then((res) => res.data.data)
         )
-        .then((r) => r.data.data),
+      ),
     staleTime: 5 * 60 * 1000, // 5분 캐시
   });
 
-  // API 응답을 차트 데이터로 변환
+  // API 응답을 차트 데이터로 변환 (priceChangeRate = % 단위 변동률)
   const chartData = (regionTrends ?? []).map((t) => ({
-    region: t.region,
-    change: t.priceChange,
+    region: t.regionName.replace(/특별시|광역시|특별자치시|도$/, ''),
+    change: t.priceChangeRate,
     avg: Math.round(t.avgPrice / 10000),
   }));
 
@@ -339,6 +344,11 @@ export default function TrendPage() {
                   </div>
                 </Box>
 
+                {isSupplyLoading ? (
+                  <Box sx={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)' }}>로딩 중...</Typography>
+                  </Box>
+                ) : (
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={supplyData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-chart-grid, #E5E8EB)" vertical={false} />
@@ -359,6 +369,7 @@ export default function TrendPage() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                )}
 
                 {/* 범례 */}
                 <FlexBox alignItems="center" gap="16px" style={{ marginTop: '8px' }}>

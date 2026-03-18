@@ -181,11 +181,11 @@ function AptHeaderCell({ name, address, id, onRemove }: AptHeaderCellProps) {
 }
 
 // 단지별 전세가율 조회 훅
-function useJeonseRate(id: string | undefined) {
+function useJeonseRate(id: string | undefined, lawdCd: string | undefined) {
   return useQuery({
-    queryKey: ['apartment', id, 'jeonse-rate'],
-    queryFn: () => getJeonseRate(id!),
-    enabled: !!id,
+    queryKey: ['apartment', id, 'jeonse-rate', lawdCd],
+    queryFn: () => getJeonseRate(id!, lawdCd),
+    enabled: !!id && !!lawdCd,
     staleTime: 10 * 60 * 1000,
   });
 }
@@ -213,7 +213,7 @@ function PriceHistoryChart({ ids, names }: PriceHistoryChartProps) {
     // 각 단지의 날짜 집합 수집
     const dateSet = new Set<string>();
     histories.forEach((h) => {
-      (h.data ?? []).forEach((t: TradeHistory) => dateSet.add(t.date));
+      (h.data ?? []).forEach((t: TradeHistory) => dateSet.add(t.dealDate));
     });
 
     // 날짜 오름차순 정렬
@@ -224,7 +224,7 @@ function PriceHistoryChart({ ids, names }: PriceHistoryChartProps) {
       const map: Record<string, number> = {};
       (h.data ?? []).forEach((t: TradeHistory) => {
         // 같은 날짜에 여러 거래가 있을 경우 마지막 값 사용
-        map[t.date] = t.price;
+        map[t.dealDate] = t.price;
       });
       return map;
     });
@@ -320,11 +320,13 @@ function PriceHistoryChart({ ids, names }: PriceHistoryChartProps) {
             width={48}
           />
           <Tooltip
-            formatter={(value: number, name: string) => {
-              const idx = parseInt(name.replace('apt', ''), 10);
-              return [`${value.toFixed(2)}억`, names[idx] ?? name];
+            formatter={(value, name) => {
+              const nameStr = String(name ?? '');
+              const idx = parseInt(nameStr.replace('apt', ''), 10);
+              const v = typeof value === 'number' ? value : parseFloat(String(value ?? '0'));
+              return [`${v.toFixed(2)}억`, names[idx] ?? nameStr] as [string, string];
             }}
-            labelFormatter={(label: string) => label}
+            labelFormatter={(label: unknown) => String(label ?? '')}
             contentStyle={{
               fontSize: '12px',
               borderRadius: '8px',
@@ -366,10 +368,10 @@ function CompareTable({ ids }: { ids: string[] }) {
   const q1 = useApartmentDetail(ids[1]);
   const q2 = useApartmentDetail(ids[2]);
 
-  // 전세가율 조회 (단지별)
-  const jr0 = useJeonseRate(ids[0]);
-  const jr1 = useJeonseRate(ids[1]);
-  const jr2 = useJeonseRate(ids[2]);
+  // 전세가율 조회 (단지별) — lawdCd는 상세 조회 후 확보
+  const jr0 = useJeonseRate(ids[0], q0.data?.lawdCd);
+  const jr1 = useJeonseRate(ids[1], q1.data?.lawdCd);
+  const jr2 = useJeonseRate(ids[2], q2.data?.lawdCd);
 
   const queries = [q0, q1, q2].slice(0, ids.length);
   const isLoading = queries.some((q) => q.isLoading);

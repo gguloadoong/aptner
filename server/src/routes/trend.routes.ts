@@ -9,6 +9,7 @@ import { getRegionTrend } from '../services/trend.service';
 import { cacheService, CACHE_TTL } from '../services/cache.service';
 import { SiDo, SiGunGu, TrendQueryParams, HotTradeApartment } from '../types';
 import { getHotTradeApartments } from '../services/hot-trade.service';
+import { SIGUNGU_TABLE } from '../constants/region.constants';
 
 const router = Router();
 
@@ -165,6 +166,112 @@ router.get('/region', async (req: Request, res: Response, next: NextFunction) =>
       success: true,
       data,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/regions/lawdCd
+ * 좌표(lat, lng) → 가장 가까운 법정동 코드(5자리) 반환
+ *
+ * Query params:
+ *   - lat: 위도 (필수)
+ *   - lng: 경도 (필수)
+ *
+ * 응답:
+ *   { success: true, data: { lawdCd: "11200", sigungu: "서울 성동구" } }
+ *
+ * 구현 방식:
+ *   1순위: 좌표가 바운딩박스 내부에 있는 시군구 코드 반환 (정확한 매칭)
+ *   2순위: 바운딩박스 중심점과의 유클리드 거리가 가장 가까운 시군구 코드 반환 (fallback)
+ */
+router.get('/lawdCd', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { lat, lng } = req.query as Partial<Record<string, string>>;
+
+    // lat/lng 필수 검증
+    if (!lat || !lng) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'MISSING_PARAMS',
+          message: 'lat(위도)와 lng(경도)는 필수 파라미터입니다.',
+        },
+      });
+      return;
+    }
+
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+
+    if (isNaN(latNum) || isNaN(lngNum)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_COORDS',
+          message: 'lat, lng는 숫자여야 합니다.',
+        },
+      });
+      return;
+    }
+
+    // 한국 좌표 범위 검증 (대략적 범위)
+    if (latNum < 33.0 || latNum > 38.7 || lngNum < 124.5 || lngNum > 131.0) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'OUT_OF_RANGE',
+          message: '한국 범위를 벗어난 좌표입니다.',
+        },
+      });
+      return;
+    }
+
+    const cacheKey = `lawdCd:${latNum.toFixed(3)}:${lngNum.toFixed(3)}`;
+    const cached = cacheService.get<{ lawdCd: string; sigungu: string }>(cacheKey);
+    if (cached) {
+      res.json({ success: true, data: cached });
+      return;
+    }
+
+    // 1순위: 바운딩박스 포함 여부 확인
+    const contained = SIGUNGU_TABLE.find(
+      (sg) =>
+        latNum >= sg.swLat &&
+        latNum <= sg.neLat &&
+        lngNum >= sg.swLng &&
+        lngNum <= sg.neLng,
+    );
+
+    let result: { lawdCd: string; sigungu: string };
+
+    if (contained) {
+      result = { lawdCd: contained.code, sigungu: contained.name };
+    } else {
+      // 2순위: 바운딩박스 중심점까지 유클리드 거리 최솟값
+      let minDist = Infinity;
+      let nearest = SIGUNGU_TABLE[0];
+
+      for (const sg of SIGUNGU_TABLE) {
+        const centerLat = (sg.swLat + sg.neLat) / 2;
+        const centerLng = (sg.swLng + sg.neLng) / 2;
+        const dist =
+          (latNum - centerLat) * (latNum - centerLat) +
+          (lngNum - centerLng) * (lngNum - centerLng);
+        if (dist < minDist) {
+          minDist = dist;
+          nearest = sg;
+        }
+      }
+
+      result = { lawdCd: nearest.code, sigungu: nearest.name };
+    }
+
+    // 캐시 저장 (24시간 — 좌표 → 행정구역은 거의 변하지 않음)
+    cacheService.set(cacheKey, result, CACHE_TTL.REGION);
+
+    res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

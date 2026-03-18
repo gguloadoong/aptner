@@ -28,22 +28,23 @@ const REGION_MAP: Record<string, string> = {
   제주: '제주특별자치도',
 };
 
-// BE Subscription → FE Subscription 어댑터 (CRIT-01 수정)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function adaptSubscription(raw: any): Subscription {
+// BE Subscription → FE Subscription 어댑터 (CRIT-01)
+function adaptSubscription(raw: Record<string, unknown>): Subscription {
+  const endDate = (raw.endDate as string | undefined) ?? '';
+  const dDay = calcDayDiff(endDate);
   return {
-    id: raw.id,
-    name: raw.name,
-    location: `${raw.sido ?? ''} ${raw.sigungu ?? ''}`.trim(),
-    district: raw.sigungu ?? '',
-    startPrice: raw.minPrice ?? 0,
-    maxPrice: raw.maxPrice ?? 0,
-    deadline: raw.endDate ?? '',
-    startDate: raw.startDate ?? '',
+    id: raw.id as string,
+    name: raw.name as string,
+    location: (raw.location as string | undefined) ?? `${(raw.sido as string | undefined) ?? ''} ${(raw.sigungu as string | undefined) ?? ''}`.trim(),
     status: raw.status as SubscriptionStatus,
-    supplyUnits: raw.totalSupply ?? 0,
-    type: raw.type?.includes('특별') ? 'special' : 'general',  // CRIT-03 수정
-    areas: (raw.areas ?? []).map((a: { area?: number; price?: number; supply?: number }) => ({
+    startDate: (raw.startDate as string | undefined) ?? '',
+    endDate,
+    dDay,
+    totalUnits: (raw.totalSupply as number | undefined) ?? (raw['세대수'] as number | undefined) ?? 0,
+    // BE minPrice는 만원 단위, formatPrice도 만원 단위 → 그대로 사용. 0은 미확정으로 처리
+    supplyPrice: raw.minPrice != null && (raw.minPrice as number) > 0 ? (raw.minPrice as number) : undefined,
+    district: (raw.sigungu as string | undefined) ?? '',
+    areas: ((raw.areas as Array<{ area?: number; price?: number; supply?: number }> | undefined) ?? []).map((a) => ({
       area: String(Math.round(a.area ?? 0)),
       price: a.price ?? 0,
       units: a.supply ?? 0,
@@ -53,14 +54,25 @@ function adaptSubscription(raw: any): Subscription {
     // MAJOR-03: BE schedule 필드 직접 매핑
     schedule: raw.schedule
       ? {
-          announceDate: raw.schedule.announceDate,
-          contractStartDate: raw.schedule.contractStartDate,
-          contractEndDate: raw.schedule.contractEndDate,
+          announceDate: (raw.schedule as Record<string, string>).announceDate,
+          contractStartDate: (raw.schedule as Record<string, string>).contractStartDate,
+          contractEndDate: (raw.schedule as Record<string, string>).contractEndDate,
         }
       : undefined,
-    lat: raw.lat,
-    lng: raw.lng,
+    address: (raw.address as string | undefined) ?? undefined,
+    lat: raw.lat as number | undefined,
+    lng: raw.lng as number | undefined,
   };
+}
+
+// endDate 기준 D-day 숫자 계산 (오늘 = 0, 미래 = 양수, 과거 = 음수)
+function calcDayDiff(endDate: string): number {
+  if (!endDate) return -999;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  return Math.round((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 // Mock 필터/정렬/페이지네이션 공통 로직
@@ -80,9 +92,9 @@ function applyMockFilters(params: {
     data = data.filter((s) => s.location.includes(params.region!));
   }
   if (params.sort === 'deadline') {
-    data.sort((a, b) => a.deadline.localeCompare(b.deadline));
+    data.sort((a, b) => a.endDate.localeCompare(b.endDate));
   } else if (params.sort === 'price') {
-    data.sort((a, b) => a.startPrice - b.startPrice);
+    data.sort((a, b) => (a.supplyPrice ?? 0) - (b.supplyPrice ?? 0));
   } else if (params.sort === 'latest') {
     data.sort((a, b) => b.startDate.localeCompare(a.startDate));
   }
@@ -107,16 +119,24 @@ export async function getSubscriptions(params: {
   }
 
   try {
+    // FE SortOrder → BE sort 파라미터 변환 (MAJOR-04)
+    // latest(최신순)는 BE 미지원 → undefined로 처리하여 기본 dDay 정렬 사용
+    const SORT_MAP: Record<string, string | undefined> = {
+      deadline: 'dDay',
+      price: 'price',
+      latest: undefined,
+    };
+
     // 실 API: 파라미터 변환 후 전송
     const beParams: Record<string, unknown> = {
       page: params.page ?? 1,
       limit: params.pageSize ?? 20,
       status: params.status,
-      sort: params.sort,
+      sort: params.sort ? (SORT_MAP[params.sort] ?? params.sort) : undefined,
       sido: params.region && params.region !== '전국' ? (REGION_MAP[params.region] ?? params.region) : undefined,
     };
 
-    const response = await api.get<{ success: true; data: unknown[]; meta: { total: number } }>(
+    const response = await api.get<{ success: true; data: Record<string, unknown>[]; meta: { total: number } }>(
       '/subscriptions',
       { params: beParams },
     );
@@ -140,7 +160,7 @@ export async function getSubscriptionDetail(id: string): Promise<Subscription | 
     return MOCK_SUBSCRIPTIONS.find((s) => s.id === id) ?? null;
   }
 
-  const response = await api.get<{ success: true; data: unknown }>(`/subscriptions/${id}`);
+  const response = await api.get<{ success: true; data: Record<string, unknown> }>(`/subscriptions/${id}`);
   return adaptSubscription(response.data.data);
 }
 

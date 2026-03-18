@@ -1,72 +1,52 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useHotApartments } from '../hooks/useApartment';
-import { useSubscriptions } from '../hooks/useSubscription';
-import HeroApartmentCard from '../components/apartment/HeroApartmentCard';
-import UrgentSubscriptionCard from '../components/subscription/UrgentSubscriptionCard';
 import SearchBar from '../components/ui/SearchBar';
 import BomzipLogo from '../components/ui/BomzipLogo';
-import { formatPriceShort, formatChange, calcDday } from '../utils/formatNumber';
-import HotTag from '../components/apartment/HotTag';
-import RankChange from '../components/apartment/RankChange';
 import { useBookmarkStore } from '../stores/bookmarkStore';
 import CompareBar from '../components/apartment/CompareBar';
 import {
-  Button,
-  TextButton,
   IconButton,
   Box,
   FlexBox,
   Typography,
-  Skeleton,
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
-import {
-  IconChevronRight,
-  IconSearch,
-} from '@wanteddev/wds-icon';
-import type { Apartment } from '../types';
-
-// 지역 시세 섹션 — TrendPage 실 API 연동 완료 후 동일 훅 재사용 예정. 그 전까지 숨김 처리
-const SHOW_REGION_PRICE = false;
+import { IconSearch } from '@wanteddev/wds-icon';
+import QuickActionTabs from '../components/home/QuickActionTabs';
+import TodaySubscriptionBadge from '../components/home/TodaySubscriptionBadge';
+import HotApartmentSection from '../components/home/HotApartmentSection';
+import WeeklySubscriptionTimeline from '../components/home/WeeklySubscriptionTimeline';
+import RecordHighSection from '../components/home/RecordHighSection';
+import { useSubscriptions } from '../hooks/useSubscription';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const isMobile = !useIsPC();
-
-  // 찜 개수 (헤더 배지용)
   const bookmarkCount = useBookmarkStore((s) => s.bookmarkCount);
 
-  // 핫 아파트 상위 10개
-  const { data: hotApartments = [], isLoading: isAptLoading } = useHotApartments(
-    undefined,
-    10
-  );
-
-  // 진행 중인 청약 (마감임박 필터용)
-  const { data: subData, isLoading: isSubLoading } = useSubscriptions({
+  // 타임라인용 청약 데이터 (ongoing + upcoming 병합)
+  const { data: ongoingData, isLoading: ongoingLoading } = useSubscriptions({
     status: 'ongoing',
     sort: 'deadline',
   });
+  const { data: upcomingData, isLoading: upcomingLoading } = useSubscriptions({
+    status: 'upcoming',
+    sort: 'deadline',
+  });
 
-  // D-14 이내 청약만 필터링
-  const urgentSubscriptions = useMemo(() => {
-    const all = subData?.data ?? [];
-    return all.filter((sub) => {
-      const ddayStr = calcDday(sub.deadline);
-      if (ddayStr === '마감') return false;
-      const n = ddayStr === 'D-day' ? 0 : parseInt(ddayStr.replace('D-', ''), 10);
-      return n <= 14;
-    });
-  }, [subData]);
+  const allSubscriptions = useMemo(() => {
+    return [
+      ...(ongoingData?.data ?? []),
+      ...(upcomingData?.data ?? []),
+    ];
+  }, [ongoingData, upcomingData]);
 
-  const topApt = hotApartments[0] ?? null;
-  const restApts = hotApartments.slice(1, 8);
+  const timelineLoading = ongoingLoading || upcomingLoading;
 
   return (
     <div style={{ minHeight: '100svh', backgroundColor: 'var(--semantic-background-normal-alternative)' }}>
 
-      {/* 모바일 헤더 — useMediaQuery로 조건부 렌더링 */}
+      {/* 모바일 헤더 */}
       {isMobile && (
         <Box
           sx={{
@@ -79,7 +59,6 @@ export default function HomePage() {
           }}
         >
           <Box sx={{ padding: '16px 20px 12px 20px' }}>
-            {/* 로고 + 찜 배지 행 */}
             <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '12px' }}>
               <BomzipLogo size="md" showText={true} />
               <FlexBox alignItems="center" gap="6px">
@@ -113,14 +92,12 @@ export default function HomePage() {
                 </IconButton>
               </FlexBox>
             </FlexBox>
-
-            {/* 검색바 */}
             <SearchBar placeholder="아파트 단지명 또는 지역 검색" />
           </Box>
         </Box>
       )}
 
-      {/* PC 전용 콘텐츠 헤더 */}
+      {/* PC 헤더 */}
       {!isMobile && (
         <Box
           sx={{
@@ -139,287 +116,62 @@ export default function HomePage() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <Box
-        as="main"
-        sx={{ paddingBottom: isMobile ? '96px' : '40px' }}
-      >
-        <Box sx={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+      <Box as="main" sx={{ paddingBottom: isMobile ? '96px' : '40px' }}>
+        <Box sx={{ maxWidth: '1200px', margin: '0 auto' }}>
 
           {/* 모바일 슬로건 */}
           {isMobile && (
             <Typography
               variant="caption1"
               weight="medium"
-              sx={{ color: 'var(--semantic-label-assistive)', display: 'block', paddingTop: '16px', paddingBottom: '4px' }}
+              sx={{
+                color: 'var(--semantic-label-assistive)',
+                display: 'block',
+                padding: '16px 20px 4px 20px',
+              }}
             >
               봄처럼 따뜻하게, 집처럼 포근하게
             </Typography>
           )}
 
-          {/* 데스크탑 2열 레이아웃 */}
+          {/* 단일 컬럼 레이아웃 */}
           <div
             style={{
-              display: isMobile ? 'block' : 'grid',
-              gridTemplateColumns: isMobile ? undefined : '1fr 360px',
-              gap: isMobile ? undefined : '40px',
-              paddingTop: isMobile ? undefined : '32px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: isMobile ? '16px' : '20px',
+              padding: isMobile ? '12px 0 0 0' : '32px 20px 0 20px',
             }}
           >
+            {/* 퀵 액션 탭 */}
+            <QuickActionTabs />
 
-            {/* 좌측: HOT 랭킹 */}
-            <div>
-              <Box as="section" sx={{ paddingTop: isMobile ? '20px' : '0' }}>
-                {/* 섹션 헤더 */}
-                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '16px' }}>
-                  <div>
-                    <Typography
-                      variant={isMobile ? 'title3' : 'title2'}
-                      weight="bold"
-                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
-                    >
-                      이번 주 HOT
-                    </Typography>
-                    <Typography
-                      variant="caption1"
-                      weight="medium"
-                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
-                    >
-                      조회 · 거래량 기준 주간 랭킹
-                    </Typography>
-                  </div>
-                  <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
-                    전체 보기
-                  </TextButton>
-                </FlexBox>
+            {/* 오늘의 청약 배지 (D-7 이내) */}
+            <TodaySubscriptionBadge />
 
-                {/* 1위 히어로 카드 */}
-                {isAptLoading ? (
-                  <HotApartmentSkeleton isHero />
-                ) : topApt ? (
-                  <HeroApartmentCard apartment={topApt} />
-                ) : (
-                  <HotApartmentEmpty />
-                )}
+            {/* 주간 청약 타임라인 */}
+            <WeeklySubscriptionTimeline
+              subscriptions={allSubscriptions}
+              isLoading={timelineLoading}
+            />
 
-                {/* 2~8위 컴팩트 리스트 */}
-                {!isAptLoading && restApts.length > 0 && (
-                  <Box
-                    sx={{
-                      marginTop: '8px',
-                      backgroundColor: 'var(--semantic-background-normal-normal)',
-                      borderRadius: '16px',
-                      border: '1px solid var(--semantic-line-normal)',
-                      overflow: 'hidden',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-                    }}
-                  >
-                    {restApts.map((apt, i) => (
-                      <CompactApartmentRow
-                        key={apt.id}
-                        apartment={apt}
-                        rank={i + 2}
-                        isLast={i === restApts.length - 1}
-                      />
-                    ))}
-                  </Box>
-                )}
+            {/* 이달의 신고가 섹션 */}
+            <RecordHighSection />
 
-                {/* 스켈레톤 리스트 (로딩 중) */}
-                {isAptLoading && (
-                  <Box
-                    sx={{
-                      marginTop: '8px',
-                      backgroundColor: 'var(--semantic-background-normal-normal)',
-                      borderRadius: '16px',
-                      border: '1px solid var(--semantic-line-normal)',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {[2, 3, 4, 5, 6].map((rank) => (
-                      <FlexBox
-                        key={rank}
-                        alignItems="center"
-                        gap="12px"
-                        style={{ padding: '12px 16px', borderBottom: '1px solid var(--semantic-background-normal-alternative)' }}
-                      >
-                        <Skeleton variant="circle" width="24px" height="24px" />
-                        <FlexBox flex="1" justifyContent="space-between" gap="12px">
-                          <Skeleton variant="text" width="55%" height="13px" />
-                          <Skeleton variant="text" width="18%" height="13px" />
-                        </FlexBox>
-                      </FlexBox>
-                    ))}
-                  </Box>
-                )}
+            {/* HOT 아파트 랭킹 */}
+            <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
+              <HotApartmentSection />
+            </Box>
 
-                {/* TOP 10 전체 보기 버튼 */}
-                <Button
-                  variant="solid"
-                  color="primary"
-                  fullWidth
-                  onClick={() => navigate('/trend')}
-                  style={{ marginTop: '12px' }}
-                >
-                  TOP 10 전체 보기
-                </Button>
-              </Box>
-
-              {/* 지도 바로가기 배너 (모바일에서만 이쪽에 위치) */}
-              {isMobile && (
-                <Box sx={{ marginTop: '20px' }}>
-                  <MapBanner />
-                </Box>
-              )}
-            </div>
-
-            {/* 우측: 청약 + 지역 시세 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '24px' : '28px' }}>
-
-              {/* Section 2: 마감 임박 청약 */}
-              <Box as="section" sx={{ paddingTop: isMobile ? '20px' : '0' }}>
-                <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '16px' }}>
-                  <div>
-                    <Typography
-                      variant="heading1"
-                      weight="bold"
-                      sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
-                    >
-                      마감 임박 청약
-                    </Typography>
-                    <Typography
-                      variant="caption1"
-                      sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
-                    >
-                      D-14 이내 마감 예정
-                    </Typography>
-                  </div>
-                  <TextButton size="small" color="primary" onClick={() => navigate('/subscription')}>
-                    전체 보기
-                  </TextButton>
-                </FlexBox>
-
-                {isSubLoading ? (
-                  <FlexBox flexDirection="column" gap="8px">
-                    {[1, 2, 3].map((i) => (
-                      <Box
-                        key={i}
-                        sx={{
-                          height: '68px',
-                          backgroundColor: 'var(--semantic-background-normal-normal)',
-                          borderRadius: '12px',
-                          border: '1px solid var(--semantic-line-normal)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '12px',
-                          padding: '0 16px',
-                        }}
-                      >
-                        <Skeleton variant="rectangle" width="44px" height="28px" />
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <Skeleton variant="text" width="65%" height="13px" />
-                          <Skeleton variant="text" width="40%" height="11px" />
-                        </div>
-                      </Box>
-                    ))}
-                  </FlexBox>
-                ) : urgentSubscriptions.length === 0 ? (
-                  <Box
-                    sx={{
-                      padding: '28px 16px',
-                      textAlign: 'center',
-                      backgroundColor: 'var(--semantic-background-normal-normal)',
-                      borderRadius: '16px',
-                      border: '1px solid var(--semantic-line-normal)',
-                    }}
-                  >
-                    <Typography variant="body2" weight="medium" sx={{ color: 'var(--semantic-label-assistive)' }}>
-                      현재 마감 임박 청약이 없습니다
-                    </Typography>
-                    <Box sx={{ marginTop: '12px' }}>
-                      <TextButton
-                        size="small"
-                        color="primary"
-                        onClick={() => navigate('/subscription')}
-                        trailingContent={<IconChevronRight />}
-                      >
-                        진행 중 청약 보기
-                      </TextButton>
-                    </Box>
-                  </Box>
-                ) : (
-                  <FlexBox flexDirection="column" gap="8px">
-                    {urgentSubscriptions.slice(0, 4).map((sub) => (
-                      <UrgentSubscriptionCard key={sub.id} subscription={sub} />
-                    ))}
-                  </FlexBox>
-                )}
-              </Box>
-
-              {/* Section 3: 지역 시세 — SHOW_REGION_PRICE=true 시 활성화 */}
-              {SHOW_REGION_PRICE && (
-                <Box as="section">
-                  <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
-                    <div>
-                      <Typography
-                        variant="heading1"
-                        weight="bold"
-                        sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.02em', display: 'block' }}
-                      >
-                        지역 시세
-                      </Typography>
-                      <Typography
-                        variant="caption1"
-                        sx={{ color: 'var(--semantic-label-assistive)', marginTop: '2px', display: 'block' }}
-                      >
-                        주간 평균 실거래가
-                      </Typography>
-                    </div>
-                    <TextButton size="small" color="primary" onClick={() => navigate('/trend')}>
-                      더보기
-                    </TextButton>
-                  </FlexBox>
-
-                  {/* 지역 시세 — 실제 데이터 연동 전 skeleton UI 표시 */}
-                  <Box
-                    sx={{
-                      padding: '20px 16px',
-                      textAlign: 'center',
-                      backgroundColor: 'var(--semantic-background-normal-normal)',
-                      borderRadius: '16px',
-                      border: '1px solid var(--semantic-line-normal)',
-                    }}
-                  >
-                    <FlexBox flexDirection="column" gap="8px">
-                      {[1, 2, 3].map((i) => (
-                        <FlexBox key={i} alignItems="center" justifyContent="space-between" gap="12px">
-                          <Skeleton variant="text" width="60px" height="13px" />
-                          <Skeleton variant="text" width="80px" height="13px" />
-                          <Skeleton variant="text" width="48px" height="13px" />
-                        </FlexBox>
-                      ))}
-                      <Typography
-                        variant="caption2"
-                        sx={{ color: 'var(--semantic-label-assistive)', marginTop: '8px', display: 'block' }}
-                      >
-                        지역 시세 데이터 준비 중입니다
-                      </Typography>
-                    </FlexBox>
-                  </Box>
-                </Box>
-              )}
-
-              {/* 지도 바로가기 배너 (데스크탑에서만 우측 하단에 위치) */}
-              {!isMobile && (
-                <Box as="section">
-                  <MapBanner />
-                </Box>
-              )}
-            </div>
+            {/* 지도 바로가기 배너 */}
+            <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
+              <MapBanner />
+            </Box>
           </div>
         </Box>
       </Box>
 
-      {/* 단지 비교 바 — AppLayout의 BottomNav 위에 렌더링되도록 z-index 주의 */}
+      {/* 단지 비교 바 */}
       <CompareBar />
     </div>
   );
@@ -476,205 +228,6 @@ function MapBanner() {
         </div>
       </FlexBox>
     </button>
-  );
-}
-
-// CompactApartmentRow — 2~8위 컴팩트 행
-interface CompactApartmentRowProps {
-  apartment: Apartment;
-  rank: number;
-  isLast: boolean;
-}
-
-function CompactApartmentRow({ apartment, rank, isLast }: CompactApartmentRowProps) {
-  const navigate = useNavigate();
-
-  const isUp = apartment.priceChangeType === 'up';
-  const isDown = apartment.priceChangeType === 'down';
-  const priceColor = isUp ? '#FF4B4B' : isDown ? '#3B82F6' : 'var(--semantic-label-assistive)';
-  const changeArrow = isUp ? '▲' : isDown ? '▼' : '';
-
-  const hasHotTags = apartment.hotTags && apartment.hotTags.length > 0;
-
-  const renderRankBadge = () => {
-    const badgeBase: React.CSSProperties = {
-      width: '24px',
-      height: '24px',
-      borderRadius: '50%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '11px',
-      fontWeight: 900,
-      color: 'white',
-    };
-
-    if (rank === 2) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
-          <span style={{ ...badgeBase, backgroundColor: '#C0C0C0', boxShadow: '0 2px 4px rgba(192,192,192,0.5)' }}>2</span>
-          <RankChange change={apartment.rankChange} />
-        </div>
-      );
-    }
-    if (rank === 3) {
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
-          <span style={{ ...badgeBase, backgroundColor: '#CD7F32', boxShadow: '0 2px 4px rgba(205,127,50,0.5)' }}>3</span>
-          <RankChange change={apartment.rankChange} />
-        </div>
-      );
-    }
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '28px' }}>
-        <span style={{ fontSize: '14px', fontWeight: 900, color: '#C9D1D9', textAlign: 'center', lineHeight: 1.3 }}>{rank}</span>
-        <RankChange change={apartment.rankChange} />
-      </div>
-    );
-  };
-
-  return (
-    <div
-      style={{
-        minHeight: '54px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        padding: '10px 16px',
-        cursor: 'pointer',
-        transition: 'background-color 100ms',
-        borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
-      }}
-      onClick={() => navigate(`/apartment/${apartment.id}`)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && navigate(`/apartment/${apartment.id}`)}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)'; }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
-    >
-      {/* 순위 뱃지 */}
-      {renderRankBadge()}
-
-      {/* 단지명 + 위치 + HOT 태그 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          variant="body2"
-          weight="medium"
-          sx={{ color: 'var(--semantic-label-normal)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}
-        >
-          {apartment.name}
-        </Typography>
-        <Typography
-          variant="caption2"
-          sx={{ color: 'var(--semantic-label-assistive)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '2px' }}
-        >
-          {apartment.district} · {apartment.dong}
-        </Typography>
-        {hasHotTags && (
-          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-            {apartment.hotTags!.slice(0, 2).map((tag) => (
-              <HotTag key={tag} tag={tag} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 가격 + 변동률 */}
-      <div style={{ flexShrink: 0, textAlign: 'right' }}>
-        <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)' }}>
-          {formatPriceShort(apartment.recentPrice)}
-        </span>
-        <Typography
-          variant="caption2"
-          weight="medium"
-          sx={{ color: priceColor, display: 'block', marginTop: '2px' }}
-        >
-          {changeArrow} {formatChange(apartment.priceChange)}
-        </Typography>
-      </div>
-    </div>
-  );
-}
-
-// HotApartmentSkeleton
-function HotApartmentSkeleton({ isHero = false }: { isHero?: boolean }) {
-  if (isHero) {
-    return (
-      <Box
-        sx={{
-          backgroundColor: 'var(--semantic-background-normal-normal)',
-          borderRadius: '16px',
-          padding: '20px',
-          borderLeft: '4px solid var(--semantic-line-normal)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-        }}
-      >
-        <FlexBox justifyContent="space-between" alignItems="center">
-          <Skeleton variant="rectangle" width="36px" height="20px" />
-          <Skeleton variant="text" width="28px" height="16px" />
-        </FlexBox>
-        <Skeleton variant="text" width="58%" height="24px" style={{ marginTop: '12px' }} />
-        <Skeleton variant="text" width="38%" height="14px" style={{ marginTop: '8px' }} />
-        <FlexBox alignItems="flex-end" gap="8px" style={{ marginTop: '20px' }}>
-          <Skeleton variant="text" width="112px" height="32px" />
-          <Skeleton variant="text" width="56px" height="16px" style={{ marginBottom: '4px' }} />
-        </FlexBox>
-        <Skeleton variant="text" width="80px" height="12px" style={{ marginTop: '8px' }} />
-      </Box>
-    );
-  }
-  return (
-    <Box sx={{ backgroundColor: 'var(--semantic-background-normal-normal)', borderRadius: '12px', border: '1px solid var(--semantic-line-normal)', padding: '14px 16px', height: '70px' }}>
-      <FlexBox alignItems="center" gap="12px">
-        <Skeleton variant="circle" width="24px" height="24px" />
-        <FlexBox flex="1" alignItems="center" justifyContent="space-between" gap="12px">
-          <Skeleton variant="text" width="60%" height="13px" />
-          <Skeleton variant="text" width="22%" height="13px" />
-        </FlexBox>
-      </FlexBox>
-    </Box>
-  );
-}
-
-// HotApartmentEmpty
-function HotApartmentEmpty() {
-  const navigate = useNavigate();
-
-  return (
-    <Box
-      sx={{
-        backgroundColor: 'var(--semantic-background-normal-normal)',
-        borderRadius: '16px',
-        border: '1px solid var(--semantic-line-normal)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: '40px 16px',
-      }}
-    >
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--semantic-line-normal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-      <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '12px', display: 'block' }}>
-        이번 주 핫한 아파트를 불러오는 중
-      </Typography>
-      <Typography variant="caption1" sx={{ color: 'var(--semantic-label-assistive)', marginTop: '4px', display: 'block' }}>
-        잠시 후 다시 확인해 주세요
-      </Typography>
-      <Box sx={{ marginTop: '16px' }}>
-        <Button
-          variant="outlined"
-          color="primary"
-          size="small"
-          onClick={() => navigate('/map')}
-          trailingContent={<IconChevronRight />}
-        >
-          지도에서 직접 찾기
-        </Button>
-      </Box>
-    </Box>
   );
 }
 
