@@ -1103,6 +1103,8 @@ export const MOCK_MAP_APARTMENTS: MapApartment[] = [
     lng: apt.lng!, // mock 데이터는 항상 좌표 포함
     price: apt.recentPrice,
     area: apt.recentPriceArea,
+    lawdNm: [apt.address.split(' ').slice(0, 2).join(' '), apt.dong].filter(Boolean).join(' '),
+    umdNm: apt.dong,
     areas: apt.areas,
     priceChangeType: apt.priceChangeType,
     markerType: resolveMarkerType(apt),

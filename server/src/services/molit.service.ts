@@ -930,6 +930,8 @@ const MAP_MARKERS_MOCK: ApartmentMapMarker[] = APT_BASE_DATA.map((apt) => ({
   lng: apt.lng,
   price: apt.basePrice,
   area: String(apt.area),
+  lawdNm: apt.lawdNm,
+  umdNm: apt.lawdNm.split(' ')[apt.lawdNm.split(' ').length - 1],
   priceChangeType: apt.priceChange > 0 ? 'up' : apt.priceChange < 0 ? 'down' : 'flat',
   unitCount: apt.totalUnits,
   isBrand: apt.builder ? isBrandBuilder(apt.builder) : false,
@@ -1145,6 +1147,13 @@ function getLawdCdCoords(aptCode: string): { lat: number; lng: number } | null {
     return LAWD_CD_COORDS[padded];
   }
   return null;
+}
+
+function normalizeApartmentId(aptCode: string): string {
+  if (/^\d{5}-APT\d+$/i.test(aptCode)) {
+    return aptCode.split('-').slice(1).join('-');
+  }
+  return aptCode;
 }
 
 // ============================================================
@@ -1575,6 +1584,8 @@ function tradesToMapMarkers(trades: ApartmentTrade[], lawdCd: string): Apartment
       lng: baseCoords.lng + lngOffset,
       price: latest.price,
       area: String(Math.round(latest.area)),
+      lawdNm: `${LAWD_CD_TO_LOCATION[latest.lawdCd] ?? LAWD_CD_TO_LOCATION[lawdCd] ?? latest.lawdNm}${latest.lawdNm ? ` ${latest.lawdNm}` : ''}`.trim(),
+      umdNm: latest.lawdNm,
       priceChangeType,
       isRecordHigh,
     });
@@ -1847,20 +1858,21 @@ function getMockMarkersWithFilter(
  * @param aptCode - 아파트 코드 (APT001 형식 또는 국토부 코드 형식)
  */
 export async function getApartmentById(aptCode: string): Promise<HotApartment | null> {
-  const cacheKey = `apt:${aptCode}`;
+  const normalizedAptCode = normalizeApartmentId(aptCode);
+  const cacheKey = `apt:${normalizedAptCode}`;
 
   const cached = cacheService.get<HotApartment>(cacheKey);
   if (cached) {
-    console.log(`[Molit] 아파트 상세 캐시 히트: ${aptCode}`);
+    console.log(`[Molit] 아파트 상세 캐시 히트: ${normalizedAptCode}`);
     return cached;
   }
 
   // 1차: Mock 데이터에서 정확한 aptCode 검색 (APT001 형식)
-  let found = APT_BASE_DATA.find((apt) => apt.aptCode === aptCode);
+  let found = APT_BASE_DATA.find((apt) => apt.aptCode === normalizedAptCode);
 
   // 2차: 국토부 코드 형식(숫자 또는 "숫자-숫자")이면 시군구 좌표로 근사 매핑
-  if (!found && /^\d/.test(aptCode)) {
-    const coords = getLawdCdCoords(aptCode);
+  if (!found && /^\d/.test(normalizedAptCode)) {
+    const coords = getLawdCdCoords(normalizedAptCode);
     if (coords) {
       // 좌표 ±0.1도 이내 가장 가까운 Mock 단지 선택
       const nearby = APT_BASE_DATA.filter(
@@ -1873,15 +1885,15 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
           const dc = Math.hypot(closest.lat - coords.lat, closest.lng - coords.lng);
           return d < dc ? apt : closest;
         });
-        console.log(`[Molit] 국토부 코드 "${aptCode}" → 근사 단지 "${found.aptCode}" (${found.apartmentName}) 반환`);
+        console.log(`[Molit] 국토부 코드 "${normalizedAptCode}" → 근사 단지 "${found.aptCode}" (${found.apartmentName}) 반환`);
       } else {
         // 인근 단지가 없어도 시군구 대표 좌표로 최소 응답 생성 (FE 404 방지)
-        console.log(`[Molit] 국토부 코드 "${aptCode}" → 시군구 대표 좌표 기본 응답 생성`);
+        console.log(`[Molit] 국토부 코드 "${normalizedAptCode}" → 시군구 대표 좌표 기본 응답 생성`);
         const fallback: HotApartment = {
           rank: 0,
-          aptCode,
-          apartmentName: `아파트 (${aptCode})`,
-          lawdNm: aptCode.split('-')[0],
+          aptCode: normalizedAptCode,
+          apartmentName: `아파트 (${normalizedAptCode})`,
+          lawdNm: normalizedAptCode.split('-')[0],
           recentPrice: 0,
           area: 84,
           tradeCount: 0,
@@ -1898,7 +1910,7 @@ export async function getApartmentById(aptCode: string): Promise<HotApartment | 
   }
 
   if (!found) {
-    console.log(`[Molit] 아파트 없음: aptCode=${aptCode}`);
+    console.log(`[Molit] 아파트 없음: aptCode=${normalizedAptCode}`);
     return null;
   }
 
