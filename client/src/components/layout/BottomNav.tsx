@@ -12,6 +12,7 @@ import {
   IconLocationFill,
   IconCalendar,
 } from '@wanteddev/wds-icon';
+import { useBookmarkStore } from '../../stores/bookmarkStore';
 
 // WDS에 트렌드 전용 아이콘 없어 AppLayout 사이드바와 동일한 인라인 SVG 사용
 function TrendIcon() {
@@ -34,6 +35,7 @@ function HotIcon() {
 export default function BottomNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const hasNew = useBookmarkStore((s) => s.newTrades.length > 0);
 
   return (
     <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 30 }}>
@@ -44,7 +46,26 @@ export default function BottomNav() {
         <BottomNavigationItem
           value="/"
           label="홈"
-          icon={pathname === '/' ? <IconHomeFill /> : <IconHome />}
+          icon={
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              {pathname === '/' ? <IconHomeFill /> : <IconHome />}
+              {hasNew && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: '#FF4B4B',
+                    flexShrink: 0,
+                  }}
+                  aria-label="새 거래 알림"
+                />
+              )}
+            </span>
+          }
         />
         <BottomNavigationItem
           value="/map"

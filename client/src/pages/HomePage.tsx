@@ -18,11 +18,14 @@ import HotApartmentSection from '../components/home/HotApartmentSection';
 import WeeklySubscriptionTimeline from '../components/home/WeeklySubscriptionTimeline';
 import RecordHighSection from '../components/home/RecordHighSection';
 import { useSubscriptions } from '../hooks/useSubscription';
+import type { NewTradeItem } from '../stores/bookmarkStore';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const isMobile = !useIsPC();
   const bookmarkCount = useBookmarkStore((s) => s.bookmarkCount);
+  const updateLastCheckedPrice = useBookmarkStore((s) => s.updateLastCheckedPrice);
+  const newTrades = useBookmarkStore((s) => s.newTrades);
 
   // 타임라인용 청약 데이터 (ongoing + upcoming 병합)
   const { data: ongoingData, isLoading: ongoingLoading } = useSubscriptions({
@@ -143,6 +146,15 @@ export default function HomePage() {
               padding: isMobile ? '12px 0 0 0' : '32px 20px 0 20px',
             }}
           >
+            {/* 관심 단지 업데이트 카드 */}
+            {newTrades.length > 0 && (
+              <BookmarkUpdateSection
+                trades={newTrades}
+                onTradeRead={updateLastCheckedPrice}
+                isMobile={isMobile}
+              />
+            )}
+
             {/* 퀵 액션 탭 */}
             <QuickActionTabs />
 
@@ -174,6 +186,105 @@ export default function HomePage() {
       {/* 단지 비교 바 */}
       <CompareBar />
     </div>
+  );
+}
+
+// BookmarkUpdateSection — 관심 단지 신규 거래 알림 카드
+function BookmarkUpdateSection({
+  trades,
+  onTradeRead,
+  isMobile,
+}: {
+  trades: NewTradeItem[];
+  onTradeRead: (id: string, price: number) => void;
+  isMobile: boolean;
+}) {
+  return (
+    <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
+      <FlexBox alignItems="center" gap="6px" style={{ marginBottom: '10px' }}>
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: '#FF4B4B',
+            flexShrink: 0,
+            display: 'inline-block',
+          }}
+        />
+        <Typography variant="body2" weight="bold" sx={{ color: 'var(--semantic-label-normal)' }}>
+          내 관심 단지 업데이트
+        </Typography>
+      </FlexBox>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {trades.map((trade) => {
+          const changeAmt = trade.newPrice - trade.oldPrice;
+          const changeRate = trade.oldPrice > 0
+            ? ((changeAmt / trade.oldPrice) * 100).toFixed(1)
+            : '0.0';
+          const isUp = changeAmt > 0;
+          const changeColor = isUp ? '#FF4B4B' : '#3B82F6';
+          const changeSign = isUp ? '+' : '';
+
+          return (
+            <button
+              key={trade.id}
+              onClick={() => onTradeRead(trade.id, trade.newPrice)}
+              style={{
+                width: '100%',
+                backgroundColor: 'var(--semantic-background-normal-normal)',
+                border: '1px solid var(--semantic-line-normal)',
+                borderRadius: '12px',
+                padding: '14px 16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <Typography
+                  variant="body2"
+                  weight="bold"
+                  sx={{
+                    color: 'var(--semantic-label-normal)',
+                    display: 'block',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {trade.name}
+                </Typography>
+                <Typography
+                  variant="caption1"
+                  sx={{ color: 'var(--semantic-label-alternative)', display: 'block', marginTop: '2px' }}
+                >
+                  {(trade.oldPrice / 10000).toFixed(1)}억 → {(trade.newPrice / 10000).toFixed(1)}억
+                </Typography>
+              </div>
+              <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                <Typography
+                  variant="body2"
+                  weight="bold"
+                  sx={{ color: changeColor, display: 'block' }}
+                >
+                  {changeSign}{(changeAmt / 10000).toFixed(1)}억
+                </Typography>
+                <Typography
+                  variant="caption1"
+                  sx={{ color: changeColor, display: 'block' }}
+                >
+                  {changeSign}{changeRate}%
+                </Typography>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </Box>
   );
 }
 
