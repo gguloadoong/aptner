@@ -60,10 +60,10 @@ export default function ApartmentDetailPage() {
       .catch(() => {});
   }, [apartment?.id, apartment?.lawdCd]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     // areas 배열이 비어있을 수 있으므로 안전하게 접근
     if (apartment && apartment.areas.length > 0) setSelectedArea(apartment.areas[0]);
-  }, [apartment]);
+  }, [apartment?.id, apartment?.areas]);
 
   const { data: tradeHistory = [], isLoading: isHistoryLoading } = useApartmentHistory(
     id,

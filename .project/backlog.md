@@ -30,15 +30,15 @@
 
 ## Minor (다음 스프린트)
 
-| ID | 이슈 | 담당 |
-|----|------|------|
-| MINOR-01 | TrendPage 날짜 하드코딩 | 민준 |
-| MINOR-02 | 지도 마커 innerHTML 사용 → textContent 교체 | 민준 |
-| MINOR-03 | HotApartments region 파라미터 코드/문자열 불일치 | 민준+서연 |
-| MINOR-04 | 청약 캐시 TTL 중 status/dDay 재계산 필요 | 서연 |
-| MINOR-05 | geolocation 실패 시 alert → toast 교체 | 민준 |
-| MINOR-06 | ApartmentDetailPage useEffect 의존성 개선 | 민준 |
-| MINOR-07 | Button isLoading 시 aria-busy 추가 | 민준 |
+| ID | 이슈 | 상태 | 담당 |
+|----|------|------|------|
+| MINOR-01 | TrendPage 날짜 하드코딩 | ✅ 완료 (new Date() 동적 처리 확인) | - |
+| MINOR-02 | 지도 마커 innerHTML 사용 → textContent 교체 | ✅ 완료 (DOM API 이미 적용) | - |
+| MINOR-03 | HotApartments region 파라미터 코드/문자열 불일치 | ✅ 완료 (FE/BE 모두 문자열 region 사용 확인) | - |
+| MINOR-04 | 청약 캐시 TTL 중 status/dDay 재계산 필요 | 유지 (10분 TTL 실용상 허용) | 서연 |
+| MINOR-05 | geolocation 실패 시 alert → toast 교체 | ✅ 완료 (alert 사용 없음 확인) | - |
+| MINOR-06 | ApartmentDetailPage useEffect 의존성 개선 | 미착수 | 민준 |
+| MINOR-07 | Button isLoading 시 aria-busy 추가 | 미착수 | 민준 |
 
 ---
 
