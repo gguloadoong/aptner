@@ -270,5 +270,5 @@ function CustomTooltip({
 function formatLabel(yearMonth: string, range: number): string {
   const [year, month] = yearMonth.split('-');
   if (range <= 12) return `${month}월`;
-  return parseInt(month) === 1 ? `${year.slice(2)}년` : `${month}월`;
+  return parseInt(month, 10) === 1 ? `${year.slice(2)}년` : `${month}월`;
 }
