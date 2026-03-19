@@ -211,7 +211,7 @@ function MapBanner() {
             지도로 아파트 찾기
           </Typography>
           <Typography variant="caption1" sx={{ color: 'rgba(255,255,255,0.75)', display: 'block', marginTop: '4px' }}>
-            서울 주요 아파트 실거래가를 지도에서 확인
+            전국 아파트 실거래가를 지도에서 확인
           </Typography>
         </div>
         <div
@@ -267,9 +267,9 @@ function TrendBanner() {
       : `${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`;
   const rateColor =
     rate > 0
-      ? 'var(--semantic-label-danger)'
+      ? '#FF4B4B'
       : rate < 0
-        ? 'var(--semantic-label-info)'
+        ? '#3B82F6'
         : 'var(--semantic-label-assistive)';
 
   return (
