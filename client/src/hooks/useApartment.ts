@@ -7,6 +7,7 @@ import {
   getHotApartmentRanking,
   searchApartments,
   getSupplyData,
+  getRecentTrades,
 } from '../services/apartment.service';
 
 // 핫 아파트 목록 조회 훅
@@ -84,6 +85,15 @@ export function useHotRanking(region?: string, limit = 3) {
   return useQuery({
     queryKey: ['apartments', 'hotRanking', region, limit],
     queryFn: () => getHotApartmentRanking(region, limit),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// 최근 실거래 조회 훅
+export function useRecentTrades(region = '11') {
+  return useQuery({
+    queryKey: ['recent-trades', region],
+    queryFn: () => getRecentTrades(region, 20),
     staleTime: 5 * 60 * 1000,
   });
 }

@@ -13,15 +13,6 @@ import {
   IconCalendar,
 } from '@wanteddev/wds-icon';
 
-// WDS에 트렌드 전용 아이콘 없어 AppLayout 사이드바와 동일한 인라인 SVG 사용
-function TrendIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-    </svg>
-  );
-}
-
 // 핫 랭킹 아이콘 (불꽃 모양 인라인 SVG)
 function HotIcon() {
   return (
@@ -55,11 +46,6 @@ export default function BottomNav() {
           value="/subscription"
           label="청약"
           icon={<IconCalendar />}
-        />
-        <BottomNavigationItem
-          value="/trend"
-          label="트렌드"
-          icon={<TrendIcon />}
         />
         <BottomNavigationItem
           value="/hot"

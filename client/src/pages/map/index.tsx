@@ -7,6 +7,7 @@ import { useGeocoder } from '../../hooks/useGeocoder';
 import { useIsPC } from '../../hooks/useBreakpoint';
 import { Box, useToast } from '@wanteddev/wds';
 import type { MapApartment, ApartmentComplex } from '../../types';
+import { MAP_ZOOM } from './constants';
 import { getApartmentsByBounds, getComplexesByBounds, searchApartments } from '../../services/apartment.service';
 import { useMapApartments } from '../../hooks/useMapApartments';
 import type { PlaceMarkerData } from '../../hooks/useMapApartments';
@@ -132,7 +133,7 @@ export default function MapPage() {
       }
 
       // 충분히 줌인한 경우에만 단지/가격 마커를 조회합니다.
-      if (zoom <= 4) {
+      if (zoom <= MAP_ZOOM.COMPLEX_DATA_FETCH) {
         setIsComplexLoading(true);
         try {
           const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
@@ -220,7 +221,7 @@ export default function MapPage() {
   // 기존 마커 업데이트 — 충분히 줌인한 경우에만 개별 마커 표시
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker' && currentZoom <= 3) {
+    if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
       updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
@@ -230,7 +231,7 @@ export default function MapPage() {
   // 호갱노노 스타일 단지 마커 업데이트
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker' && currentZoom <= 3) {
+    if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.COMPLEX_MARKERS) {
       updateComplexMarkers(complexes, handleComplexClick);
     } else {
       updateComplexMarkers([], handleComplexClick);
@@ -249,7 +250,7 @@ export default function MapPage() {
   // Places AT4 마커 업데이트 — 단지 뷰에서만 표시
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker' && currentZoom <= 3) {
+    if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
       updatePlaceMarkers(placeMarkers, handlePlaceMarkerClick);
     } else {
       updatePlaceMarkers([], handlePlaceMarkerClick);
@@ -269,7 +270,7 @@ export default function MapPage() {
   // 줌 단계별 평균가 오버레이 업데이트
   useEffect(() => {
     if (!isLoaded) return;
-    if (viewMode === 'marker' && currentZoom >= 4) {
+    if (viewMode === 'marker' && currentZoom >= MAP_ZOOM.DISTRICT_OVERLAYS) {
       updateDistrictOverlays(mapApartments, currentZoom);
     } else {
       clearDistrictOverlays();

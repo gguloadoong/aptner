@@ -39,6 +39,20 @@ export const COMPLEX_FEATURE_OPTIONS: { value: ComplexFeature; label: string }[]
   { value: 'school', label: '초품아' },
 ];
 
+// 카카오맵 줌 레벨 (낮을수록 더 확대됨, 1=건물, 14=전국)
+// getRegionOverlayLevel 기준: zoom >= 9 → sido, >= 7 → sigungu, >= 5 → gu, >= 4 → dong, < 4 → complex
+export const MAP_ZOOM = {
+  // 개별 거래 마커 표시 임계값 (이 이하일 때 표시)
+  INDIVIDUAL_MARKERS: 3,
+  // 단지(complex) 마커 표시 임계값 (이 이하일 때 표시)
+  COMPLEX_MARKERS: 4,
+  // 구역별 오버레이(dong/gu/sigungu/sido) 표시 임계값 (이 이상일 때 표시)
+  // zoom 4는 dong 레벨이지만 complex 마커와 겹치므로 5부터 district overlay 활성화
+  DISTRICT_OVERLAYS: 5,
+  // 단지 데이터 API 호출 임계값 (이 이하일 때 서버 요청)
+  COMPLEX_DATA_FETCH: 4,
+} as const;
+
 // 가격 범례 아이템 (마커 색상과 동일한 4단계 기준)
 export const PRICE_LEGEND_ITEMS = [
   { color: '#8B95A1', label: '5억 미만' },

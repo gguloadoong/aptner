@@ -223,6 +223,18 @@ export interface RecordHighApartment {
   lawdCd: string;
 }
 
+// 최근 실거래 타입 (BE GET /api/apartments/recent-trades)
+export interface RecentTrade {
+  id: string;
+  aptNm: string;
+  umdNm: string;
+  lawdCd: string;
+  area: number;       // m²
+  price: number;      // 만원
+  dealDate: string;   // YYYY-MM-DD
+  buildYear?: number;
+}
+
 // API 응답 공통 타입
 export interface ApiResponse<T> {
   data: T;

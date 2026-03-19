@@ -22,6 +22,9 @@ const API_TIMEOUT = 10_000;
 // 단 한 번에 최대 요청 건수 (국토부 API 최대값)
 const MAX_ROWS_PER_REQUEST = 1000;
 
+// 페이지 cap: 최대 5페이지 = 5,000건
+const MAX_PAGES = 5;
+
 // 최근 2개월 거래만 조회
 const MONTHS_BACK = 2;
 
@@ -45,28 +48,22 @@ interface RawTradeItem {
 }
 
 /**
- * 국토부 API에서 특정 시군구 + 년월 데이터를 조회합니다.
- * 실패 시 빈 배열 반환 (상위 Promise.allSettled에서 처리).
+ * 국토부 API 단일 페이지를 요청하고 파싱된 결과와 totalCount를 반환합니다.
  */
-async function fetchMolitRaw(
+async function fetchMolitPage(
+  axios: import('axios').AxiosStatic,
+  parseStringPromise: (xml: string) => Promise<unknown>,
+  apiKey: string,
   lawdCd: string,
   dealYmd: string,
-): Promise<RawTradeItem[]> {
-  const apiKey = process.env.MOLIT_API_KEY;
-  if (!apiKey || apiKey === 'demo_key_replace_with_real_key') {
-    throw new Error('MOLIT_API_KEY 환경변수가 설정되지 않았습니다.');
-  }
-
-  // axios 대신 native http 활용 가능하지만 일관성 유지를 위해 axios 사용
-  const axios = (await import('axios')).default;
-  const { parseStringPromise } = await import('xml2js');
-
+  pageNo: number,
+): Promise<{ items: RawTradeItem[]; totalCount: number }> {
   const response = await axios.get<string>(MOLIT_API_BASE_URL, {
     params: {
       serviceKey: apiKey,
       LAWD_CD: lawdCd,
       DEAL_YMD: dealYmd,
-      pageNo: '1',
+      pageNo: String(pageNo),
       numOfRows: String(MAX_ROWS_PER_REQUEST),
     },
     timeout: API_TIMEOUT,
@@ -74,13 +71,14 @@ async function fetchMolitRaw(
     headers: { Accept: 'application/xml' },
   });
 
-  // XML → JSON 파싱
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const parsed: any = await parseStringPromise(response.data);
+  const body = parsed?.response?.body?.[0];
+  const totalCount = parseInt(body?.totalCount?.[0] ?? '0', 10) || 0;
   const rawItems: Record<string, string[]>[] =
-    parsed?.response?.body?.[0]?.items?.[0]?.item ?? [];
+    body?.items?.[0]?.item ?? [];
 
-  return rawItems.map((item) => {
+  const items = rawItems.map((item) => {
     const rawPrice = (item.dealAmount?.[0] ?? '0').replace(/,/g, '').trim();
     const year  = parseInt(item.dealYear?.[0]?.trim()  ?? '0', 10);
     const month = parseInt(item.dealMonth?.[0]?.trim() ?? '0', 10);
@@ -98,6 +96,66 @@ async function fetchMolitRaw(
       aptSeq:     item.aptSeq?.[0]?.trim(),
     };
   });
+
+  return { items, totalCount };
+}
+
+/**
+ * 국토부 API에서 특정 시군구 + 년월 데이터를 전체 페이지 수집하여 반환합니다.
+ * - 첫 페이지 요청 후 totalCount를 파싱해 추가 페이지 수를 계산
+ * - 추가 페이지는 병렬 요청 (최대 MAX_PAGES = 5, 5,000건 cap)
+ * - 실패 시 빈 배열 반환 (상위 Promise.allSettled에서 처리)
+ */
+async function fetchMolitRaw(
+  lawdCd: string,
+  dealYmd: string,
+): Promise<RawTradeItem[]> {
+  const apiKey = process.env.MOLIT_API_KEY;
+  if (!apiKey || apiKey === 'demo_key_replace_with_real_key') {
+    throw new Error('MOLIT_API_KEY 환경변수가 설정되지 않았습니다.');
+  }
+
+  const axios = (await import('axios')).default;
+  const { parseStringPromise } = await import('xml2js');
+
+  // 1. 첫 번째 페이지 요청 — totalCount 포함
+  const firstPage = await fetchMolitPage(axios, parseStringPromise, apiKey, lawdCd, dealYmd, 1);
+  const { totalCount } = firstPage;
+  const allItems: RawTradeItem[] = [...firstPage.items];
+
+  // 2. 추가 페이지 수 계산 (cap: MAX_PAGES)
+  const totalPages = Math.min(
+    Math.ceil(totalCount / MAX_ROWS_PER_REQUEST),
+    MAX_PAGES,
+  );
+
+  if (totalPages > 1) {
+    console.log(
+      `[Complex] ${lawdCd}/${dealYmd} totalCount=${totalCount}, ` +
+      `추가 페이지 ${totalPages - 1}개 병렬 요청`,
+    );
+
+    // 3. 2페이지 이상 병렬 요청
+    const pageNums = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    const extraPages = await Promise.allSettled(
+      pageNums.map((p) =>
+        fetchMolitPage(axios, parseStringPromise, apiKey, lawdCd, dealYmd, p),
+      ),
+    );
+
+    for (const result of extraPages) {
+      if (result.status === 'fulfilled') {
+        allItems.push(...result.value.items);
+      } else {
+        console.warn(
+          `[Complex] ${lawdCd}/${dealYmd} 추가 페이지 요청 실패:`,
+          result.reason?.message ?? result.reason,
+        );
+      }
+    }
+  }
+
+  return allItems;
 }
 
 // ============================================================

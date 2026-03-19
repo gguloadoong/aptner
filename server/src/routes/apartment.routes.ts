@@ -17,6 +17,7 @@ import {
   getRecordHighApartments,
 } from '../services/molit.service';
 import { getHotApartmentRanking } from '../services/hot-ranking.service';
+import { getRecentTrades } from '../services/recent-trades.service';
 import { getComplexesByViewport } from '../services/complex.service';
 import { apiRateLimiter } from '../middleware/security';
 import { ComplexFilter, TradeQueryParams } from '../types';
@@ -423,6 +424,68 @@ router.get('/hot', apiRateLimiter, async (req: Request, res: Response, next: Nex
       data,
       meta: {
         total: data.length,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/apartments/recent-trades
+ * 홈 화면 최근 거래 피드 — 거래일 최신순 실거래 리스트
+ *
+ * Query params:
+ *   - region: 시도 코드 2자리 (선택, 기본: '11' = 서울)
+ *   - limit:  반환 건수 (선택, 기본: 20, 최대: 30)
+ *
+ * 응답:
+ *   { success: true, data: RecentTrade[] }
+ *   MOLIT API 실패 시 빈 배열 반환 (홈 화면 크래시 방지)
+ */
+router.get('/recent-trades', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { region, limit } = req.query as Partial<Record<string, string>>;
+
+    // region 형식 검증 (전달된 경우만 — 2자리 숫자)
+    if (region && !/^\d{2}$/.test(region)) {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_REGION',
+          message: 'region은 시도 코드 2자리 숫자여야 합니다. (예: 11=서울, 41=경기)',
+        },
+      });
+      return;
+    }
+
+    // limit 검증: 1~30
+    const MAX_LIMIT = 30;
+    let limitNum = 20;
+    if (limit !== undefined) {
+      limitNum = parseInt(limit, 10);
+      if (isNaN(limitNum) || limitNum < 1 || limitNum > MAX_LIMIT) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_LIMIT',
+            message: `limit은 1~${MAX_LIMIT} 사이의 정수여야 합니다.`,
+          },
+        });
+        return;
+      }
+    }
+
+    const regionCode = region ?? '11';
+    const data = await getRecentTrades(regionCode, limitNum);
+
+    res.json({
+      success: true,
+      data,
+      meta: {
+        total: data.length,
+        region: regionCode,
         updatedAt: new Date().toISOString(),
       },
     });

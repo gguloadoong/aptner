@@ -338,35 +338,83 @@ export default function MapCanvas({
             />
           ) : selectedApartment ? (
             <Box style={{ padding: '20px' }}>
-              {/* 청약 정보 섹션 (청약 마커인 경우) */}
-              {selectedMapApt && (selectedMapApt.markerType === 'subOngoing' || selectedMapApt.markerType === 'subUpcoming') && (
-                <SubscriptionInfoSection apt={selectedMapApt} navigate={navigate} />
+              {/* 청약 마커인 경우 — 청약 전용 UI */}
+              {selectedApartment.id.startsWith('sub-') ? (
+                <>
+                  {/* 청약 단지 배지 */}
+                  <FlexBox alignItems="center" style={{ gap: '8px', marginBottom: '12px' }}>
+                    <Box
+                      style={{
+                        height: '22px',
+                        padding: '0 8px',
+                        borderRadius: '11px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        background: selectedMapApt?.markerType === 'subOngoing' ? '#E8F1FD' : '#FFF4E5',
+                        color: selectedMapApt?.markerType === 'subOngoing' ? '#0066FF' : '#E67E22',
+                      }}
+                    >
+                      {selectedMapApt?.markerType === 'subOngoing' ? '청약 진행중' : '청약 예정'}
+                    </Box>
+                    <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>
+                      청약 단지
+                    </Typography>
+                  </FlexBox>
+                  {/* 단지명 */}
+                  <Typography variant="title3" weight="bold" style={{ color: 'var(--semantic-label-normal)', lineHeight: 1.3 }}>
+                    {selectedApartment.name}
+                  </Typography>
+                  {/* 청약 상세 정보 (SubscriptionInfoSection 재사용) */}
+                  {selectedMapApt && (
+                    <Box style={{ marginTop: '12px' }}>
+                      <SubscriptionInfoSection apt={selectedMapApt} navigate={navigate} />
+                    </Box>
+                  )}
+                  {/* subId 없는 경우 대비 — subId가 있으면 SubscriptionInfoSection 내부 버튼으로 처리됨 */}
+                  {selectedMapApt && !selectedMapApt.subId && (
+                    <Button
+                      variant="solid"
+                      color="primary"
+                      fullWidth
+                      style={{ marginTop: '12px' }}
+                      onClick={() => navigate('/subscription')}
+                    >
+                      청약 목록 보기
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* 일반 마커 fallback — 상세 API 로딩 전 임시 표시 */}
+                  <Typography variant="title3" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
+                    {selectedApartment.name}
+                  </Typography>
+                  <Typography
+                    variant="title1"
+                    weight="bold"
+                    style={{ color: 'var(--semantic-label-normal)', marginTop: '8px' }}
+                  >
+                    {formatPriceShort(selectedApartment.recentPrice)}
+                  </Typography>
+                  {/* 상세 데이터 로딩 중 스피너 표시 */}
+                  {isDetailLoading && (
+                    <FlexBox alignItems="center" justifyContent="center" style={{ padding: '8px 0' }}>
+                      <LoadingSpinner message="상세 정보 로딩중..." />
+                    </FlexBox>
+                  )}
+                  <Button
+                    variant="solid"
+                    color="primary"
+                    fullWidth
+                    style={{ marginTop: '16px' }}
+                    onClick={() => onNavigateToDetail(selectedApartment.id)}
+                  >
+                    상세보기
+                  </Button>
+                </>
               )}
-              <Typography variant="title3" weight="bold" style={{ color: 'var(--semantic-label-normal)' }}>
-                {selectedApartment.name}
-              </Typography>
-              <Typography
-                variant="title1"
-                weight="bold"
-                style={{ color: 'var(--semantic-label-normal)', marginTop: '8px' }}
-              >
-                {formatPriceShort(selectedApartment.recentPrice)}
-              </Typography>
-              {/* 상세 데이터 로딩 중 스피너 표시 */}
-              {isDetailLoading && (
-                <FlexBox alignItems="center" justifyContent="center" style={{ padding: '8px 0' }}>
-                  <LoadingSpinner message="상세 정보 로딩중..." />
-                </FlexBox>
-              )}
-              <Button
-                variant="solid"
-                color="primary"
-                fullWidth
-                style={{ marginTop: '16px' }}
-                onClick={() => onNavigateToDetail(selectedApartment.id)}
-              >
-                상세보기
-              </Button>
             </Box>
           ) : null}
         </BottomSheet>

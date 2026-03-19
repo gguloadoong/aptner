@@ -1,5 +1,5 @@
 import api from './api';
-import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex, HotApartment, RecordHighApartment } from '../types';
+import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex, HotApartment, RecordHighApartment, RecentTrade } from '../types';
 import { getSubscriptions } from './subscription.service';
 import {
   MOCK_APARTMENTS,
@@ -745,6 +745,41 @@ export async function getRecordHighs(region = '수도권', limit = 5): Promise<R
     console.warn('[getRecordHighs] API 호출 실패, Mock 데이터로 폴백:', err);
     await delay(250);
     return MOCK_RECORD_HIGHS.slice(0, limit);
+  }
+}
+
+// 최근 실거래 Mock 데이터
+const MOCK_RECENT_TRADES: RecentTrade[] = [
+  { id: 'rt-001', aptNm: '아크로리버파크', umdNm: '반포동', lawdCd: '11650', area: 84, price: 460000, dealDate: '2026-03-15', buildYear: 2016 },
+  { id: 'rt-002', aptNm: '래미안 대치팰리스', umdNm: '대치동', lawdCd: '11680', area: 84, price: 295000, dealDate: '2026-03-14', buildYear: 2015 },
+  { id: 'rt-003', aptNm: '압구정현대아파트', umdNm: '압구정동', lawdCd: '11680', area: 176, price: 540000, dealDate: '2026-03-14', buildYear: 1976 },
+  { id: 'rt-004', aptNm: '반포자이', umdNm: '반포동', lawdCd: '11650', area: 84, price: 390000, dealDate: '2026-03-13', buildYear: 2009 },
+  { id: 'rt-005', aptNm: '헬리오시티', umdNm: '가락동', lawdCd: '11710', area: 84, price: 185000, dealDate: '2026-03-13', buildYear: 2019 },
+  { id: 'rt-006', aptNm: '잠실엘스', umdNm: '잠실동', lawdCd: '11710', area: 84, price: 230000, dealDate: '2026-03-12', buildYear: 2008 },
+  { id: 'rt-007', aptNm: '타워팰리스', umdNm: '도곡동', lawdCd: '11680', area: 164, price: 415000, dealDate: '2026-03-12', buildYear: 2002 },
+  { id: 'rt-008', aptNm: '은마아파트', umdNm: '대치동', lawdCd: '11680', area: 76, price: 195000, dealDate: '2026-03-11', buildYear: 1979 },
+  { id: 'rt-009', aptNm: '도곡렉슬', umdNm: '도곡동', lawdCd: '11680', area: 84, price: 260000, dealDate: '2026-03-11', buildYear: 2002 },
+  { id: 'rt-010', aptNm: '올림픽파크포레온', umdNm: '둔촌동', lawdCd: '11740', area: 59, price: 142000, dealDate: '2026-03-10', buildYear: 2023 },
+];
+
+// 최근 실거래 목록 조회
+// BE: GET /api/apartments/recent-trades?region=11&limit=20
+export async function getRecentTrades(region = '11', limit = 20): Promise<RecentTrade[]> {
+  if (USE_MOCK) {
+    await delay(300);
+    return MOCK_RECENT_TRADES.slice(0, limit);
+  }
+
+  try {
+    const response = await api.get<{ success: true; data: RecentTrade[] }>(
+      '/apartments/recent-trades',
+      { params: { region, limit } }
+    );
+    return response.data.data;
+  } catch (err) {
+    console.warn('[getRecentTrades] API 호출 실패, Mock 데이터로 폴백:', err);
+    await delay(300);
+    return MOCK_RECENT_TRADES.slice(0, limit);
   }
 }
 

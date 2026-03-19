@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import SearchBar from '../components/ui/SearchBar';
 import BomzipLogo from '../components/ui/BomzipLogo';
 import { useBookmarkStore } from '../stores/bookmarkStore';
@@ -9,14 +10,17 @@ import {
   Box,
   FlexBox,
   Typography,
+  Skeleton,
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
-import { IconSearch } from '@wanteddev/wds-icon';
+import { IconSearch, IconArrowRight } from '@wanteddev/wds-icon';
 import HotApartmentSection from '../components/home/HotApartmentSection';
 import MarketSummaryBanner from '../components/home/MarketSummaryBanner';
 import WeeklySubscriptionTimeline from '../components/home/WeeklySubscriptionTimeline';
 import RecordHighSection from '../components/home/RecordHighSection';
+import RecentTradesSection from '../components/home/RecentTradesSection';
 import { useSubscriptions } from '../hooks/useSubscription';
+import api from '../services/api';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -148,6 +152,9 @@ export default function HomePage() {
             {/* 이달의 신고가 섹션 */}
             <RecordHighSection />
 
+            {/* 최근 실거래 */}
+            <RecentTradesSection />
+
             {/* 주간 청약 타임라인 */}
             <WeeklySubscriptionTimeline
               subscriptions={allSubscriptions}
@@ -157,6 +164,11 @@ export default function HomePage() {
             {/* HOT 아파트 랭킹 */}
             <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
               <HotApartmentSection />
+            </Box>
+
+            {/* 트렌드 요약 배너 */}
+            <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
+              <TrendBanner />
             </Box>
 
             {/* 지도 바로가기 배너 */}
@@ -223,6 +235,117 @@ function MapBanner() {
           </svg>
         </div>
       </FlexBox>
+    </button>
+  );
+}
+
+// TrendBanner — 서울 부동산 트렌드 요약 카드 (트렌드 탭 인라인 통합)
+interface MarketSummary {
+  avgPrice: number;
+  priceChangeRate: number;
+  tradeCount: number;
+}
+
+function TrendBanner() {
+  const navigate = useNavigate();
+
+  const { data, isLoading } = useQuery({
+    // MarketSummaryBanner와 동일한 queryKey → 캐시 재활용
+    queryKey: ['trends', 'region', '전국', 'monthly'],
+    queryFn: () =>
+      api
+        .get<{ success: boolean; data: MarketSummary }>('/trends/summary')
+        .then((res) => res.data.data),
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
+  });
+
+  const rate = data?.priceChangeRate ?? 0;
+  const rateText =
+    rate === 0
+      ? '0.0%'
+      : `${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`;
+  const rateColor =
+    rate > 0 ? '#FF4B4B' : rate < 0 ? '#00C896' : 'rgba(255,255,255,0.7)';
+
+  return (
+    <button
+      onClick={() => navigate('/trend')}
+      style={{
+        width: '100%',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        borderRadius: '16px',
+        padding: '20px',
+        textAlign: 'left',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'opacity 150ms ease',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.95'; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+      aria-label="서울 부동산 트렌드 상세 보기"
+    >
+      <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '14px' }}>
+        <Typography variant="body1" weight="bold" sx={{ color: 'white', display: 'block' }}>
+          서울 부동산 트렌드
+        </Typography>
+        <FlexBox alignItems="center" style={{ gap: '4px', color: 'rgba(255,255,255,0.6)' }}>
+          <Typography variant="caption1" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+            자세히 보기
+          </Typography>
+          <IconArrowRight style={{ width: '14px', height: '14px', color: 'rgba(255,255,255,0.6)' }} />
+        </FlexBox>
+      </FlexBox>
+
+      {isLoading ? (
+        <FlexBox style={{ gap: '12px' }}>
+          <Skeleton variant="rectangle" width="80px" height="36px" style={{ borderRadius: '8px' }} />
+          <Skeleton variant="rectangle" width="60px" height="36px" style={{ borderRadius: '8px' }} />
+        </FlexBox>
+      ) : (
+        <FlexBox alignItems="flex-end" style={{ gap: '20px' }}>
+          <div>
+            <Typography variant="caption2" sx={{ color: 'rgba(255,255,255,0.55)', display: 'block', marginBottom: '2px' }}>
+              전국 평균가
+            </Typography>
+            <Typography
+              variant="title3"
+              weight="bold"
+              sx={{ color: 'white', fontFamily: 'var(--font-jetbrains, monospace)' }}
+            >
+              {data
+                ? data.avgPrice >= 10000
+                  ? `${Math.floor(data.avgPrice / 10000)}억`
+                  : `${data.avgPrice.toLocaleString()}만`
+                : '—'}
+            </Typography>
+          </div>
+          <div>
+            <Typography variant="caption2" sx={{ color: 'rgba(255,255,255,0.55)', display: 'block', marginBottom: '2px' }}>
+              전월 대비
+            </Typography>
+            <Typography
+              variant="title3"
+              weight="bold"
+              sx={{ color: rateColor, fontFamily: 'var(--font-jetbrains, monospace)' }}
+            >
+              {rateText}
+            </Typography>
+          </div>
+          <div>
+            <Typography variant="caption2" sx={{ color: 'rgba(255,255,255,0.55)', display: 'block', marginBottom: '2px' }}>
+              이번달 거래
+            </Typography>
+            <Typography
+              variant="title3"
+              weight="bold"
+              sx={{ color: 'white', fontFamily: 'var(--font-jetbrains, monospace)' }}
+            >
+              {data ? `${data.tradeCount.toLocaleString()}건` : '—'}
+            </Typography>
+          </div>
+        </FlexBox>
+      )}
     </button>
   );
 }
