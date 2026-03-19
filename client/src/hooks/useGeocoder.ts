@@ -70,6 +70,33 @@ function geocodeOnce(
   });
 }
 
+// 카카오 Places keywordSearch 단건 호출 (아파트명 → 좌표 변환용)
+function keywordSearchOnce(keyword: string): Promise<{ lat: number; lng: number } | null> {
+  return new Promise((resolve) => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const services = (window.kakao?.maps as any)?.services;
+      if (!services) { resolve(null); return; }
+      const ps = new services.Places();
+      ps.keywordSearch(
+        keyword,
+        (result: Array<{ x: string; y: string; category_group_code: string }>, status: string) => {
+          if (status === 'OK' && result.length > 0) {
+            // AT4(아파트) 카테고리 결과 우선, 없으면 첫 번째 결과
+            const apt = result.find((r) => r.category_group_code === 'AT4') ?? result[0];
+            resolve({ lat: parseFloat(apt.y), lng: parseFloat(apt.x) });
+          } else {
+            resolve(null);
+          }
+        },
+        { size: 5 }
+      );
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 // Kakao Geocoder 응답 단건 타입
 interface KakaoGeoResult {
   x: string; // 경도
@@ -115,7 +142,7 @@ export function useGeocoder() {
       // 1차: 도로명/지번 주소로 시도
       let coords = await geocodeOnce(geocoder, address);
 
-      // 2차: fallback 쿼리로 재시도
+      // 2차: fallback 쿼리로 addressSearch 재시도
       if (!coords && fallbackQuery) {
         const fallbackKey = fallbackQuery.trim();
         if (cache[fallbackKey] && Date.now() - cache[fallbackKey].ts < CACHE_TTL_MS) {
@@ -124,6 +151,19 @@ export function useGeocoder() {
         coords = await geocodeOnce(geocoder, fallbackQuery);
         if (coords) {
           cache[fallbackKey] = { ...coords, ts: Date.now() };
+        }
+      }
+
+      // 3차: Places keywordSearch (아파트명 검색 — addressSearch가 실패하는 단지명용)
+      if (!coords) {
+        const keywordQuery = fallbackQuery ?? address;
+        const kwKey = `kw:${keywordQuery.trim()}`;
+        if (cache[kwKey] && Date.now() - cache[kwKey].ts < CACHE_TTL_MS) {
+          return { lat: cache[kwKey].lat, lng: cache[kwKey].lng };
+        }
+        coords = await keywordSearchOnce(keywordQuery);
+        if (coords) {
+          cache[kwKey] = { ...coords, ts: Date.now() };
         }
       }
 

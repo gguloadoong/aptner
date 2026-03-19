@@ -132,7 +132,18 @@ export default function MapPage() {
         console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err);
       }
 
-      // 충분히 줌인한 경우에만 단지/가격 마커를 조회합니다.
+      // Places AT4(아파트) 검색 — INDIVIDUAL_MARKERS 임계값까지 표시하므로 같은 조건으로 fetch
+      if (zoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
+        const centerLat = (swLat + neLat) / 2;
+        const centerLng = (swLng + neLng) / 2;
+        fetchPlaceMarkersRef.current?.(centerLat, centerLng)
+          .then((markers) => setPlaceMarkers(markers))
+          .catch((err) => console.warn('[handleBoundsChange] Places 마커 갱신 실패:', err));
+      } else {
+        setPlaceMarkers([]);
+      }
+
+      // 충분히 줌인한 경우에만 MOLIT 단지 집계 마커 조회
       if (zoom <= MAP_ZOOM.COMPLEX_DATA_FETCH) {
         setIsComplexLoading(true);
         try {
@@ -145,18 +156,8 @@ export default function MapPage() {
         } finally {
           setIsComplexLoading(false);
         }
-
-        // Places AT4 검색 + 거래가 매칭 (뷰포트 중심 좌표 기준)
-        // bounds 중심을 center로 사용 (kakao map center와 근사)
-        const centerLat = (swLat + neLat) / 2;
-        const centerLng = (swLng + neLng) / 2;
-        fetchPlaceMarkersRef.current?.(centerLat, centerLng)
-          .then((markers) => setPlaceMarkers(markers))
-          .catch((err) => console.warn('[handleBoundsChange] Places 마커 갱신 실패:', err));
       } else {
-        // 줌아웃 시 단지 마커 및 Places 마커 초기화
         setComplexes([]);
-        setPlaceMarkers([]);
       }
     },
     [batchGeocode, priceFilter]
