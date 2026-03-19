@@ -16,7 +16,7 @@ interface RecordHighCardProps {
   rank: number;
   apt: RecordHighApartment;
   isLast: boolean;
-  onNavigate: (lawdCd: string) => void;
+  onNavigate: (apt: RecordHighApartment) => void;
 }
 
 function RecordHighCard({ rank, apt, isLast, onNavigate }: RecordHighCardProps) {
@@ -31,7 +31,7 @@ function RecordHighCard({ rank, apt, isLast, onNavigate }: RecordHighCardProps) 
         borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
         cursor: 'pointer',
       }}
-      onClick={() => onNavigate(apt.lawdCd)}
+      onClick={() => onNavigate(apt)}
     >
       {/* 순위 배지 */}
       <div
@@ -212,7 +212,7 @@ export default function RecordHighSection() {
               rank={i + 1}
               apt={apt}
               isLast={i === recordHighs.length - 1}
-              onNavigate={(lawdCd) => navigate(`/apartment/${lawdCd}`)}
+              onNavigate={(apt) => navigate(`/map?search=${encodeURIComponent(apt.aptName)}`)}
             />
           ))}
         </Box>

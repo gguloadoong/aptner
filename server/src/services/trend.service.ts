@@ -90,6 +90,45 @@ export async function getRegionTrend(params: TrendQueryParams): Promise<RegionTr
   return result;
 }
 
+export interface MarketSummary {
+  avgPrice: number;        // 전국 평균가 (만원)
+  priceChangeRate: number; // 전월 대비 변동률 (%)
+  tradeCount: number;      // 이번 달 거래량 (건)
+}
+
+/**
+ * 전국 시장 요약 지표를 반환합니다.
+ * - 전국 평균가: 서울(11) 최근 1개월 실거래 평균
+ * - 전월 대비 변동률: 최근 2개월 평균 비교
+ * - 이번 달 거래량: 최근 1개월 거래 건수
+ */
+export async function getMarketSummary(): Promise<MarketSummary> {
+  const cacheKey = 'trend:market-summary';
+  const cached = cacheService.get<MarketSummary>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const params: TrendQueryParams = { regionCode: '11', type: 'monthly' };
+    const trend = await getRegionTrend(params);
+
+    const result: MarketSummary = {
+      avgPrice: trend.avgPrice,
+      priceChangeRate: trend.priceChangeRate,
+      tradeCount: trend.tradeCount,
+    };
+
+    // 6시간 캐시
+    cacheService.set(cacheKey, result, 6 * 3600);
+    return result;
+  } catch {
+    // fallback — API 실패 시 빈 상태 반환 (FE에서 데이터 없음 처리)
+    // TTL을 15분으로 단축해 빠른 재시도 유도
+    const fallback: MarketSummary = { avgPrice: 0, priceChangeRate: 0, tradeCount: 0 };
+    cacheService.set(cacheKey, fallback, 15 * 60);
+    return fallback;
+  }
+}
+
 /**
  * ISO 주차 번호를 계산합니다.
  */

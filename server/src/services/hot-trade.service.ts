@@ -1,12 +1,33 @@
 // ============================================================
 // [P1-02] 거래량 급등 단지 서비스
-// Mock 구현: APT_BASE_DATA 기반, 날짜 시드로 주간 일관성 유지
-// TODO: 실 API 연동 시 이 서비스 교체
+// 실 API: hot-ranking.service.ts와 동일한 MOLIT API 데이터를 활용.
+// 좌표는 sggCd → SIGUNGU_TABLE 바운딩박스 중심값으로 계산.
+// API 실패 시 HOT_TRADE_BASE Mock fallback.
+// 캐시 TTL: 30분
 // ============================================================
-import { HotTradeApartment } from '../types';
+import axios from 'axios';
+import { parseStringPromise } from 'xml2js';
+import { HotTradeApartment, MolitApiResponse, MolitTradeItem } from '../types';
+import { cacheService } from './cache.service';
+import { SIGUNGU_TABLE } from '../constants/region.constants';
 
-// APT_BASE_DATA와 동일한 단지 정보를 직접 참조하기 위해 molit.service 일부를 재사용
-// (순환 참조 방지를 위해 service → service 직접 import 대신 독립 Mock 정의)
+const HOT_TRADE_TTL = 60 * 30; // 30분
+
+// 국토부 실거래가 API — Cloudflare Workers 프록시 경유
+const MOLIT_API_BASE_URL = 'https://molit-proxy.bomzip.workers.dev/trade';
+const API_TIMEOUT = 10_000;
+
+// 전국 주요 시군구 코드 (서울 주요 구 + 경기 주요 시)
+const HOT_TRADE_SIGUNGU_CODES = [
+  '11680', '11710', '11650', '11590', '11440', '11170', // 강남구, 송파구, 서초구, 동작구, 마포구, 용산구
+  '11740', '11200', '11350', '11500',                   // 강동구, 성동구, 노원구, 강서구
+  '41135', '41281', '41460', '41390', '41363',          // 성남 분당구, 고양 덕양구, 화성, 파주, 용인 기흥구
+  '26350', '26290',                                      // 부산 해운대구, 동래구
+];
+
+// ============================================================
+// Fallback Mock 기준 데이터 (API 실패 시 사용)
+// ============================================================
 interface HotTradeBaseData {
   aptCode: string;
   name: string;
@@ -17,7 +38,6 @@ interface HotTradeBaseData {
   priceChange: number;
 }
 
-/** APT_BASE_DATA와 일치하는 단지 정보 (순환 import 방지용 로컬 사본) */
 const HOT_TRADE_BASE: HotTradeBaseData[] = [
   { aptCode: 'APT001', name: '래미안 원베일리',       address: '서울 서초구 반포동',     lat: 37.5068, lng: 127.0053, basePrice: 280000, priceChange:  15000 },
   { aptCode: 'APT002', name: '아크로리버파크',         address: '서울 서초구 반포동',     lat: 37.5075, lng: 126.9994, basePrice: 310000, priceChange:   8000 },
@@ -31,14 +51,14 @@ const HOT_TRADE_BASE: HotTradeBaseData[] = [
   { aptCode: 'APT010', name: '래미안 첼리투스',        address: '서울 용산구 이촌동',     lat: 37.5225, lng: 126.9685, basePrice: 260000, priceChange:  11000 },
 ];
 
+// ============================================================
+// 유틸 함수
+// ============================================================
+
 /**
- * 날짜 기반 단순 시드 생성기.
- * 같은 주에는 동일한 시드를 반환하여 랜덤 값이 일주일 동안 유지됩니다.
- *
- * @param seed  단지별 고유 오프셋 (aptCode 인덱스)
+ * 날짜 기반 단순 시드 생성기 (Mock fallback 전용).
  */
 function seededRandom(seed: number): () => number {
-  // ISO 주차(년도 + 주번호)를 기반으로 주간 시드 고정
   const now = new Date();
   const startOfYear = new Date(now.getFullYear(), 0, 1);
   const weekNumber = Math.floor(
@@ -47,31 +67,260 @@ function seededRandom(seed: number): () => number {
   let s = now.getFullYear() * 100 + weekNumber + seed * 997;
 
   return () => {
-    // LCG (선형 합동법)
     s = (s * 1664525 + 1013904223) & 0xffffffff;
     return (s >>> 0) / 0xffffffff;
   };
 }
 
 /**
- * 거래량 급등 단지 Top 10을 반환합니다.
- * - changeRate: 150~500% 범위의 날짜 시드 기반 랜덤 값
- * - 일주일 동안 동일한 값 유지
+ * YYYYMM 형식의 년월 문자열을 반환합니다.
  */
-export async function getHotTradeApartments(): Promise<HotTradeApartment[]> {
+function getYearMonth(offset: number = 0): string {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + offset);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}${month}`;
+}
+
+/**
+ * sggCd로 SIGUNGU_TABLE에서 바운딩박스 중심 좌표를 반환합니다.
+ * 매핑되지 않는 코드는 null 반환.
+ */
+function getSigunguCenter(sggCd: string): { lat: number; lng: number } | null {
+  const info = SIGUNGU_TABLE.find((sg) => sg.code === sggCd);
+  if (!info) return null;
+  return {
+    lat: (info.swLat + info.neLat) / 2,
+    lng: (info.swLng + info.neLng) / 2,
+  };
+}
+
+// ============================================================
+// MOLIT API 호출
+// ============================================================
+
+interface RawItem {
+  aptNm: string;
+  sggCd: string;
+  umdNm: string;
+  dealAmount: number; // 만원
+  dealYear: number;
+  dealMonth: number;
+  dealDay: number;
+}
+
+/**
+ * 국토부 실거래가 API에서 특정 시군구·년월 데이터를 조회합니다.
+ */
+async function fetchMolitForHotTrade(
+  apiKey: string,
+  lawdCd: string,
+  dealYmd: string,
+): Promise<RawItem[]> {
+  const params = {
+    serviceKey: apiKey,
+    LAWD_CD: lawdCd,
+    DEAL_YMD: dealYmd,
+    pageNo: '1',
+    numOfRows: '1000',
+  };
+
+  const response = await axios.get<string>(MOLIT_API_BASE_URL, {
+    params,
+    timeout: API_TIMEOUT,
+    responseType: 'text',
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BomzipServer/1.0)' },
+  });
+
+  const parsed = (await parseStringPromise(response.data)) as MolitApiResponse;
+  const body = parsed.response?.body?.[0];
+  const rawItems: MolitTradeItem[] = body?.items?.[0]?.item ?? [];
+
+  return rawItems.map((item) => ({
+    aptNm: item.aptNm?.[0]?.trim() ?? '',
+    sggCd: item.sggCd?.[0]?.trim() ?? lawdCd,
+    umdNm: item.umdNm?.[0]?.trim() ?? '',
+    dealAmount: parseInt((item.dealAmount?.[0] ?? '0').replace(/,/g, ''), 10),
+    dealYear: parseInt(item.dealYear?.[0] ?? '0', 10),
+    dealMonth: parseInt(item.dealMonth?.[0] ?? '0', 10),
+    dealDay: parseInt(item.dealDay?.[0] ?? '0', 10),
+  }));
+}
+
+// ============================================================
+// 실 API 기반 거래량 급등 단지 계산
+// ============================================================
+
+interface AggregatedHotTrade {
+  aptCode: string;
+  name: string;
+  address: string;
+  sggCd: string;
+  thisMonthCount: number;
+  prevMonthCount: number;
+  recentPrice: number; // 만원
+  changeRate: number;
+}
+
+/**
+ * 이번달/이전달 RawItem 배열로 단지별 집계를 수행합니다.
+ */
+function aggregateHotTrades(
+  thisMonthItems: RawItem[],
+  prevMonthItems: RawItem[],
+): AggregatedHotTrade[] {
+  // 이번달 단지별 집계
+  const thisMap = new Map<string, { count: number; latestPrice: number; latestDay: number; sggCd: string; umdNm: string }>();
+  for (const item of thisMonthItems) {
+    if (!item.aptNm) continue;
+    const key = `${item.aptNm}__${item.sggCd}__${item.umdNm}`;
+    const existing = thisMap.get(key);
+    if (!existing) {
+      thisMap.set(key, {
+        count: 1,
+        latestPrice: item.dealAmount,
+        latestDay: item.dealDay,
+        sggCd: item.sggCd,
+        umdNm: item.umdNm,
+      });
+    } else {
+      existing.count += 1;
+      if (item.dealDay > existing.latestDay) {
+        existing.latestPrice = item.dealAmount;
+        existing.latestDay = item.dealDay;
+      }
+    }
+  }
+
+  // 이전달 단지별 거래량 집계
+  const prevMap = new Map<string, number>();
+  for (const item of prevMonthItems) {
+    if (!item.aptNm) continue;
+    const key = `${item.aptNm}__${item.sggCd}__${item.umdNm}`;
+    prevMap.set(key, (prevMap.get(key) ?? 0) + 1);
+  }
+
+  const result: AggregatedHotTrade[] = [];
+  for (const [key, thisData] of thisMap.entries()) {
+    const parts = key.split('__');
+    const aptNm = parts[0];
+    const sggCd = parts[1];
+    const umdNm = parts[2];
+
+    const prevCount = prevMap.get(key) ?? 0;
+
+    // changeRate: 이전달 0건이면 thisMonthCount * 100 (신규 진입)
+    const changeRate = prevCount === 0
+      ? thisData.count * 100
+      : Math.round(((thisData.count - prevCount) / prevCount) * 100 * 10) / 10;
+
+    // 주소: 시군구명 + 읍면동명
+    const sigunguInfo = SIGUNGU_TABLE.find((sg) => sg.code === sggCd);
+    const sigunguName = sigunguInfo?.name ?? sggCd;
+    const address = umdNm ? `${sigunguName} ${umdNm}` : sigunguName;
+
+    result.push({
+      aptCode: `REAL-${sggCd}-${aptNm.replace(/\s/g, '')}`,
+      name: aptNm,
+      address,
+      sggCd,
+      thisMonthCount: thisData.count,
+      prevMonthCount: prevCount,
+      recentPrice: thisData.latestPrice,
+      changeRate,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * 실 MOLIT API를 조회해 거래량 급등 Top 10을 반환합니다.
+ */
+async function buildHotTradeFromApi(): Promise<HotTradeApartment[]> {
+  const apiKey = process.env.MOLIT_API_KEY;
+  if (!apiKey || apiKey === 'demo_key_replace_with_real_key') {
+    throw new Error('MOLIT_API_KEY 없음 — mock fallback 사용');
+  }
+
+  const thisYm = getYearMonth(0);
+  const prevYm = getYearMonth(-1);
+
+  // 이번달 + 전달 데이터 병렬 조회
+  const fetchTasks = HOT_TRADE_SIGUNGU_CODES.flatMap((code) => [
+    fetchMolitForHotTrade(apiKey, code, thisYm),
+    fetchMolitForHotTrade(apiKey, code, prevYm),
+  ]);
+
+  const settled = await Promise.allSettled(fetchTasks);
+
+  const thisMonthItems: RawItem[] = [];
+  const prevMonthItems: RawItem[] = [];
+
+  HOT_TRADE_SIGUNGU_CODES.forEach((code, idx) => {
+    const thisResult = settled[idx * 2];
+    const prevResult = settled[idx * 2 + 1];
+
+    if (thisResult.status === 'fulfilled') {
+      thisMonthItems.push(...thisResult.value);
+    } else {
+      console.warn(`[HotTrade] 이번달 조회 실패: sigungu=${code}`, thisResult.reason);
+    }
+    if (prevResult.status === 'fulfilled') {
+      prevMonthItems.push(...prevResult.value);
+    } else {
+      console.warn(`[HotTrade] 전달 조회 실패: sigungu=${code}`, prevResult.reason);
+    }
+  });
+
+  if (thisMonthItems.length === 0) {
+    throw new Error('이번달 데이터 0건 — mock fallback 사용');
+  }
+
+  const aggregated = aggregateHotTrades(thisMonthItems, prevMonthItems);
+
+  // changeRate 내림차순 정렬 후 상위 10건
+  aggregated.sort((a, b) => b.changeRate - a.changeRate);
+  const top10 = aggregated.slice(0, 10);
+
+  return top10.map((d): HotTradeApartment => {
+    const center = getSigunguCenter(d.sggCd);
+
+    // priceChangeType: 이번달 거래량이 전달보다 많으면 up
+    const priceChangeType: 'up' | 'down' | 'flat' =
+      d.thisMonthCount > d.prevMonthCount ? 'up'
+      : d.thisMonthCount < d.prevMonthCount ? 'down'
+      : 'flat';
+
+    return {
+      id: d.aptCode,
+      name: d.name,
+      address: d.address,
+      lat: center?.lat ?? 37.5665,   // 매핑 실패 시 서울 시청 기준
+      lng: center?.lng ?? 126.9780,
+      tradeCount: d.thisMonthCount,
+      prevTradeCount: d.prevMonthCount,
+      changeRate: d.changeRate,
+      recentPrice: d.recentPrice,
+      priceChangeType,
+    };
+  });
+}
+
+// ============================================================
+// Mock fallback
+// ============================================================
+
+function buildHotTradeFromMock(): HotTradeApartment[] {
   return HOT_TRADE_BASE.map((apt, idx) => {
     const rand = seededRandom(idx);
 
-    // 지난 주 거래 수: 3~8 범위
     const prevTradeCount = Math.floor(rand() * 6) + 3;
-
-    // changeRate: 150~500% 범위
     const changeRate = Math.floor(rand() * 351) + 150;
-
-    // 이번 주 거래 수: prevTradeCount × (1 + changeRate/100)
     const tradeCount = Math.round(prevTradeCount * (1 + changeRate / 100));
 
-    // 가격 변동 타입
     const priceChangeType: 'up' | 'down' | 'flat' =
       apt.priceChange > 0 ? 'up' : apt.priceChange < 0 ? 'down' : 'flat';
 
@@ -88,4 +337,38 @@ export async function getHotTradeApartments(): Promise<HotTradeApartment[]> {
       priceChangeType,
     };
   });
+}
+
+// ============================================================
+// Public API
+// ============================================================
+
+/**
+ * 거래량 급등 단지 Top 10을 반환합니다.
+ *
+ * 실 MOLIT API → 실패 시 Mock fallback 순서로 동작합니다.
+ * 캐시 TTL: 30분
+ */
+export async function getHotTradeApartments(): Promise<HotTradeApartment[]> {
+  const cacheKey = 'hot-trade:top10';
+
+  const cached = cacheService.get<HotTradeApartment[]>(cacheKey);
+  if (cached) {
+    console.log('[HotTrade] 캐시 히트');
+    return cached;
+  }
+
+  let result: HotTradeApartment[];
+
+  try {
+    result = await buildHotTradeFromApi();
+    console.log(`[HotTrade] 실 API 성공: ${result.length}건`);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(`[HotTrade] 실 API 실패 → Mock fallback 사용: ${reason}`);
+    result = buildHotTradeFromMock();
+  }
+
+  cacheService.set(cacheKey, result, HOT_TRADE_TTL);
+  return result;
 }

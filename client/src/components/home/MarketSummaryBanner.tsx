@@ -72,13 +72,34 @@ export default function MarketSummaryBanner() {
     );
   }
 
-  const rate = data!.priceChangeRate;
+  const isEmpty = !data || (data.avgPrice === 0 && data.tradeCount === 0);
+
+  if (isEmpty) {
+    return (
+      <div
+        style={{
+          height: '72px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'var(--semantic-background-normal-alternative)',
+          borderBottom: '1px solid var(--semantic-line-normal)',
+        }}
+      >
+        <span style={{ fontSize: '13px', color: 'var(--semantic-label-assistive)' }}>
+          시장 데이터를 불러오는 중
+        </span>
+      </div>
+    );
+  }
+
+  const rate = data.priceChangeRate;
   const rateSymbol = rate > 0 ? '▲' : rate < 0 ? '▼' : '—';
   const rateColor =
     rate > 0 ? '#FF4B4B' : rate < 0 ? 'var(--color-price-down, #00C896)' : 'var(--semantic-label-assistive)';
   const rateText =
     rate === 0
-      ? '0.0%'
+      ? '—'
       : `${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`;
 
   return (
@@ -106,7 +127,7 @@ export default function MarketSummaryBanner() {
             전국 평균
           </dt>
           <dd style={{ fontSize: '17px', fontWeight: 700, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)', margin: 0 }}>
-            {formatAvgPrice(data!.avgPrice)}
+            {data.avgPrice === 0 ? '—' : formatAvgPrice(data.avgPrice)}
           </dd>
         </div>
 
@@ -116,7 +137,9 @@ export default function MarketSummaryBanner() {
             전월 대비
           </dt>
           <dd style={{ margin: 0 }}>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: rateColor }}>{rateSymbol} </span>
+            {rate !== 0 && (
+              <span style={{ fontSize: '11px', fontWeight: 600, color: rateColor }}>{rateSymbol} </span>
+            )}
             <span style={{ fontSize: '17px', fontWeight: 700, color: rateColor, fontFamily: 'var(--font-jetbrains, monospace)' }}>
               {rateText}
             </span>
@@ -129,7 +152,7 @@ export default function MarketSummaryBanner() {
             이번달 거래
           </dt>
           <dd style={{ fontSize: '17px', fontWeight: 700, color: 'var(--semantic-label-normal)', fontFamily: 'var(--font-jetbrains, monospace)', margin: 0 }}>
-            {data!.tradeCount.toLocaleString()}건
+            {data.tradeCount === 0 ? '—' : `${data.tradeCount.toLocaleString()}건`}
           </dd>
         </div>
       </dl>
