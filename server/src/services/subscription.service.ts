@@ -688,7 +688,7 @@ function buildSubscriptions(): Subscription[] {
     ...raw,
     location: [raw.sido, raw.sigungu].filter(Boolean).join(' '),
     totalUnits: raw.totalSupply,
-    supplyPrice: raw.minPrice > 0 ? raw.minPrice * 10000 : undefined,
+    supplyPrice: raw.minPrice > 0 ? raw.minPrice : undefined,
     status: calcStatus(raw.startDate, raw.endDate),
     dDay: calcDDay(raw.endDate),
   }));

@@ -7,6 +7,11 @@ import type { RecentTrade } from '../../types';
 
 type SortOrder = 'latest' | 'price';
 
+const REGION_LABEL: Record<string, string> = {
+  '11': '서울', '41': '경기', '28': '인천', '26': '부산',
+  '27': '대구', '29': '광주', '30': '대전', '31': '울산', '36': '세종',
+};
+
 // m² → 평 환산 (1평 = 3.3058㎡)
 function toPyeong(sqm: number): number {
   return Math.round(sqm / 3.3);
@@ -172,7 +177,7 @@ export default function RecentTradesSection({ region = '11' }: RecentTradesSecti
                 borderRadius: '9999px',
               }}
             >
-              서울
+              {REGION_LABEL[region] ?? region}
             </span>
           </FlexBox>
           <Typography
