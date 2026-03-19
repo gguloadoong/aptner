@@ -16,6 +16,7 @@ import {
   MolitTradeItem,
 } from '../types';
 import { cacheService, CACHE_TTL } from './cache.service';
+import { getOverlappingSigunguCodes } from '../constants/region.constants';
 
 // 국토부 실거래가 API — Cloudflare Workers 프록시를 통해 호출
 // Railway 서버가 해외 IP라 직접 호출 시 WAF 차단됨
@@ -1635,10 +1636,11 @@ export async function getApartmentMapMarkers(
   // ── 실 API 경로 ──────────────────────────────────────────────
   if (isRealApiKey(process.env.MOLIT_API_KEY)) {
     try {
-      // 1. 뷰포트 안에 중심 좌표가 들어오는 구 목록 추출
-      const inBoundsLawdCds = LAWD_CD_LIST.filter(
-        (d) => d.lat >= swLat && d.lat <= neLat && d.lng >= swLng && d.lng <= neLng,
-      );
+      // 1. 뷰포트와 경계 박스(AABB)가 겹치는 구 목록 추출
+      // 구의 중심 좌표 대신 SIGUNGU_TABLE의 실제 경계 박스 기반 교차 검사 사용
+      // (줌인 시 구 중심이 뷰포트 밖에 있어도 해당 구 내 동네가 보이는 경우 커버)
+      const overlapCodes = new Set(getOverlappingSigunguCodes(swLat, swLng, neLat, neLng));
+      const inBoundsLawdCds = LAWD_CD_LIST.filter((d) => overlapCodes.has(d.lawdCd));
 
       if (inBoundsLawdCds.length === 0) {
         console.log('[Molit] 지도 마커: 뷰포트 내 구 없음 → Mock 폴백');
@@ -2632,10 +2634,13 @@ export async function getRecordHighApartments(
       });
     }
 
-    // priceChangeRate 내림차순 정렬
-    recordHighs.sort((a, b) => b.priceChangeRate - a.priceChangeRate);
+    // priceChangeRate 50% 초과 항목 제거 (이상 데이터 필터링)
+    const filtered = recordHighs.filter((r) => r.priceChangeRate <= 50);
 
-    const result = recordHighs.slice(0, limit);
+    // recentPrice 내림차순 정렬
+    filtered.sort((a, b) => b.recentPrice - a.recentPrice);
+
+    const result = filtered.slice(0, limit);
 
     // 신고가 경신 단지가 없으면 Mock fallback
     if (result.length === 0) {
