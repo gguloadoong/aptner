@@ -132,7 +132,7 @@ export async function getSubscriptions(params: {
       page: params.page ?? 1,
       limit: params.pageSize ?? 20,
       status: params.status,
-      sort: params.sort ? (SORT_MAP[params.sort] ?? params.sort) : undefined,
+      sort: params.sort ? SORT_MAP[params.sort] : undefined,
       sido: params.region && params.region !== '전국' ? (REGION_MAP[params.region] ?? params.region) : undefined,
     };
 
