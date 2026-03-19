@@ -5,6 +5,7 @@
 import { RegionTrend, TrendDataPoint, TrendQueryParams } from '../types';
 import { cacheService, CACHE_TTL } from './cache.service';
 import { fetchTradesForTrend } from './molit.service';
+import { SIGUNGU_TABLE } from '../constants/region.constants';
 
 /**
  * 지역별 가격 트렌드를 계산합니다.
@@ -163,5 +164,8 @@ function getRegionName(code: string): string {
     '48': '경상남도',
     '50': '제주특별자치도',
   };
-  return regionMap[code] ?? `지역코드 ${code}`;
+  if (regionMap[code]) return regionMap[code];
+  // 5자리 시군구 코드 — SIGUNGU_TABLE에서 이름 조회
+  const sigungu = SIGUNGU_TABLE.find((s) => s.code === code);
+  return sigungu?.name ?? `지역코드 ${code}`;
 }
