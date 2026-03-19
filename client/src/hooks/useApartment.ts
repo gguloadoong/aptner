@@ -8,6 +8,7 @@ import {
   searchApartments,
   getSupplyData,
   getRecentTrades,
+  getRedevelopmentProjects,
 } from '../services/apartment.service';
 
 // 핫 아파트 목록 조회 훅
@@ -95,5 +96,14 @@ export function useRecentTrades(region = '11') {
     queryKey: ['recent-trades', region],
     queryFn: () => getRecentTrades(region, 20),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// 정비사업(재개발/재건축) 마커 조회 훅
+export function useRedevelopmentProjects(region = '11') {
+  return useQuery({
+    queryKey: ['redevelopment', region],
+    queryFn: () => getRedevelopmentProjects(region),
+    staleTime: 30 * 60 * 1000,
   });
 }

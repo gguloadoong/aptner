@@ -257,6 +257,19 @@ export type SubscriptionStatus = 'ongoing' | 'upcoming' | 'closed';
 // 정렬 기준 타입
 export type SortOrder = 'deadline' | 'price' | 'latest';
 
+// 정비사업(재개발/재건축) 마커 타입 (BE RedevelopmentProject와 동일 필드)
+export interface RedevelopmentProject {
+  id: string;
+  name: string;         // 정비사업명
+  type: 'redevelopment' | 'reconstruction'; // 재개발 | 재건축
+  status: 'planning' | 'approved' | 'construction' | 'completed'; // 단계
+  lat: number;
+  lng: number;
+  address: string;
+  estimatedUnits?: number; // 예상 세대수
+  completionYear?: number; // 예상 완공연도
+}
+
 // BE /api/apartments/complexes 응답 단지 타입
 // lat/lng는 Geocoder 변환 후 채워짐
 export interface ApartmentComplex {

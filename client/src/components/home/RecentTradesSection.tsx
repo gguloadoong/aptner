@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
 import { useRecentTrades } from '../../hooks/useApartment';
 import { formatPriceShort } from '../../utils/formatNumber';
 import type { RecentTrade } from '../../types';
+
+type SortOrder = 'latest' | 'price';
 
 // m² → 평 환산 (1평 = 3.3058㎡)
 function toPyeong(sqm: number): number {
@@ -133,13 +136,18 @@ interface RecentTradesSectionProps {
 export default function RecentTradesSection({ region = '11' }: RecentTradesSectionProps) {
   const navigate = useNavigate();
   const { data: trades = [], isLoading } = useRecentTrades(region);
+  const [sortOrder, setSortOrder] = useState<SortOrder>('latest');
 
   const handleNavigate = (aptNm: string, umdNm: string) => {
     navigate(`/map?search=${encodeURIComponent(aptNm + ' ' + umdNm)}`);
   };
 
-  // 최대 5건만 홈에 표시
-  const displayTrades = trades.slice(0, 5);
+  // 정렬 후 최대 5건만 홈에 표시
+  const sortedTrades = [...trades].sort((a, b) => {
+    if (sortOrder === 'price') return b.price - a.price;
+    return b.dealDate.localeCompare(a.dealDate);
+  });
+  const displayTrades = sortedTrades.slice(0, 5);
 
   return (
     <Box as="section" sx={{ padding: '0 16px' }}>
@@ -174,6 +182,38 @@ export default function RecentTradesSection({ region = '11' }: RecentTradesSecti
             국토부 실거래가 기준 (2~3주 지연)
           </Typography>
         </div>
+        {/* 정렬 토글 */}
+        <FlexBox alignItems="center" gap="0px" style={{ marginBottom: '2px' }}>
+          {(['latest', 'price'] as SortOrder[]).map((order, idx) => {
+            const isActive = sortOrder === order;
+            const label = order === 'latest' ? '최신순' : '고가순';
+            return (
+              <button
+                key={order}
+                onClick={() => setSortOrder(order)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: isActive ? 700 : 400,
+                  color: isActive
+                    ? 'var(--semantic-label-normal)'
+                    : 'var(--semantic-label-assistive)',
+                  borderBottom: isActive
+                    ? '2px solid var(--semantic-label-normal)'
+                    : '2px solid transparent',
+                  borderRight: idx === 0 ? '1px solid var(--semantic-line-normal)' : 'none',
+                  lineHeight: '1.4',
+                  transition: 'color 0.15s, border-bottom-color 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </FlexBox>
       </FlexBox>
 
       {isLoading ? (

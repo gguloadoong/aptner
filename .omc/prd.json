@@ -1,0 +1,79 @@
+{
+  "project": "봄집 퀄리티 향상",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "complex.service.ts 경고 메시지 + 주석 전국 지원으로 업데이트",
+      "passes": false,
+      "acceptanceCriteria": [
+        "'서울/경기 외 지역' 경고 문구가 전국 지원 메시지로 교체됨",
+        "파일 상단 주석이 전국 커버리지 반영",
+        "tsc --noEmit 에러 0건"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "hot-ranking 빈 결과 fallback 로그 개선",
+      "passes": false,
+      "acceptanceCriteria": [
+        "실API 결과 0건일 때 명확한 warn 로그 + Mock fallback 사용 로그 출력",
+        "tsc --noEmit 에러 0건"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "RecentTradesSection 정렬 토글 (최신순/고가순)",
+      "passes": false,
+      "acceptanceCriteria": [
+        "최신순/고가순 토글 버튼 UI 존재",
+        "토글 시 목록 순서가 바뀜",
+        "tsc --noEmit 에러 0건",
+        "빌드 성공"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "TrendBanner 가격 변동 색상 분기 검증 + 수정",
+      "passes": false,
+      "acceptanceCriteria": [
+        "양수 변동률 → 빨간색(#EF4444 계열)",
+        "음수 변동률 → 파란색(#3B82F6 계열)",
+        "0 → 회색",
+        "tsc --noEmit 에러 0건"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "BE/FE RecentTrade 타입 일치 + MAP_ZOOM vs getRegionOverlayLevel 정합성 검증",
+      "passes": false,
+      "acceptanceCriteria": [
+        "BE RecentTrade와 FE RecentTrade의 모든 필드명/타입이 동일",
+        "MAP_ZOOM.DISTRICT_OVERLAYS(5) >= getRegionOverlayLevel 'gu' 임계값(5) 확인",
+        "불일치 발견 시 수정 후 tsc 통과"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "정비사업 마커 Mock 구조 + stub 엔드포인트",
+      "passes": false,
+      "acceptanceCriteria": [
+        "GET /api/apartments/redevelopment 엔드포인트 존재",
+        "Mock 데이터 5건 이상 (재개발/재건축 각각 포함)",
+        "FE 지도에 정비사업 레이어 토글 가능한 구조 (실제 마커 미표시는 허용, 훅/상태 구조만)",
+        "tsc --noEmit 에러 0건",
+        "빌드 성공"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "최종 빌드 + QA 검증",
+      "passes": false,
+      "acceptanceCriteria": [
+        "client npm run build 성공",
+        "server tsc --noEmit 에러 0건",
+        "QA 에이전트 Critical/Major 이슈 0건",
+        "변경사항 커밋 완료"
+      ]
+    }
+  ]
+}

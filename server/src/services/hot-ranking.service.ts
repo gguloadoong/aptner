@@ -547,7 +547,7 @@ export async function getHotApartmentRanking(
     console.log(`[HotRanking] 실 API 성공: ${result.length}건`);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    console.warn(`[HotRanking] 실 API 실패 → Mock fallback 사용: ${reason}`);
+    console.warn(`[HotRanking] 실 API 실패 → Mock fallback 사용 (region=${regionCode ?? '전국'}): ${reason}`);
     result = buildRankingFromMock(regionCode, limit);
   }
 

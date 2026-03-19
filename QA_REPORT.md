@@ -1637,3 +1637,168 @@ function filterByDate(subscriptions: Subscription[], date: Date): Subscription[]
 - `useMemo`/`useCallback` 성능 최적화
 - Graceful Shutdown (SIGTERM/SIGINT)
 - 캐시 전략 (공공 API 실패 시 캐시 폴백)
+
+---
+
+## 2026-03-19 (4차) Ralph 세션 변경사항 검증
+
+### 검증 대상
+
+- `server/src/services/complex.service.ts` — 경고 메시지 교체
+- `server/src/services/hot-ranking.service.ts` — 빈 결과 fallback 경고 로그 추가
+- `client/src/components/home/RecentTradesSection.tsx` — 최신순/고가순 정렬 토글
+- `client/src/pages/HomePage.tsx` TrendBanner — 가격 변동 색상 수정
+- `server/src/services/redevelopment.service.ts` — 정비사업 Mock 서비스 신규
+- `server/src/routes/apartment.routes.ts` — GET /api/apartments/redevelopment 추가
+- FE: `RedevelopmentProject` 타입 + `getRedevelopmentProjects` 서비스 + `useRedevelopmentProjects` 훅
+
+### 검증 방법
+
+실제 파일 직접 읽기 + tsc --noEmit 양측 실행
+
+---
+
+### 1. 타입 안전성
+
+**BE** (`server/`): `tsc --noEmit` — 에러 0건  
+**FE** (`client/`): `tsc --noEmit` — 에러 0건
+
+✅ PASS
+
+---
+
+### 2. RecentTradesSection 정렬 로직
+
+**파일**: `client/src/components/home/RecentTradesSection.tsx`
+
+- `sortOrder` state: `useState<SortOrder>('latest')` — 존재 확인 ✅
+- latest 정렬 (`localeCompare`): `b.dealDate.localeCompare(a.dealDate)` — 내림차순 ✅
+- price 정렬: `b.price - a.price` — 내림차순 ✅
+- 5건 cap 순서: `[...trades].sort(...).slice(0, 5)` — 정렬 후 슬라이싱 ✅ (정렬 전 슬라이싱 버그 없음)
+
+✅ PASS
+
+---
+
+### 3. TrendBanner 색상 로직
+
+**파일**: `client/src/pages/HomePage.tsx` (TrendBanner 컴포넌트, 265~274행)
+
+```
+rate > 0  → var(--semantic-label-danger)   // 빨강 ✅
+rate < 0  → var(--semantic-label-info)     // 파랑 ✅
+rate === 0 → var(--semantic-label-assistive) // 회색 ✅
+```
+
+✅ PASS
+
+---
+
+### 4. /redevelopment 엔드포인트
+
+**파일**: `server/src/routes/apartment.routes.ts`
+
+**라우트 선언 순서** (808행 vs 877행):
+```
+808:  router.get('/redevelopment', ...)   // 고정 경로
+877:  router.get('/:aptCode', ...)        // 와일드카드
+```
+`/redevelopment`가 `/:aptCode`보다 앞에 선언됨 ✅
+
+**Mock 데이터 건수**: `MOCK_REDEVELOPMENT_PROJECTS` — 재개발 3건 + 재건축 3건 = 총 6건 ✅
+
+**캐시 TTL**: `CACHE_TTL_MS = 60 * 60 * 1000` — 1시간(ms) 인메모리 캐시 ✅
+
+✅ PASS
+
+---
+
+### 5. BE/FE RedevelopmentProject 타입 일치
+
+**BE** (`server/src/services/redevelopment.service.ts`):
+```ts
+interface RedevelopmentProject {
+  id: string;
+  name: string;
+  type: 'redevelopment' | 'reconstruction';
+  status: 'planning' | 'approved' | 'construction' | 'completed';
+  lat: number;
+  lng: number;
+  address: string;
+  estimatedUnits?: number;
+  completionYear?: number;
+}
+```
+
+**FE** (`client/src/types/index.ts`):
+```ts
+interface RedevelopmentProject {
+  id: string;
+  name: string;
+  type: 'redevelopment' | 'reconstruction';
+  status: 'planning' | 'approved' | 'construction' | 'completed';
+  lat: number;
+  lng: number;
+  address: string;
+  estimatedUnits?: number;
+  completionYear?: number;
+}
+```
+
+필드명·타입·optional 여부 전 항목 일치 ✅
+
+✅ PASS
+
+---
+
+### 6. hot-ranking fallback 경고 로그
+
+**파일**: `server/src/services/hot-ranking.service.ts` (548~551행)
+
+catch 블록:
+```ts
+console.warn(`[HotRanking] 실 API 실패 → Mock fallback 사용: ${reason}`);
+console.warn(`[HotRanking] 실API 결과 0건 → Mock fallback 사용 (region=...)`);
+```
+
+warn 로그 존재 확인 ✅
+
+단, warn 로그가 2줄 중복으로 존재합니다. 첫 번째는 모든 catch에 출력되고 두 번째도 동일 catch 블록에서 항상 출력됩니다. 0건일 때만 출력하려는 의도라면 `buildRankingFromApi` 내부의 `throw new Error('이번달 데이터 0건...')` 경로와 API 키 없음 경로가 구분 없이 같은 메시지를 냅니다.
+
+🟡 MINOR — 기능적 결함 없음. `console.warn` 중복 출력. 다음 스프린트에 정리 권장.
+
+---
+
+### 7. complex.service.ts 경고 메시지
+
+**파일**: `server/src/services/complex.service.ts` (319행)
+
+```ts
+console.warn('[Complex] 뷰포트 내 시군구 코드 없음 (해당 좌표가 SIGUNGU_TABLE 커버 범위 밖)');
+```
+
+"서울/경기" 한정 문구 없음. 전국 범위 표현으로 교체됨 ✅
+
+✅ PASS
+
+---
+
+### 종합 결과
+
+| 항목 | 결과 |
+|------|------|
+| BE tsc --noEmit | ✅ PASS (에러 0건) |
+| FE tsc --noEmit | ✅ PASS (에러 0건) |
+| RecentTradesSection 정렬 로직 | ✅ PASS |
+| TrendBanner 색상 (양수/음수/0) | ✅ PASS |
+| /redevelopment 라우트 순서 | ✅ PASS |
+| Mock 데이터 6건 | ✅ PASS |
+| 캐시 TTL 1시간 | ✅ PASS |
+| BE/FE RedevelopmentProject 타입 | ✅ PASS |
+| hot-ranking fallback warn 로그 | ✅ PASS (중복 로그 MINOR) |
+| complex.service 경고 메시지 교체 | ✅ PASS |
+
+**Critical 0건 / Major 0건 / Minor 1건**
+
+배포 가능합니다.
+

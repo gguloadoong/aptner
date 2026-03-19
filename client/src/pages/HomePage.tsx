@@ -266,7 +266,11 @@ function TrendBanner() {
       ? '0.0%'
       : `${rate > 0 ? '+' : ''}${rate.toFixed(1)}%`;
   const rateColor =
-    rate > 0 ? '#FF4B4B' : rate < 0 ? '#00C896' : 'rgba(255,255,255,0.7)';
+    rate > 0
+      ? 'var(--semantic-label-danger)'
+      : rate < 0
+        ? 'var(--semantic-label-info)'
+        : 'var(--semantic-label-assistive)';
 
   return (
     <button

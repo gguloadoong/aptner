@@ -1,5 +1,5 @@
 import api from './api';
-import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex, HotApartment, RecordHighApartment, RecentTrade } from '../types';
+import type { Apartment, TradeHistory, MapApartment, MarkerType, ComplexFeature, ApartmentComplex, HotApartment, RecordHighApartment, RecentTrade, RedevelopmentProject } from '../types';
 import { getSubscriptions } from './subscription.service';
 import {
   MOCK_APARTMENTS,
@@ -780,6 +780,27 @@ export async function getRecentTrades(region = '11', limit = 20): Promise<Recent
     console.warn('[getRecentTrades] API 호출 실패, Mock 데이터로 폴백:', err);
     await delay(300);
     return MOCK_RECENT_TRADES.slice(0, limit);
+  }
+}
+
+// 정비사업(재개발/재건축) 마커 목록 조회
+// BE: GET /api/apartments/redevelopment?region=11
+// 실패 시 빈 배열 반환 (지도 마커 렌더링 크래시 방지)
+export async function getRedevelopmentProjects(region = '11'): Promise<RedevelopmentProject[]> {
+  if (USE_MOCK) {
+    await delay(200);
+    return [];
+  }
+
+  try {
+    const response = await api.get<{ success: true; data: RedevelopmentProject[] }>(
+      '/apartments/redevelopment',
+      { params: { region } }
+    );
+    return response.data.data;
+  } catch (err) {
+    console.warn('[getRedevelopmentProjects] API 호출 실패, 빈 배열 반환:', err);
+    return [];
   }
 }
 

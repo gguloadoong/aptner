@@ -316,7 +316,7 @@ export async function getComplexesByViewport(
   // 1. 뷰포트와 겹치는 시군구 코드 추출
   const codes = getOverlappingSigunguCodes(swLat, swLng, neLat, neLng);
   if (codes.length === 0) {
-    console.warn('[Complex] 뷰포트 내 시군구 코드 없음 (서울/경기 외 지역)');
+    console.warn('[Complex] 뷰포트 내 시군구 코드 없음 (해당 좌표가 SIGUNGU_TABLE 커버 범위 밖)');
     return [];
   }
 
