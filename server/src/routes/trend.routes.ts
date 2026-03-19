@@ -7,7 +7,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { getRegionTrend, getMarketSummary } from '../services/trend.service';
 import { cacheService, CACHE_TTL } from '../services/cache.service';
-import { SiDo, SiGunGu, TrendQueryParams, HotTradeApartment } from '../types';
+import { SiDo, SiGunGu, TrendQueryParams } from '../types';
 import { getHotTradeApartments } from '../services/hot-trade.service';
 import { SIGUNGU_TABLE } from '../constants/region.constants';
 
@@ -59,18 +59,8 @@ router.get('/summary', async (_req: Request, res: Response, next: NextFunction) 
  */
 router.get('/hot-trades', async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const cacheKey = 'trends:hot-trades';
-    const cached = cacheService.get<HotTradeApartment[]>(cacheKey);
-    if (cached) {
-      res.json({ success: true, data: cached });
-      return;
-    }
-
+    // 캐시는 getHotTradeApartments() 내부에서 관리 (TTL: 30분)
     const data = await getHotTradeApartments();
-
-    // 1시간 캐시
-    cacheService.set(cacheKey, data, 3600);
-
     res.json({ success: true, data });
   } catch (error) {
     next(error);
