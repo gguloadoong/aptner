@@ -234,7 +234,7 @@ function adaptLhItem(item: any, houseTypeMap: Map<string, any[]>): Subscription 
   const supplyPrice = minPrice > 0 ? minPrice : undefined;
 
   return {
-    id: houseManageNo || String(Math.random()),
+    id: houseManageNo || `${item.HOUSE_NM ?? 'unknown'}-${sido}-${startDate}`,
     name: item.HOUSE_NM ?? '단지명 없음',
     location: [sido, sigungu].filter(Boolean).join(' '),
     constructor: item.CNSTRCT_ENTRPS_NM ?? '',
