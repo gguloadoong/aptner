@@ -25,8 +25,8 @@ const MAX_ROWS_PER_REQUEST = 1000;
 // 페이지 cap: 최대 5페이지 = 5,000건
 const MAX_PAGES = 5;
 
-// 최근 2개월 거래만 조회
-const MONTHS_BACK = 2;
+// 최근 N개월 거래 조회 (환경변수 COMPLEX_MONTHS_BACK으로 설정, 기본 2, 최대 12)
+const MONTHS_BACK = Math.min(Math.max(parseInt(process.env.COMPLEX_MONTHS_BACK ?? '2', 10) || 2, 1), 12);
 
 // 단지별 집계 후 최대 반환 개수
 const MAX_COMPLEXES = 200;

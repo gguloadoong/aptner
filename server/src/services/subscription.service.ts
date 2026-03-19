@@ -85,26 +85,47 @@ async function fetchHouseTypeDetails(page = 1, perPage = 500): Promise<Map<strin
   const apiKey = process.env.LH_SUBSCRIPTION_API_KEY;
   if (!apiKey) return new Map();
 
-  try {
-    const response = await axios.get(
-      'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl',
-      {
-        params: { serviceKey: apiKey, page, perPage },
-        timeout: LH_API_TIMEOUT,
-      }
-    );
+  const typeMap = new Map<string, any[]>();
 
-    const items: any[] = response.data?.data ?? [];
-    console.log(`[Subscription] 주택형 API 응답: ${items.length}건`);
-
-    // HOUSE_MANAGE_NO 기준으로 그룹화
-    const typeMap = new Map<string, any[]>();
+  const addItems = (items: any[]) => {
     for (const item of items) {
       const key = String(item.HOUSE_MANAGE_NO ?? item.PBLANC_NO ?? '');
       if (!key) continue;
       if (!typeMap.has(key)) typeMap.set(key, []);
       typeMap.get(key)!.push(item);
     }
+  };
+
+  try {
+    // 첫 페이지 요청 — totalCount 확인 후 추가 페이지 처리
+    const first = await axios.get(
+      'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl',
+      { params: { serviceKey: apiKey, page, perPage }, timeout: LH_API_TIMEOUT }
+    );
+    const firstItems: any[] = first.data?.data ?? [];
+    const totalCount: number = first.data?.totalCount ?? firstItems.length;
+    console.log(`[Subscription] 주택형 API 응답: ${firstItems.length}건 (전체 ${totalCount}건)`);
+    addItems(firstItems);
+
+    // 추가 페이지가 있으면 병렬 수집 (최대 10페이지 cap)
+    const totalPages = Math.min(Math.ceil(totalCount / perPage), 10);
+    if (totalPages > 1) {
+      const pageNums = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+      const results = await Promise.allSettled(
+        pageNums.map((p) =>
+          axios.get(
+            'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl',
+            { params: { serviceKey: apiKey, page: p, perPage }, timeout: LH_API_TIMEOUT }
+          )
+        )
+      );
+      for (const res of results) {
+        if (res.status === 'fulfilled') {
+          addItems(res.value.data?.data ?? []);
+        }
+      }
+    }
+
     return typeMap;
   } catch (err) {
     console.warn('[Subscription] 주택형 API 호출 실패 → areas 빈 배열로 대체:', err);
