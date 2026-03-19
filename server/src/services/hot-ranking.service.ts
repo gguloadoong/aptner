@@ -14,8 +14,8 @@ import { cacheService } from './cache.service';
 // TTL: 30분 (핫 랭킹은 실시간성보다 quota 보호 우선)
 const HOT_RANKING_TTL = 60 * 30;
 
-// 국토부 실거래가 API — Cloudflare Workers 프록시 경유
-const MOLIT_API_BASE_URL = 'https://molit-proxy.bomzip.workers.dev/trade';
+// 국토부 실거래가 API — Cloudflare Workers 프록시 경유 (MOLIT_PROXY_URL 환경변수 우선)
+const MOLIT_API_BASE_URL = process.env.MOLIT_PROXY_URL ?? 'https://molit-proxy.bomzip.workers.dev/trade';
 const API_TIMEOUT = 10_000;
 
 // 지역별 대표 시군구 코드 (서울 주요 구, 경기 주요 시)

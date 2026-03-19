@@ -352,11 +352,11 @@ export default function MapCanvas({
                         fontWeight: 700,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        background: selectedMapApt?.markerType === 'subOngoing' ? '#E8F1FD' : '#FFF4E5',
-                        color: selectedMapApt?.markerType === 'subOngoing' ? '#0066FF' : '#E67E22',
+                        background: (selectedMapApt?.markerType ?? selectedApartment.markerType) === 'subOngoing' ? '#E8F1FD' : '#FFF4E5',
+                        color: (selectedMapApt?.markerType ?? selectedApartment.markerType) === 'subOngoing' ? '#0066FF' : '#E67E22',
                       }}
                     >
-                      {selectedMapApt?.markerType === 'subOngoing' ? '청약 진행중' : '청약 예정'}
+                      {(selectedMapApt?.markerType ?? selectedApartment.markerType) === 'subOngoing' ? '청약 진행중' : '청약 예정'}
                     </Box>
                     <Typography variant="caption2" style={{ color: 'var(--semantic-label-assistive)' }}>
                       청약 단지

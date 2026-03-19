@@ -69,7 +69,7 @@ export default function MapPage() {
       recentPriceArea: apt.area,
       priceChange: 0,
       priceChangeType: apt.priceChangeType,
-      // 청약 관련 필드는 selectedApartment(Apartment)에 없으므로 별도 상태로 관리
+      markerType: apt.markerType,
     });
   }, [setSelectedApartment]);
 
