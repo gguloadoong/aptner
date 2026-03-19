@@ -1,7 +1,7 @@
 # QA 리포트 - Aptner v1.0
 
 최초 작성: 2026-03-14
-최종 업데이트: 2026-03-19 (P0/P1/P2 전수 검증 — 지도 줌 상수화·recent-trades·청약 마커 UI)
+최종 업데이트: 2026-03-19 (지도 서버사이드 Geocoding + QA 잔여 MAJOR/MINOR 해소)
 검토자: 정동현 (QA Engineer)
 
 ---
@@ -17,6 +17,7 @@
 | 2026-03-19 | 청약 캘린더 페이지 QA. CRITICAL 0건, MAJOR 1건 신규 발견 (useSubscriptions pageSize 파라미터 타입 미선언 — 캐스팅 우회), MINOR 2건 신규 발견 |
 | 2026-03-19 (2차) | 홈 전면 개편 QA. CRITICAL 1건 신규 발견 (WeeklySubscriptionTimeline dateKey KST 버그 — 오늘 청약 Badge 오작동), MAJOR 0건, MINOR 2건 신규 발견 |
 | 2026-03-19 (3차) | P0/P1/P2 전수 검증. CRITICAL 0건, MAJOR 2건 신규 발견, MINOR 3건 신규 발견 |
+| 2026-03-19 (4차) | 지도 서버사이드 Geocoding 도입 + 잔여 MAJOR 2건·MINOR 3건 해소. CRITICAL 0건, 신규 이슈 없음 |
 
 ---
 
