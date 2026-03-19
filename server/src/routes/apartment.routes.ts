@@ -19,7 +19,7 @@ import {
 import { getHotApartmentRanking } from '../services/hot-ranking.service';
 import { getRecentTrades } from '../services/recent-trades.service';
 import { getComplexesByViewport } from '../services/complex.service';
-import { getRedevelopmentProjects } from '../services/redevelopment.service';
+
 import { apiRateLimiter } from '../middleware/security';
 import { ComplexFilter, TradeQueryParams } from '../types';
 
@@ -795,42 +795,7 @@ router.get(
   },
 );
 
-/**
- * GET /api/apartments/redevelopment
- * 정비사업(재개발/재건축) 마커 목록 조회
- *
- * Query params:
- *   - region: 시도 코드 2자리 (선택, 기본: '11' = 서울)
- *
- * 응답:
- *   { success: true, data: RedevelopmentProject[] }
- */
-router.get('/redevelopment', apiRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { region } = req.query as Partial<Record<string, string>>;
-
-    // region 형식 검증 (전달된 경우만 — 2자리 숫자)
-    if (region && !/^\d{2}$/.test(region)) {
-      res.status(400).json({
-        success: false,
-        error: {
-          code: 'INVALID_REGION',
-          message: 'region은 시도 코드 2자리 숫자여야 합니다. (예: 11=서울, 41=경기)',
-        },
-      });
-      return;
-    }
-
-    const data = await getRedevelopmentProjects(region ?? '11');
-
-    res.json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// GET /api/apartments/redevelopment 제거 — GET /api/redevelopment (redevelopment.routes.ts)로 통합됨
 
 /**
  * GET /api/apartments/:aptCode/sale-price
