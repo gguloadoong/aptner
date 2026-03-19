@@ -156,8 +156,14 @@ export default function MapPage() {
         setIsComplexLoading(true);
         try {
           const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
+          // 줌이 넓을수록 단지 수 제한 (geocoding rate limit 대응)
+          // zoom 6-7: 거래량 상위 25개만 / zoom ≤5: 전체
+          const MAX_COMPLEXES = zoom >= 6 ? 25 : rawComplexes.length;
+          const topComplexes = [...rawComplexes]
+            .sort((a, b) => (b.tradeCount ?? 0) - (a.tradeCount ?? 0))
+            .slice(0, MAX_COMPLEXES);
           // Geocoder로 주소 → 좌표 변환 (로딩 중 기존 마커 유지)
-          const geocoded = await batchGeocode(rawComplexes);
+          const geocoded = await batchGeocode(topComplexes);
           setComplexes(geocoded);
         } catch (err) {
           console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err);
@@ -233,13 +239,7 @@ export default function MapPage() {
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-      const apts =
-        currentZoom > MAP_ZOOM.COMPLEX_MARKERS
-          ? mapApartments.filter(
-              (apt) => apt.markerType === 'subOngoing' || apt.markerType === 'subUpcoming'
-            )
-          : mapApartments;
-      updateMarkers(apts, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
+      updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     }

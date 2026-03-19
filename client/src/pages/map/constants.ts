@@ -44,17 +44,17 @@ export const COMPLEX_FEATURE_OPTIONS: { value: ComplexFeature; label: string }[]
 //
 // 레이어 계층 설계:
 //  zoom 1-7  : 개별 단지 가격 마커 (mapApartments - 이미 좌표 포함, Geocoding 불필요)
-//  zoom 1-4  : 실 MOLIT 단지 집계 마커 (complexes - Geocoding 필요, 더 정확한 대표가)
+//  zoom 1-7  : 실 MOLIT 단지 집계 마커 (complexes - Geocoding 필요, 거래량 상위 25개)
 //  zoom 8-14 : 시/구 단위 평균가 오버레이 (지역 평균 요약)
 export const MAP_ZOOM = {
   // 개별 가격 마커 표시 임계값: zoom 7 이하에서 표시 (기본 시티뷰에서도 마커 보임)
   INDIVIDUAL_MARKERS: 7,
-  // 단지(complex) 집계 마커 표시 임계값: zoom 4 이하 (더 정확한 MOLIT 집계 단지)
-  COMPLEX_MARKERS: 4,
+  // 단지(complex) 집계 마커 표시 임계값: zoom 7 이하 (기본 줌에서도 단지 마커 보임)
+  COMPLEX_MARKERS: 7,
   // 지역 평균가 오버레이 표시 임계값: zoom 8 이상 (광역 뷰에서만)
   DISTRICT_OVERLAYS: 8,
-  // 단지 데이터 API 호출 임계값: zoom 5 이하
-  COMPLEX_DATA_FETCH: 5,
+  // 단지 데이터 API 호출 임계값: zoom 7 이하
+  COMPLEX_DATA_FETCH: 7,
 } as const;
 
 // 가격 범례 아이템 (마커 색상과 동일한 4단계 기준)
