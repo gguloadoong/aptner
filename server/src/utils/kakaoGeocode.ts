@@ -3,6 +3,25 @@
 
 const GEO_CACHE = new Map<string, { lat: number; lng: number; ts: number }>();
 const GEO_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7일
+const GEO_CACHE_MAX = 500; // 최대 항목 수 — 초과 시 만료/오래된 항목 제거
+
+function evictGeoCache(): void {
+  const now = Date.now();
+  // 1차: 만료된 항목 제거
+  for (const [key, val] of GEO_CACHE) {
+    if (now - val.ts >= GEO_CACHE_TTL) GEO_CACHE.delete(key);
+  }
+  // 2차: 여전히 초과면 가장 오래된 항목부터 제거
+  if (GEO_CACHE.size > GEO_CACHE_MAX) {
+    const overflow = GEO_CACHE.size - GEO_CACHE_MAX;
+    let removed = 0;
+    for (const key of GEO_CACHE.keys()) {
+      if (removed >= overflow) break;
+      GEO_CACHE.delete(key);
+      removed++;
+    }
+  }
+}
 
 export async function geocodeComplex(
   name: string,
@@ -51,6 +70,7 @@ export async function geocodeComplex(
     ) ?? data.documents[0];
     const doc = apt;
     const coords = { lat: parseFloat(doc.y), lng: parseFloat(doc.x) };
+    if (GEO_CACHE.size >= GEO_CACHE_MAX) evictGeoCache();
     GEO_CACHE.set(cacheKey, { ...coords, ts: Date.now() });
     return coords;
   } catch {
