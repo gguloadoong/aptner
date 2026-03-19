@@ -392,8 +392,7 @@ router.get('/hot', apiRateLimiter, async (req: Request, res: Response, next: Nex
   try {
     const { region, limit } = req.query as Partial<Record<string, string>>;
 
-    // limit: 기본 20, 최대 50
-    const limitNum = limit ? Math.min(50, Math.max(1, parseInt(limit, 10))) : 20;
+    // limit: 검증 후 파싱 (순서 중요 — NaN 상태로 limitNum 사용 방지)
     if (limit && isNaN(parseInt(limit, 10))) {
       res.status(400).json({
         success: false,
@@ -401,6 +400,7 @@ router.get('/hot', apiRateLimiter, async (req: Request, res: Response, next: Nex
       });
       return;
     }
+    const limitNum = limit ? Math.min(50, Math.max(1, parseInt(limit, 10))) : 20;
 
     // region 정규화: 숫자 2자리 코드만 허용, 전국/미지정은 undefined
     const isNationwide = !region || region === '전국';

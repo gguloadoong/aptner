@@ -34,6 +34,22 @@ function isRealApiKey(key: string | undefined): boolean {
   return !!key && key !== 'demo_key_replace_with_real_key';
 }
 
+/**
+ * ComplexFilter → 정렬된 안정적인 캐시 키 문자열 생성
+ * JSON.stringify는 속성 삽입 순서에 의존하므로 사용 금지
+ */
+function makeComplexFilterKey(f: ComplexFilter): string {
+  return [
+    `u${f.minUnit ?? ''}`,
+    f.isBrand ? 'br' : '',
+    f.isWalkSubway ? 'ws' : '',
+    f.isLargeComplex ? 'lc' : '',
+    f.isNewBuild ? 'nb' : '',
+    f.isFlat ? 'fl' : '',
+    f.hasElementarySchool ? 'es' : '',
+  ].filter(Boolean).join('_') || 'none';
+}
+
 // ============================================================
 // 서울/경기 실제 아파트 Mock 데이터 정의
 // ============================================================
@@ -1624,7 +1640,7 @@ export async function getApartmentMapMarkers(
   priceFilter?: number,
   complexFilter?: ComplexFilter,
 ): Promise<ApartmentMapMarker[]> {
-  const filterKey = complexFilter ? JSON.stringify(complexFilter) : 'none';
+  const filterKey = complexFilter ? makeComplexFilterKey(complexFilter) : 'none';
   const cacheKey = `map:${swLat}:${swLng}:${neLat}:${neLng}:${priceFilter ?? 'all'}:${filterKey}`;
 
   const cached = cacheService.get<ApartmentMapMarker[]>(cacheKey);
@@ -1841,7 +1857,7 @@ function getMockMarkersWithFilter(
   console.log(`[Molit] 지도 마커 Mock: 뷰포트 내 ${markers.length}개 반환`);
 
   // 캐시 저장 (30초 - Mock 데이터는 짧게)
-  const filterKey = complexFilter ? JSON.stringify(complexFilter) : 'none';
+  const filterKey = complexFilter ? makeComplexFilterKey(complexFilter) : 'none';
   const cacheKey = `map:${swLat}:${swLng}:${neLat}:${neLng}:${priceFilter ?? 'all'}:${filterKey}`;
   cacheService.set(cacheKey, markers, 30);
 

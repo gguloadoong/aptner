@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getApartmentDetail,
   getApartmentHistory,
-  getApartmentsByBounds,
   getHotApartments,
   getHotApartmentRanking,
   searchApartments,
@@ -42,23 +41,6 @@ export function useApartmentHistory(
     queryFn: () => getApartmentHistory(aptId!, area, months),
     enabled: !!aptId,
     staleTime: 10 * 60 * 1000, // 10분 캐시
-  });
-}
-
-// 지도용 아파트 마커 조회 훅
-export function useApartmentsByBounds(
-  swLat: number,
-  swLng: number,
-  neLat: number,
-  neLng: number,
-  priceFilter?: string,
-  enabled = true
-) {
-  return useQuery({
-    queryKey: ['apartments', 'bounds', swLat, swLng, neLat, neLng, priceFilter],
-    queryFn: () => getApartmentsByBounds(swLat, swLng, neLat, neLng, priceFilter),
-    enabled: enabled && swLat !== 0 && swLng !== 0,
-    staleTime: 3 * 60 * 1000,
   });
 }
 
