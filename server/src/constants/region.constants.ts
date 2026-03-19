@@ -14,7 +14,7 @@ export interface SigunguInfo {
   neLng: number;  // 북동 경도
 }
 
-// 서울 25개 구 + 경기 주요 시군구 바운딩박스 테이블
+// 전국 시군구 바운딩박스 테이블 (서울·경기·인천·부산·대구·광주·대전·울산·세종·강원·충청·전라·경상·제주)
 export const SIGUNGU_TABLE: SigunguInfo[] = [
   // ---- 서울 25개 구 ----
   { code: '11110', name: '서울 종로구',      swLat: 37.548, swLng: 126.956, neLat: 37.608, neLng: 127.021 },
