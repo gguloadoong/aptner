@@ -317,7 +317,7 @@ function TrendBanner() {
               weight="bold"
               sx={{ color: 'white', fontFamily: 'var(--font-jetbrains, monospace)' }}
             >
-              {data
+              {data?.avgPrice
                 ? data.avgPrice >= 10000
                   ? `${Math.floor(data.avgPrice / 10000)}억`
                   : `${data.avgPrice.toLocaleString()}만`
@@ -345,7 +345,7 @@ function TrendBanner() {
               weight="bold"
               sx={{ color: 'white', fontFamily: 'var(--font-jetbrains, monospace)' }}
             >
-              {data ? `${data.tradeCount.toLocaleString()}건` : '—'}
+              {data?.tradeCount ? `${data.tradeCount.toLocaleString()}건` : '—'}
             </Typography>
           </div>
         </FlexBox>
