@@ -240,19 +240,16 @@ export default function MapPage() {
   const [currentZoom, setCurrentZoom] = useState<number>(7);
 
   // 기존 마커 업데이트 — 충분히 줌인한 경우에만 개별 마커 표시
-  // zoom 5-7: MOLIT 가격 마커는 hash 기반 가짜 좌표(한강/도로에 뜸) → 청약 마커만 표시
-  //           실거래가 위치는 geocoded complexes + Places 파이프라인이 담당
-  // zoom ≤4 : 모든 마커 표시 (줌인 시 정밀도 허용)
+  // MOLIT price/hot/allTimeHigh 마커는 hash 기반 가짜 좌표(±3km 오프셋)이므로 전 줌 레벨에서 제외
+  // 실거래가 위치는 server-geocoded complex 마커 + Places AT4 마커 레이어가 담당
+  // mapApartments 레이어는 청약 마커(실좌표)만 표시
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-      const apts =
-        currentZoom > 4
-          ? mapApartments.filter(
-              (apt) => apt.markerType === 'subOngoing' || apt.markerType === 'subUpcoming'
-            )
-          : mapApartments;
-      updateMarkers(apts, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
+      const subApts = mapApartments.filter(
+        (apt) => apt.markerType === 'subOngoing' || apt.markerType === 'subUpcoming'
+      );
+      updateMarkers(subApts, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     }
