@@ -36,64 +36,7 @@ const SI_DO_LIST: SiDo[] = [
   { code: '50', name: '제주특별자치도' },
 ];
 
-// ---- 시군구 코드 정적 데이터 (주요 지역 포함) ----
-// 국토부 실거래가 API에서 사용하는 법정동 코드 앞 5자리
-const SI_GUN_GU_LIST: SiGunGu[] = [
-  // 서울특별시
-  { code: '11110', name: '종로구', siDoCode: '11' },
-  { code: '11140', name: '중구', siDoCode: '11' },
-  { code: '11170', name: '용산구', siDoCode: '11' },
-  { code: '11200', name: '성동구', siDoCode: '11' },
-  { code: '11215', name: '광진구', siDoCode: '11' },
-  { code: '11230', name: '동대문구', siDoCode: '11' },
-  { code: '11260', name: '중랑구', siDoCode: '11' },
-  { code: '11290', name: '성북구', siDoCode: '11' },
-  { code: '11305', name: '강북구', siDoCode: '11' },
-  { code: '11320', name: '도봉구', siDoCode: '11' },
-  { code: '11350', name: '노원구', siDoCode: '11' },
-  { code: '11380', name: '은평구', siDoCode: '11' },
-  { code: '11410', name: '서대문구', siDoCode: '11' },
-  { code: '11440', name: '마포구', siDoCode: '11' },
-  { code: '11470', name: '양천구', siDoCode: '11' },
-  { code: '11500', name: '강서구', siDoCode: '11' },
-  { code: '11530', name: '구로구', siDoCode: '11' },
-  { code: '11545', name: '금천구', siDoCode: '11' },
-  { code: '11560', name: '영등포구', siDoCode: '11' },
-  { code: '11590', name: '동작구', siDoCode: '11' },
-  { code: '11620', name: '관악구', siDoCode: '11' },
-  { code: '11650', name: '서초구', siDoCode: '11' },
-  { code: '11680', name: '강남구', siDoCode: '11' },
-  { code: '11710', name: '송파구', siDoCode: '11' },
-  { code: '11740', name: '강동구', siDoCode: '11' },
-  // 경기도 주요 시군구
-  { code: '41111', name: '수원시 장안구', siDoCode: '41' },
-  { code: '41113', name: '수원시 권선구', siDoCode: '41' },
-  { code: '41115', name: '수원시 팔달구', siDoCode: '41' },
-  { code: '41117', name: '수원시 영통구', siDoCode: '41' },
-  { code: '41131', name: '성남시 수정구', siDoCode: '41' },
-  { code: '41133', name: '성남시 중원구', siDoCode: '41' },
-  { code: '41135', name: '성남시 분당구', siDoCode: '41' },
-  { code: '41150', name: '의정부시', siDoCode: '41' },
-  { code: '41171', name: '안양시 만안구', siDoCode: '41' },
-  { code: '41173', name: '안양시 동안구', siDoCode: '41' },
-  { code: '41190', name: '부천시', siDoCode: '41' },
-  { code: '41210', name: '광명시', siDoCode: '41' },
-  { code: '41280', name: '고양시 덕양구', siDoCode: '41' },
-  { code: '41285', name: '고양시 일산동구', siDoCode: '41' },
-  { code: '41287', name: '고양시 일산서구', siDoCode: '41' },
-  { code: '41461', name: '용인시 처인구', siDoCode: '41' },
-  { code: '41463', name: '용인시 기흥구', siDoCode: '41' },
-  { code: '41465', name: '용인시 수지구', siDoCode: '41' },
-  // 인천광역시
-  { code: '28110', name: '중구', siDoCode: '28' },
-  { code: '28140', name: '동구', siDoCode: '28' },
-  { code: '28177', name: '미추홀구', siDoCode: '28' },
-  { code: '28185', name: '연수구', siDoCode: '28' },
-  { code: '28200', name: '남동구', siDoCode: '28' },
-  { code: '28237', name: '부평구', siDoCode: '28' },
-  { code: '28245', name: '계양구', siDoCode: '28' },
-  { code: '28260', name: '서구', siDoCode: '28' },
-];
+// SI_GUN_GU_LIST 제거 — SIGUNGU_TABLE(region.constants.ts, 전국 250개)로 대체됨
 
 /**
  * GET /api/trends/summary
@@ -338,7 +281,11 @@ router.get('/:siDoCd/sigungu', async (req: Request, res: Response, next: NextFun
       return;
     }
 
-    const list = SI_GUN_GU_LIST.filter((sg) => sg.siDoCode === siDoCd);
+    // SIGUNGU_TABLE: 전국 250개 시군구 (region.constants.ts) — 로컬 SI_GUN_GU_LIST 대신 사용
+    const siDoCode = String(siDoCd);
+    const list: SiGunGu[] = SIGUNGU_TABLE
+      .filter((sg) => sg.code.startsWith(siDoCode))
+      .map((sg) => ({ code: sg.code, name: sg.name, siDoCode: siDoCode }));
 
     if (list.length === 0) {
       res.status(404).json({
