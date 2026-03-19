@@ -797,7 +797,7 @@ export async function getRecentTrades(region = '11', limit = 20): Promise<Recent
 }
 
 // 정비사업(재개발/재건축) 마커 목록 조회
-// BE: GET /api/apartments/redevelopment?region=11
+// BE: GET /api/redevelopment?region=11 (bbox 필터 지원)
 // 실패 시 빈 배열 반환 (지도 마커 렌더링 크래시 방지)
 export async function getRedevelopmentProjects(region = '11'): Promise<RedevelopmentProject[]> {
   if (USE_MOCK) {
@@ -807,7 +807,7 @@ export async function getRedevelopmentProjects(region = '11'): Promise<Redevelop
 
   try {
     const response = await api.get<{ success: true; data: RedevelopmentProject[] }>(
-      '/apartments/redevelopment',
+      '/redevelopment',
       { params: { region } }
     );
     return response.data.data;

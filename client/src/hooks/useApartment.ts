@@ -7,7 +7,7 @@ import {
   searchApartments,
   getSupplyData,
   getRecentTrades,
-  getRedevelopmentProjects,
+
 } from '../services/apartment.service';
 
 // 핫 아파트 목록 조회 훅
@@ -81,11 +81,4 @@ export function useRecentTrades(region = '11') {
   });
 }
 
-// 정비사업(재개발/재건축) 마커 조회 훅
-export function useRedevelopmentProjects(region = '11') {
-  return useQuery({
-    queryKey: ['redevelopment', region],
-    queryFn: () => getRedevelopmentProjects(region),
-    staleTime: 30 * 60 * 1000,
-  });
-}
+// 정비사업 훅: useRenewal.ts의 useRedevelopmentProjects 사용 (bbox 필터 지원)

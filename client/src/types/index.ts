@@ -261,7 +261,7 @@ export type SortOrder = 'deadline' | 'price' | 'latest';
 export interface RedevelopmentProject {
   id: string;
   name: string;         // 정비사업명
-  type: 'redevelopment' | 'reconstruction'; // 재개발 | 재건축
+  type: 'redevelopment' | 'reconstruction' | 'newtown'; // 재개발 | 재건축 | 뉴타운
   status: 'planning' | 'approved' | 'construction' | 'completed'; // 단계
   lat: number;
   lng: number;
