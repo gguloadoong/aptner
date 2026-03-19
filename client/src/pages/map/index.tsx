@@ -16,6 +16,16 @@ import MapCanvas from './MapCanvas';
 
 const normalizeAptName = (value: string) => value.replace(/\s+/g, '').replace(/[()（）]/g, '').toLowerCase();
 
+// 만원 단위 가격 → priceFilter 통과 여부
+function passPriceMW(priceMW: number, filter: string): boolean {
+  if (filter === 'all') return true;
+  const eok = priceMW / 10000;
+  if (filter === 'under5') return eok < 5;
+  if (filter === '5to10') return eok >= 5 && eok < 10;
+  if (filter === 'over10') return eok >= 10;
+  return true;
+}
+
 // 지도 페이지 - 모바일: 지도 전체 + 바텀시트, 데스크탑: 좌측 패널 + 우측 지도
 export default function MapPage() {
   const navigate = useNavigate();
@@ -37,6 +47,9 @@ export default function MapPage() {
   // 평형대 필터 (20/30/40/50평대 구분): 지도 상단 오버레이 칩용
   const [pyeongFilter, setPyeongFilter] = useState<'all' | '20s' | '30s' | '40s' | '50plus'>('all');
   const [mapApartments, setMapApartments] = useState<MapApartment[]>([]);
+  // BUG-2 (complex): handleComplexClick DOM 핸들러 stale closure 방지용 ref
+  const mapApartmentsRef = useRef<MapApartment[]>([]);
+  mapApartmentsRef.current = mapApartments;
   // 호갱노노 스타일 실 단지 데이터 (Geocoder 변환 후 좌표 포함)
   const [complexes, setComplexes] = useState<ApartmentComplex[]>([]);
   // 단지 데이터 로딩 중 여부 (로딩 중 기존 마커 유지, 향후 스켈레톤 UI용)
@@ -76,7 +89,8 @@ export default function MapPage() {
   // 단지 마커 클릭 핸들러 (ApartmentComplex → selectedApartment 변환)
   const handleComplexClick = useCallback(async (complex: ApartmentComplex) => {
     const normalizedComplexName = normalizeAptName(complex.name);
-    const matchedMapApt = mapApartments.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
+    // mapApartmentsRef.current으로 읽어 stale closure 방지 (마커 DOM 핸들러가 구 버전 캡처 방지)
+    const matchedMapApt = mapApartmentsRef.current.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
 
     let resolvedId = matchedMapApt?.id ?? complex.id;
     if (!matchedMapApt) {
@@ -108,7 +122,7 @@ export default function MapPage() {
       priceChange: complex.priceChange ?? 0,
       priceChangeType: complex.priceChangeType ?? 'flat',
     });
-  }, [mapApartments, setSelectedApartment]);
+  }, [setSelectedApartment]); // mapApartments → mapApartmentsRef.current으로 읽으므로 deps 불필요
 
   // fetchPlaceMarkers를 ref로 안정화 — handleBoundsChange 선언 시점에
   // useMapApartments 훅이 아직 초기화되지 않으므로 ref를 통해 late-binding
@@ -244,15 +258,16 @@ export default function MapPage() {
     }
   }, [isLoaded, viewMode, currentZoom, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures]);
 
-  // 호갱노노 스타일 단지 마커 업데이트
+  // 호갱노노 스타일 단지 마커 업데이트 (priceFilter 적용)
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.COMPLEX_MARKERS) {
-      updateComplexMarkers(complexes, handleComplexClick);
+      const filtered = complexes.filter((c) => passPriceMW(c.latestPrice, priceFilter));
+      updateComplexMarkers(filtered, handleComplexClick);
     } else {
       updateComplexMarkers([], handleComplexClick);
     }
-  }, [isLoaded, viewMode, currentZoom, complexes, updateComplexMarkers, handleComplexClick]);
+  }, [isLoaded, viewMode, currentZoom, complexes, priceFilter, updateComplexMarkers, handleComplexClick]);
 
   // Places AT4 가격 마커 클릭 핸들러 — 바텀시트 열기
   // BUG-2: placeMarkersRef를 항상 최신 값으로 유지하여 stale closure 방지
@@ -281,15 +296,16 @@ export default function MapPage() {
     [setSelectedApartment]
   );
 
-  // Places AT4 마커 업데이트 — 단지 뷰에서만 표시
+  // Places AT4 마커 업데이트 — 단지 뷰에서만 표시 (priceFilter 적용, price null은 항상 표시)
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-      updatePlaceMarkers(placeMarkers, handlePlaceMarkerClick);
+      const filtered = placeMarkers.filter((p) => p.price == null || passPriceMW(p.price, priceFilter));
+      updatePlaceMarkers(filtered, handlePlaceMarkerClick);
     } else {
       updatePlaceMarkers([], handlePlaceMarkerClick);
     }
-  }, [isLoaded, viewMode, currentZoom, placeMarkers, updatePlaceMarkers, handlePlaceMarkerClick]);
+  }, [isLoaded, viewMode, currentZoom, placeMarkers, priceFilter, updatePlaceMarkers, handlePlaceMarkerClick]);
 
   // 히트맵 오버레이 업데이트 — 히트맵 모드 진입/데이터 변경 시
   useEffect(() => {
