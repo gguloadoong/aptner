@@ -54,7 +54,7 @@ export function calcDday(deadline: string): string {
 // 날짜 포맷 (YYYY-MM -> YYYY년 MM월)
 export function formatYearMonth(ym: string): string {
   const [year, month] = ym.split('-');
-  return `${year}년 ${parseInt(month)}월`;
+  return `${year}년 ${parseInt(month, 10)}월`;
 }
 
 // 세대수 포맷 (예: 1234 -> "1,234세대")
