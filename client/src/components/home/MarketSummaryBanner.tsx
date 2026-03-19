@@ -96,7 +96,7 @@ export default function MarketSummaryBanner() {
   const rate = data.priceChangeRate;
   const rateSymbol = rate > 0 ? '▲' : rate < 0 ? '▼' : '—';
   const rateColor =
-    rate > 0 ? '#FF4B4B' : rate < 0 ? 'var(--color-price-down, #00C896)' : 'var(--semantic-label-assistive)';
+    rate > 0 ? '#FF4B4B' : rate < 0 ? '#3B82F6' : 'var(--semantic-label-assistive)';
   const rateText =
     rate === 0
       ? '—'
