@@ -6,7 +6,7 @@ import { Router, Request, Response } from 'express';
 import apartmentRouter from './apartment.routes';
 import subscriptionRouter from './subscription.routes';
 import trendRouter from './trend.routes';
-import renewalRouter from './renewal.routes';
+import redevelopmentRouter from './redevelopment.routes';
 import { cacheService } from '../services/cache.service';
 
 const router = Router();
@@ -15,7 +15,7 @@ const router = Router();
 router.use('/apartments', apartmentRouter);
 router.use('/subscriptions', subscriptionRouter);
 router.use('/trends', trendRouter);
-router.use('/renewal', renewalRouter);
+router.use('/redevelopment', redevelopmentRouter);
 
 // /api/regions 는 trendRouter에 포함된 라우트를 재사용
 router.use('/regions', trendRouter);
@@ -72,7 +72,7 @@ router.get('/health', (_req: Request, res: Response) => {
         'GET /api/regions/lawdCd?lat=37.56&lng=126.97',
         'GET /api/regions/list',
         'GET /api/regions/:siDoCd/sigungu',
-        'GET /api/renewal?swLat=37.4&swLng=126.8&neLat=37.7&neLng=127.2',
+        'GET /api/redevelopment?region=11&swLat=37.4&swLng=126.8&neLat=37.7&neLng=127.2',
       ],
     },
   });
