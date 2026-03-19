@@ -13,8 +13,8 @@ import { SIGUNGU_TABLE } from '../constants/region.constants';
 
 const HOT_TRADE_TTL = 60 * 30; // 30분
 
-// 국토부 실거래가 API — Cloudflare Workers 프록시 경유
-const MOLIT_API_BASE_URL = 'https://molit-proxy.bomzip.workers.dev/trade';
+// 국토부 실거래가 API — Cloudflare Workers 프록시 경유 (MOLIT_PROXY_URL 환경변수 우선)
+const MOLIT_API_BASE_URL = process.env.MOLIT_PROXY_URL ?? 'https://molit-proxy.bomzip.workers.dev/trade';
 const API_TIMEOUT = 10_000;
 
 // 전국 주요 시군구 코드 (서울 주요 구 + 경기 주요 시)
@@ -22,7 +22,7 @@ const HOT_TRADE_SIGUNGU_CODES = [
   '11680', '11710', '11650', '11590', '11440', '11170', // 강남구, 송파구, 서초구, 동작구, 마포구, 용산구
   '11740', '11200', '11350', '11500',                   // 강동구, 성동구, 노원구, 강서구
   '41135', '41281', '41460', '41390', '41363',          // 성남 분당구, 고양 덕양구, 화성, 파주, 용인 기흥구
-  '26350', '26290',                                      // 부산 해운대구, 동래구
+  '26350', '26260',                                      // 부산 해운대구, 동래구
 ];
 
 // ============================================================
