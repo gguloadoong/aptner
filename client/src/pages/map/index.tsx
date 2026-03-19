@@ -92,21 +92,8 @@ export default function MapPage() {
     // mapApartmentsRef.current으로 읽어 stale closure 방지 (마커 DOM 핸들러가 구 버전 캡처 방지)
     const matchedMapApt = mapApartmentsRef.current.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
 
-    let resolvedId = matchedMapApt?.id ?? complex.id;
-    if (!matchedMapApt) {
-      try {
-        const searchResults = await searchApartments(complex.name);
-        const matchedSearch = searchResults.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
-        if (matchedSearch?.id) {
-          resolvedId = matchedSearch.id;
-        }
-      } catch (err) {
-        console.warn('[handleComplexClick] 단지 상세 ID 탐색 실패:', err);
-      }
-    }
-
-    setSelectedApartment({
-      id: resolvedId,
+    const baseApt = {
+      id: matchedMapApt?.id ?? complex.id,
       name: complex.name,
       address: complex.address,
       district: complex.umdNm,
@@ -121,7 +108,22 @@ export default function MapPage() {
       recentPriceArea: String(complex.area),
       priceChange: complex.priceChange ?? 0,
       priceChangeType: complex.priceChangeType ?? 'flat',
-    });
+    };
+
+    // 바텀시트 즉시 열기 — 검색 결과 기다리지 않음
+    setSelectedApartment(baseApt);
+
+    // matchedMapApt 없는 경우: 비동기 ID 탐색 후 상세 데이터 교체 (바텀시트는 이미 열림)
+    if (!matchedMapApt) {
+      searchApartments(complex.name)
+        .then((results) => {
+          const matchedSearch = results.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
+          if (matchedSearch?.id && matchedSearch.id !== baseApt.id) {
+            setSelectedApartment({ ...baseApt, id: matchedSearch.id });
+          }
+        })
+        .catch((err) => console.warn('[handleComplexClick] 단지 상세 ID 탐색 실패:', err));
+    }
   }, [setSelectedApartment]); // mapApartments → mapApartmentsRef.current으로 읽으므로 deps 불필요
 
   // fetchPlaceMarkers를 ref로 안정화 — handleBoundsChange 선언 시점에
