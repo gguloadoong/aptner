@@ -341,7 +341,7 @@ router.get('/supply', async (req: Request, res: Response, next: NextFunction) =>
       // 봄(3~5월), 가을(9~11월)에 입주 물량 집중
       const seasonalBase = [2200, 1800, 3100, 3600, 3900, 2400, 2100, 2000, 3500, 3800, 3300, 2600];
       const base = seasonalBase[(month - 1) % 12];
-      const variance = Math.floor((Math.random() - 0.5) * base * 0.3);
+      const variance = Math.floor(Math.sin(i * 1.7) * base * 0.2);
       const units = Math.max(500, Math.round((base + variance) * mult));
 
       data.push({ month: label, units, year, monthNum: month });
