@@ -258,16 +258,18 @@ export default function MapPage() {
     }
   }, [isLoaded, viewMode, currentZoom, mapApartments, updateMarkers, priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures]);
 
-  // 호갱노노 스타일 단지 마커 업데이트 (priceFilter 적용)
+  // 호갱노노 스타일 단지 마커 업데이트 (priceFilter + pyeongFilter 적용)
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.COMPLEX_MARKERS) {
-      const filtered = complexes.filter((c) => passPriceMW(c.latestPrice, priceFilter));
+      const filtered = complexes
+        .filter((c) => passPriceMW(c.latestPrice, priceFilter))
+        .filter((c) => matchPyeongFilter(String(c.area)));
       updateComplexMarkers(filtered, handleComplexClick);
     } else {
       updateComplexMarkers([], handleComplexClick);
     }
-  }, [isLoaded, viewMode, currentZoom, complexes, priceFilter, updateComplexMarkers, handleComplexClick]);
+  }, [isLoaded, viewMode, currentZoom, complexes, priceFilter, pyeongFilter, updateComplexMarkers, handleComplexClick]);
 
   // Places AT4 가격 마커 클릭 핸들러 — 바텀시트 열기
   // BUG-2: placeMarkersRef를 항상 최신 값으로 유지하여 stale closure 방지
@@ -297,15 +299,20 @@ export default function MapPage() {
   );
 
   // Places AT4 마커 업데이트 — 단지 뷰에서만 표시 (priceFilter 적용, price null은 항상 표시)
+  // complex 마커와 중복 표시 방지: 같은 이름의 complex 마커가 있으면 place 마커 생략
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-      const filtered = placeMarkers.filter((p) => p.price == null || passPriceMW(p.price, priceFilter));
+      const complexNames = new Set(complexes.map((c) => normalizeAptName(c.name)));
+      const filtered = placeMarkers
+        .filter((p) => !complexNames.has(normalizeAptName(p.placeName)))
+        .filter((p) => p.price == null || passPriceMW(p.price, priceFilter))
+        .filter((p) => p.area == null || matchPyeongFilter(String(p.area)));
       updatePlaceMarkers(filtered, handlePlaceMarkerClick);
     } else {
       updatePlaceMarkers([], handlePlaceMarkerClick);
     }
-  }, [isLoaded, viewMode, currentZoom, placeMarkers, priceFilter, updatePlaceMarkers, handlePlaceMarkerClick]);
+  }, [isLoaded, viewMode, currentZoom, placeMarkers, complexes, priceFilter, pyeongFilter, updatePlaceMarkers, handlePlaceMarkerClick]);
 
   // 히트맵 오버레이 업데이트 — 히트맵 모드 진입/데이터 변경 시
   useEffect(() => {
