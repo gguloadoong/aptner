@@ -167,7 +167,7 @@ export const SIGUNGU_TABLE: SigunguInfo[] = [
   { code: '42790', name: '강원 화천군',       swLat: 37.968, swLng: 127.468, neLat: 38.221, neLng: 127.792 },
   { code: '42800', name: '강원 양구군',       swLat: 37.975, swLng: 127.699, neLat: 38.245, neLng: 128.033 },
   { code: '42810', name: '강원 인제군',       swLat: 37.798, swLng: 127.922, neLat: 38.310, neLng: 128.457 },
-  { code: '42820', name: '강원 고성군',       swLat: 38.193, swLng: 128.343, neLat: 38.615, neLng: 128.666 },
+  { code: '42820', name: '강원 고성군',       swLat: 38.193, swLng: 128.343, neLat: 38.615, neLng: 128.666 }, // neLat 38.615 — 휴전선 접경 (의도적 범위)
   { code: '42830', name: '강원 양양군',       swLat: 37.867, swLng: 128.515, neLat: 38.179, neLng: 128.793 },
 
   // ---- 충청북도 ----

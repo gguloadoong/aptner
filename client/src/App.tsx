@@ -84,6 +84,7 @@ function App() {
                   <Route path="/subscription" element={<SubscriptionPage />} />
                   <Route path="/subscription/:id" element={<SubscriptionDetailPage />} />
                   <Route path="/apartment/:id" element={<ApartmentDetailPage />} />
+                  {/* /trend: BottomNav 탭 없이 딥링크·외부 공유 URL용으로만 유지 */}
                   <Route path="/trend" element={<TrendPage />} />
                   <Route path="/search" element={<SearchPage />} />
                   <Route path="/compare" element={<ComparePage />} />
