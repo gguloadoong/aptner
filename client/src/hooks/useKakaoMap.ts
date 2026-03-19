@@ -280,6 +280,10 @@ export function useKakaoMap(
       idleHandlerRef.current = idleHandler;
       kakao.maps.event.addListener(map, 'idle', idleHandler);
 
+      // 카카오맵은 최초 생성 시 idle 이벤트를 발화하지 않음
+      // → 수동으로 한 번 호출해 초기 뷰포트 bounds를 onBoundsChange에 전달
+      idleHandler();
+
       setState((prev) => ({ ...prev, isLoaded: true }));
     } catch (err) {
       console.error('[KakaoMap] 초기화 실패:', err);
