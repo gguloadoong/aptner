@@ -88,7 +88,7 @@ function parseMolitItemToRecentTrade(
   const buildYearRaw = item.buildYear?.[0]?.trim();
   const buildYear = buildYearRaw ? parseInt(buildYearRaw, 10) : undefined;
 
-  const id = `${sggCd}-${aptNm.replace(/\s/g, '')}-${dealDate}`;
+  const id = `${sggCd}-${aptNm.replace(/\s/g, '')}-${dealDate}-${Math.round(area)}`;
 
   return {
     id,
