@@ -75,7 +75,7 @@ function RankChangeBadge({ rankChange }: { rankChange: number | null }) {
           borderRadius: 4,
           fontSize: 11,
           fontWeight: 700,
-          backgroundColor: '#00C896',
+          backgroundColor: '#3B82F6',
           color: '#fff',
         }}
       >
@@ -176,7 +176,7 @@ function HotApartmentCard({ apt }: { apt: HotApartment }) {
                 fontFamily: "'JetBrains Mono', 'Courier New', monospace",
               }}
             >
-              {formatPrice(Math.round(apt.recentPrice / 10000))}
+              {formatPrice(apt.recentPrice)}
             </Typography>
 
             {/* 거래량 급등률 */}
