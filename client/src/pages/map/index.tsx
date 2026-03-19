@@ -113,6 +113,10 @@ export default function MapPage() {
   // fetchPlaceMarkers를 ref로 안정화 — handleBoundsChange 선언 시점에
   // useMapApartments 훅이 아직 초기화되지 않으므로 ref를 통해 late-binding
   const fetchPlaceMarkersRef = useRef<((lat: number, lng: number) => Promise<PlaceMarkerData[]>) | null>(null);
+  // BUG-4: sequence counter — stale promise 결과를 버리기 위한 카운터
+  const placeFetchSeqRef = useRef(0);
+  // BUG-2: placeMarkers를 항상 최신 값으로 참조하기 위한 ref
+  const placeMarkersRef = useRef<PlaceMarkerData[]>([]);
 
   // 뷰포트 변경 핸들러
   // 1) 기존 MapApartment 마커 갱신 (청약 포함)
@@ -136,10 +140,14 @@ export default function MapPage() {
       if (zoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
         const centerLat = (swLat + neLat) / 2;
         const centerLng = (swLng + neLng) / 2;
+        const seq = ++placeFetchSeqRef.current;
         fetchPlaceMarkersRef.current?.(centerLat, centerLng)
-          .then((markers) => setPlaceMarkers(markers))
+          .then((markers) => {
+            if (placeFetchSeqRef.current === seq) setPlaceMarkers(markers);
+          })
           .catch((err) => console.warn('[handleBoundsChange] Places 마커 갱신 실패:', err));
       } else {
+        ++placeFetchSeqRef.current; // invalidate any in-flight fetch
         setPlaceMarkers([]);
       }
 
@@ -220,10 +228,18 @@ export default function MapPage() {
   const [currentZoom, setCurrentZoom] = useState<number>(7);
 
   // 기존 마커 업데이트 — 충분히 줌인한 경우에만 개별 마커 표시
+  // zoom 5-7: MOLIT 가격 마커는 가짜 좌표 → 청약 마커만 표시 (가격은 Places 파이프라인)
+  // zoom ≤4: MOLIT 단지 집계 마커도 표시
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-      updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
+      const apts =
+        currentZoom > MAP_ZOOM.COMPLEX_MARKERS
+          ? mapApartments.filter(
+              (apt) => apt.markerType === 'subOngoing' || apt.markerType === 'subUpcoming'
+            )
+          : mapApartments;
+      updateMarkers(apts, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     }
@@ -239,13 +255,31 @@ export default function MapPage() {
     }
   }, [isLoaded, viewMode, currentZoom, complexes, updateComplexMarkers, handleComplexClick]);
 
-  // Places AT4 가격 마커 클릭 핸들러 — 단지명 검색으로 상세 이동
+  // Places AT4 가격 마커 클릭 핸들러 — 바텀시트 열기
+  // BUG-2: placeMarkersRef를 항상 최신 값으로 유지하여 stale closure 방지
+  placeMarkersRef.current = placeMarkers;
   const handlePlaceMarkerClick = useCallback(
-    (_id: string, placeName: string) => {
-      // place_name으로 검색 페이지 이동 (단지 코드가 없으므로 검색 경유)
-      navigate(`/search?q=${encodeURIComponent(placeName)}`);
+    (id: string, placeName: string) => {
+      const matched = placeMarkersRef.current.find((p) => p.id === id);
+      setSelectedApartment({
+        id,
+        name: placeName,
+        address: '',
+        district: '',
+        dong: '',
+        lat: matched?.lat ?? 0,
+        lng: matched?.lng ?? 0,
+        totalUnits: 0,
+        builtYear: 0,
+        builder: '',
+        areas: matched?.area ? [String(Math.round(matched.area))] : [],
+        recentPrice: matched?.price ?? 0,
+        recentPriceArea: matched?.area ? String(Math.round(matched.area)) : '',
+        priceChange: 0,
+        priceChangeType: 'flat',
+      });
     },
-    [navigate]
+    [setSelectedApartment]
   );
 
   // Places AT4 마커 업데이트 — 단지 뷰에서만 표시

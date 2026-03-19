@@ -351,7 +351,9 @@ export function useKakaoMap(
       const visibleIds = new Set(visibleApts.map((apt) => apt.id));
 
       // 차분 업데이트 1: 더 이상 필요 없는 마커 제거
+      // place- / complex- prefix는 다른 update 함수가 소유 — 건드리지 않음
       overlaysRef.current.forEach((overlay, id) => {
+        if (id.startsWith('place-') || id.startsWith('complex-')) return;
         if (!visibleIds.has(id)) {
           overlay.setMap(null);
           overlaysRef.current.delete(id);
@@ -1116,6 +1118,7 @@ function createPlacePriceMarker(
     lat: number;
     lng: number;
     price: number | null;
+    area?: number | null;
     dealDate: string | null;
   },
   onClick?: (id: string, placeName: string) => void
@@ -1126,8 +1129,10 @@ function createPlacePriceMarker(
   if (place.price !== null) {
     // 가격 pill 마커
     const pill = document.createElement('div');
+    const hasArea = place.area != null;
     pill.style.cssText = [
       'display: inline-flex',
+      `flex-direction: ${hasArea ? 'column' : 'row'}`,
       'align-items: center',
       'justify-content: center',
       'padding: 5px 10px',
@@ -1142,7 +1147,17 @@ function createPlacePriceMarker(
       'font-family: "JetBrains Mono", "Nanum Gothic Coding", monospace',
       'transition: transform 0.15s ease',
     ].join(';');
-    pill.textContent = formatPlacePrice(place.price);
+
+    if (hasArea) {
+      const areaEl = document.createElement('span');
+      areaEl.style.cssText = 'font-size: 10px; font-weight: 400; opacity: 0.85; line-height: 1.2;';
+      areaEl.textContent = `${Math.round(place.area!)}㎡`;
+      pill.appendChild(areaEl);
+    }
+
+    const priceEl = document.createElement('span');
+    priceEl.textContent = formatPlacePrice(place.price);
+    pill.appendChild(priceEl);
 
     // 삼각형 꼬리
     const tail = document.createElement('div');

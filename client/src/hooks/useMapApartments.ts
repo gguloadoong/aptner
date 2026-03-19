@@ -10,6 +10,7 @@ export interface PlaceMarkerData {
   lat: number;
   lng: number;
   price: number | null; // 매칭된 거래가 (만원), 없으면 null
+  area: number | null;  // 거래 기준 전용면적 (㎡), 없으면 null
   dealDate: string | null;
 }
 
@@ -90,6 +91,7 @@ export function useMapApartments({ getMap }: UseMapApartmentsOptions) {
           lat: parseFloat(place.y),
           lng: parseFloat(place.x),
           price: matched?.recentPrice ?? null,
+          area: matched?.area ?? null,
           dealDate: matched?.dealDate ?? null,
         };
       });

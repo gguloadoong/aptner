@@ -5,7 +5,7 @@
 // GET /api/regions/:siDoCd/sigungu
 // ============================================================
 import { Router, Request, Response, NextFunction } from 'express';
-import { getRegionTrend } from '../services/trend.service';
+import { getRegionTrend, getMarketSummary } from '../services/trend.service';
 import { cacheService, CACHE_TTL } from '../services/cache.service';
 import { SiDo, SiGunGu, TrendQueryParams, HotTradeApartment } from '../types';
 import { getHotTradeApartments } from '../services/hot-trade.service';
@@ -94,6 +94,19 @@ const SI_GUN_GU_LIST: SiGunGu[] = [
   { code: '28245', name: '계양구', siDoCode: '28' },
   { code: '28260', name: '서구', siDoCode: '28' },
 ];
+
+/**
+ * GET /api/trends/summary
+ * 전국 시장 요약 지표 조회 (전국 평균가 / 전월 대비 변동률 / 이번 달 거래량)
+ */
+router.get('/summary', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await getMarketSummary();
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * GET /api/trends/hot-trades
@@ -235,14 +248,19 @@ router.get('/lawdCd', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
-    // 1순위: 바운딩박스 포함 여부 확인
-    const contained = SIGUNGU_TABLE.find(
+    // 1순위: 바운딩박스 포함 여부 확인 — 여러 구가 겹칠 경우 가장 작은 BB(더 정밀) 선택
+    const matches = SIGUNGU_TABLE.filter(
       (sg) =>
         latNum >= sg.swLat &&
         latNum <= sg.neLat &&
         lngNum >= sg.swLng &&
         lngNum <= sg.neLng,
     );
+    const contained = matches.sort((a, b) => {
+      const areaA = (a.neLat - a.swLat) * (a.neLng - a.swLng);
+      const areaB = (b.neLat - b.swLat) * (b.neLng - b.swLng);
+      return areaA - areaB; // 작은 면적 우선
+    })[0];
 
     let result: { lawdCd: string; sigungu: string };
 

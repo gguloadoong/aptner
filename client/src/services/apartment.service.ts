@@ -658,6 +658,7 @@ export async function getHotApartmentRanking(
 export interface ApartmentMapPrice {
   aptName: string;      // 단지명 (Places place_name과 매칭)
   recentPrice: number;  // 최근 거래가 (만원) — BE 필드명과 일치
+  area: number;         // 거래 기준 전용면적 (㎡)
   lawdCd: string;       // 법정동 코드
   dealDate: string;     // 최근 거래일 YYYY-MM
 }
@@ -705,16 +706,16 @@ export async function getLawdCdByCoords(lat: number, lng: number): Promise<LawdC
 
 // Mock 가격 데이터 (Places 매칭 테스트용)
 const MOCK_MAP_PRICES: ApartmentMapPrice[] = [
-  { aptName: '래미안 대치팰리스', recentPrice: 290000, lawdCd: '11680', dealDate: '2024-02' },
-  { aptName: '은마아파트', recentPrice: 195000, lawdCd: '11680', dealDate: '2024-02' },
-  { aptName: '도곡렉슬', recentPrice: 260000, lawdCd: '11680', dealDate: '2024-02' },
-  { aptName: '타워팰리스', recentPrice: 400000, lawdCd: '11680', dealDate: '2024-01' },
-  { aptName: '압구정현대아파트', recentPrice: 520000, lawdCd: '11680', dealDate: '2024-01' },
-  { aptName: '반포자이', recentPrice: 380000, lawdCd: '11650', dealDate: '2024-02' },
-  { aptName: '아크로리버파크', recentPrice: 460000, lawdCd: '11650', dealDate: '2024-02' },
-  { aptName: '헬리오시티', recentPrice: 185000, lawdCd: '11710', dealDate: '2024-02' },
-  { aptName: '잠실엘스', recentPrice: 230000, lawdCd: '11710', dealDate: '2024-02' },
-  { aptName: '롯데캐슬골드파크', recentPrice: 140000, lawdCd: '11500', dealDate: '2024-02' },
+  { aptName: '래미안 대치팰리스', recentPrice: 290000, area: 84, lawdCd: '11680', dealDate: '2024-02' },
+  { aptName: '은마아파트', recentPrice: 195000, area: 76, lawdCd: '11680', dealDate: '2024-02' },
+  { aptName: '도곡렉슬', recentPrice: 260000, area: 84, lawdCd: '11680', dealDate: '2024-02' },
+  { aptName: '타워팰리스', recentPrice: 400000, area: 164, lawdCd: '11680', dealDate: '2024-01' },
+  { aptName: '압구정현대아파트', recentPrice: 520000, area: 143, lawdCd: '11680', dealDate: '2024-01' },
+  { aptName: '반포자이', recentPrice: 380000, area: 84, lawdCd: '11650', dealDate: '2024-02' },
+  { aptName: '아크로리버파크', recentPrice: 460000, area: 112, lawdCd: '11650', dealDate: '2024-02' },
+  { aptName: '헬리오시티', recentPrice: 185000, area: 84, lawdCd: '11710', dealDate: '2024-02' },
+  { aptName: '잠실엘스', recentPrice: 230000, area: 84, lawdCd: '11710', dealDate: '2024-02' },
+  { aptName: '롯데캐슬골드파크', recentPrice: 140000, area: 59, lawdCd: '11500', dealDate: '2024-02' },
 ];
 
 // 신고가 경신 단지 Mock 데이터 (홈 v2)
