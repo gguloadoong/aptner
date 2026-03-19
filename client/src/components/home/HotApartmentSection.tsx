@@ -32,7 +32,7 @@ function RankChangeBadge({ change }: { change: number | null }) {
     return <span style={{ fontSize: '11px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
   }
   if (change < 0) {
-    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#00C896' }}>▼{Math.abs(change)}</span>;
+    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
   }
   return <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--semantic-label-assistive)' }}>-</span>;
 }
