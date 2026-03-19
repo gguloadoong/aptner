@@ -11,6 +11,7 @@
 import { getOverlappingSigunguCodes } from '../constants/region.constants';
 import { cacheService, CACHE_TTL } from './cache.service';
 import { ApartmentComplex } from '../types';
+import { batchGeocodeComplexes } from '../utils/kakaoGeocode';
 
 // 국토부 API 기본 URL
 const MOLIT_API_BASE_URL =
@@ -360,8 +361,19 @@ export async function getComplexesByViewport(
   const limited = complexes.slice(0, limit);
   console.log(`[Complex] 단지 집계 완료: ${complexes.length}개 → 상위 ${limited.length}개 반환`);
 
-  // 5. 6시간 캐시 저장
-  cacheService.set(cacheKey, limited, CACHE_TTL.APARTMENT_TRADE);
+  // 5. 거래량 상위 25개 서버사이드 geocoding (API quota 보호)
+  const centerLng = (swLng + neLng) / 2;
+  const centerLat = (swLat + neLat) / 2;
+  const top25 = limited.slice(0, 25);
+  const rest = limited.slice(25);
+  const geocodedTop = await batchGeocodeComplexes(top25, centerLng, centerLat);
+  console.log(
+    `[Complex] Geocoding 완료: ${geocodedTop.filter((c) => c.lat != null).length}/${geocodedTop.length}개 좌표 확보`,
+  );
+  const result: ApartmentComplex[] = [...geocodedTop, ...rest];
 
-  return limited;
+  // 6. 6시간 캐시 저장
+  cacheService.set(cacheKey, result, CACHE_TTL.APARTMENT_TRADE);
+
+  return result;
 }

@@ -342,6 +342,10 @@ export interface ApartmentComplex {
   area: number;
   /** 건축 연도 (없으면 undefined) */
   buildYear?: number;
+  /** 위도 (서버사이드 Kakao geocoding 결과, 없으면 null) */
+  lat?: number | null;
+  /** 경도 (서버사이드 Kakao geocoding 결과, 없으면 null) */
+  lng?: number | null;
 }
 
 // ---- 핫 아파트 랭킹 (거래량 급등률 기반, FE 합의 계약) ----

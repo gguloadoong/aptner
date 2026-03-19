@@ -153,12 +153,8 @@ export default function MapPage() {
         setIsComplexLoading(true);
         const fetchComplexes = getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom })
           .then(async (rawComplexes) => {
-            // 줌이 넓을수록 단지 수 제한 (geocoding rate limit 대응)
-            const MAX_COMPLEXES = zoom >= 6 ? 25 : rawComplexes.length;
-            const topComplexes = [...rawComplexes]
-              .sort((a, b) => (b.tradeCount ?? 0) - (a.tradeCount ?? 0))
-              .slice(0, MAX_COMPLEXES);
-            const geocoded = await batchGeocode(topComplexes);
+            // 서버가 tradeCount 상위 25개를 이미 geocoding해서 반환 — 클라이언트 정렬/슬라이싱 불필요
+            const geocoded = await batchGeocode(rawComplexes);
             setComplexes(geocoded);
           })
           .catch((err) => console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err))
