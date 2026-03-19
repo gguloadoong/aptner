@@ -1295,17 +1295,34 @@ export function createComplexMarkerElement(
     'white-space: nowrap',
   ].join(';');
 
+  el.style.flexDirection = 'column';
+  el.style.gap = '1px';
+
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'name';
+  nameSpan.style.cssText = [
+    'font-size: 10px',
+    'font-weight: 500',
+    'color: #6B7684',
+    'line-height: 1.2',
+    'max-width: 80px',
+    'overflow: hidden',
+    'text-overflow: ellipsis',
+    'white-space: nowrap',
+  ].join(';');
+  nameSpan.textContent = complex.name;
+
   const priceSpan = document.createElement('span');
   priceSpan.className = 'price';
   priceSpan.style.cssText = [
     'font-size: 12px',
     'font-weight: 700',
     'line-height: 1',
-    // 거래횟수 높을수록 더 진한 색 (최고가 단지는 빨간색)
     'color: #191F28',
   ].join(';');
   priceSpan.textContent = priceText;
 
+  el.appendChild(nameSpan);
   el.appendChild(priceSpan);
 
   // 말풍선 꼬리 (삼각형)

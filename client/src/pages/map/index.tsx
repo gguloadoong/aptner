@@ -127,19 +127,12 @@ export default function MapPage() {
       // 줌 레벨 상태 업데이트 (구 단위 오버레이 표시 여부 판단)
       setCurrentZoom(zoom);
 
-      // 병렬 처리: 기존 마커 데이터 + 단지 데이터 동시 요청
-      try {
-        // 기존 마커 데이터 갱신
-        const merged = await getApartmentsByBounds(swLat, swLng, neLat, neLng, priceFilter);
-        setMapApartments(merged);
-      } catch (err) {
-        console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err);
-      }
+      // mapApartments + complexes 병렬 요청 (독립적 API)
+      const centerLat = (swLat + neLat) / 2;
+      const centerLng = (swLng + neLng) / 2;
 
-      // Places AT4(아파트) 검색 — INDIVIDUAL_MARKERS 임계값까지 표시하므로 같은 조건으로 fetch
+      // Places AT4 — fire-and-forget (geocoding과 무관하게 즉시 시작)
       if (zoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-        const centerLat = (swLat + neLat) / 2;
-        const centerLng = (swLng + neLng) / 2;
         const seq = ++placeFetchSeqRef.current;
         fetchPlaceMarkersRef.current?.(centerLat, centerLng)
           .then((markers) => {
@@ -147,31 +140,34 @@ export default function MapPage() {
           })
           .catch((err) => console.warn('[handleBoundsChange] Places 마커 갱신 실패:', err));
       } else {
-        ++placeFetchSeqRef.current; // invalidate any in-flight fetch
+        ++placeFetchSeqRef.current;
         setPlaceMarkers([]);
       }
 
-      // 충분히 줌인한 경우에만 MOLIT 단지 집계 마커 조회
+      // mapApartments + complexes 병렬 fetch
+      const fetchMap = getApartmentsByBounds(swLat, swLng, neLat, neLng, priceFilter)
+        .then((merged) => setMapApartments(merged))
+        .catch((err) => console.warn('[handleBoundsChange] 마커 데이터 갱신 실패, 기존 데이터 유지:', err));
+
       if (zoom <= MAP_ZOOM.COMPLEX_DATA_FETCH) {
         setIsComplexLoading(true);
-        try {
-          const rawComplexes = await getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom });
-          // 줌이 넓을수록 단지 수 제한 (geocoding rate limit 대응)
-          // zoom 6-7: 거래량 상위 25개만 / zoom ≤5: 전체
-          const MAX_COMPLEXES = zoom >= 6 ? 25 : rawComplexes.length;
-          const topComplexes = [...rawComplexes]
-            .sort((a, b) => (b.tradeCount ?? 0) - (a.tradeCount ?? 0))
-            .slice(0, MAX_COMPLEXES);
-          // Geocoder로 주소 → 좌표 변환 (로딩 중 기존 마커 유지)
-          const geocoded = await batchGeocode(topComplexes);
-          setComplexes(geocoded);
-        } catch (err) {
-          console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err);
-        } finally {
-          setIsComplexLoading(false);
-        }
+        const fetchComplexes = getComplexesByBounds({ swLat, swLng, neLat, neLng, zoom })
+          .then(async (rawComplexes) => {
+            // 줌이 넓을수록 단지 수 제한 (geocoding rate limit 대응)
+            const MAX_COMPLEXES = zoom >= 6 ? 25 : rawComplexes.length;
+            const topComplexes = [...rawComplexes]
+              .sort((a, b) => (b.tradeCount ?? 0) - (a.tradeCount ?? 0))
+              .slice(0, MAX_COMPLEXES);
+            const geocoded = await batchGeocode(topComplexes);
+            setComplexes(geocoded);
+          })
+          .catch((err) => console.warn('[handleBoundsChange] 단지 데이터 갱신 실패, 기존 데이터 유지:', err))
+          .finally(() => setIsComplexLoading(false));
+
+        await Promise.all([fetchMap, fetchComplexes]);
       } else {
         setComplexes([]);
+        await fetchMap;
       }
     },
     [batchGeocode, priceFilter]
@@ -234,12 +230,19 @@ export default function MapPage() {
   const [currentZoom, setCurrentZoom] = useState<number>(7);
 
   // 기존 마커 업데이트 — 충분히 줌인한 경우에만 개별 마커 표시
-  // zoom 5-7: MOLIT 가격 마커는 가짜 좌표 → 청약 마커만 표시 (가격은 Places 파이프라인)
-  // zoom ≤4: MOLIT 단지 집계 마커도 표시
+  // zoom 5-7: MOLIT 가격 마커는 hash 기반 가짜 좌표(한강/도로에 뜸) → 청약 마커만 표시
+  //           실거래가 위치는 geocoded complexes + Places 파이프라인이 담당
+  // zoom ≤4 : 모든 마커 표시 (줌인 시 정밀도 허용)
   useEffect(() => {
     if (!isLoaded) return;
     if (viewMode === 'marker' && currentZoom <= MAP_ZOOM.INDIVIDUAL_MARKERS) {
-      updateMarkers(mapApartments, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
+      const apts =
+        currentZoom > 4
+          ? mapApartments.filter(
+              (apt) => apt.markerType === 'subOngoing' || apt.markerType === 'subUpcoming'
+            )
+          : mapApartments;
+      updateMarkers(apts, { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     } else {
       updateMarkers([], { priceFilter, areaFilter, layerFilters, unitCountFilter, complexFeatures });
     }

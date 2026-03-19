@@ -159,6 +159,9 @@ export function useGeocoder() {
         const keywordQuery = fallbackQuery ?? address;
         const kwKey = `kw:${keywordQuery.trim()}`;
         if (cache[kwKey] && Date.now() - cache[kwKey].ts < CACHE_TTL_MS) {
+          // kw: 캐시 히트 → 원본 키에도 저장하여 다음 호출은 첫 번째 체크에서 히트
+          cache[cacheKey] = { ...cache[kwKey] };
+          saveCache(cache);
           return { lat: cache[kwKey].lat, lng: cache[kwKey].lng };
         }
         coords = await keywordSearchOnce(keywordQuery);
@@ -167,7 +170,7 @@ export function useGeocoder() {
         }
       }
 
-      // 캐시에 저장
+      // 캐시에 저장 (원본 주소 키 + kw: 키 모두 저장 → 다음 호출은 첫 번째 체크에서 히트)
       if (coords) {
         cache[cacheKey] = { ...coords, ts: Date.now() };
         saveCache(cache);
