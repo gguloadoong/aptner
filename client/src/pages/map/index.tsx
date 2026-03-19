@@ -111,12 +111,15 @@ export default function MapPage() {
     };
 
     // 바텀시트 즉시 열기 — 검색 결과 기다리지 않음
+    const seq = ++complexClickSeqRef.current;
     setSelectedApartment(baseApt);
 
     // matchedMapApt 없는 경우: 비동기 ID 탐색 후 상세 데이터 교체 (바텀시트는 이미 열림)
+    // seq 체크: 빠른 단지 전환 시 이전 Promise 결과가 현재 선택을 덮어쓰지 않도록 방지
     if (!matchedMapApt) {
       searchApartments(complex.name)
         .then((results) => {
+          if (complexClickSeqRef.current !== seq) return; // stale — 다른 단지가 선택됨
           const matchedSearch = results.find((apt) => normalizeAptName(apt.name) === normalizedComplexName);
           if (matchedSearch?.id && matchedSearch.id !== baseApt.id) {
             setSelectedApartment({ ...baseApt, id: matchedSearch.id });
@@ -131,6 +134,8 @@ export default function MapPage() {
   const fetchPlaceMarkersRef = useRef<((lat: number, lng: number) => Promise<PlaceMarkerData[]>) | null>(null);
   // BUG-4: sequence counter — stale promise 결과를 버리기 위한 카운터
   const placeFetchSeqRef = useRef(0);
+  // handleComplexClick race condition 방지 — 빠른 단지 전환 시 이전 비동기 결과 무시
+  const complexClickSeqRef = useRef(0);
   // BUG-2: placeMarkers를 항상 최신 값으로 참조하기 위한 ref
   const placeMarkersRef = useRef<PlaceMarkerData[]>([]);
 

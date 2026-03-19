@@ -11,9 +11,9 @@ function evictGeoCache(): void {
   for (const [key, val] of GEO_CACHE) {
     if (now - val.ts >= GEO_CACHE_TTL) GEO_CACHE.delete(key);
   }
-  // 2차: 여전히 초과면 가장 오래된 항목부터 제거
-  if (GEO_CACHE.size > GEO_CACHE_MAX) {
-    const overflow = GEO_CACHE.size - GEO_CACHE_MAX;
+  // 2차: 여전히 MAX 이상이면 가장 오래된 항목부터 제거 (새 항목 추가 공간 확보)
+  if (GEO_CACHE.size >= GEO_CACHE_MAX) {
+    const overflow = GEO_CACHE.size - GEO_CACHE_MAX + 1;
     let removed = 0;
     for (const key of GEO_CACHE.keys()) {
       if (removed >= overflow) break;
