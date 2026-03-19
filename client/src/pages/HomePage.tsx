@@ -12,9 +12,8 @@ import {
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
 import { IconSearch } from '@wanteddev/wds-icon';
-import QuickActionTabs from '../components/home/QuickActionTabs';
-import TodaySubscriptionBadge from '../components/home/TodaySubscriptionBadge';
 import HotApartmentSection from '../components/home/HotApartmentSection';
+import MarketSummaryBanner from '../components/home/MarketSummaryBanner';
 import WeeklySubscriptionTimeline from '../components/home/WeeklySubscriptionTimeline';
 import RecordHighSection from '../components/home/RecordHighSection';
 import { useSubscriptions } from '../hooks/useSubscription';
@@ -143,20 +142,17 @@ export default function HomePage() {
               padding: isMobile ? '12px 0 0 0' : '32px 20px 0 20px',
             }}
           >
-            {/* 퀵 액션 탭 */}
-            <QuickActionTabs />
+            {/* 시장 요약 배너 */}
+            <MarketSummaryBanner />
 
-            {/* 오늘의 청약 배지 (D-7 이내) */}
-            <TodaySubscriptionBadge />
+            {/* 이달의 신고가 섹션 */}
+            <RecordHighSection />
 
             {/* 주간 청약 타임라인 */}
             <WeeklySubscriptionTimeline
               subscriptions={allSubscriptions}
               isLoading={timelineLoading}
             />
-
-            {/* 이달의 신고가 섹션 */}
-            <RecordHighSection />
 
             {/* HOT 아파트 랭킹 */}
             <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
@@ -186,7 +182,7 @@ function MapBanner() {
       onClick={() => navigate('/map')}
       style={{
         width: '100%',
-        background: 'linear-gradient(135deg, #0066FF 0%, #3B82F6 100%)',
+        background: 'linear-gradient(135deg, #1B64DA 0%, #2563EB 100%)',
         borderRadius: '16px',
         padding: '20px',
         textAlign: 'left',

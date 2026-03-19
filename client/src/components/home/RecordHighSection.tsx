@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
 import { getRecordHighs } from '../../services/apartment.service';
 import { formatPrice } from '../../utils/formatNumber';
@@ -15,9 +16,10 @@ interface RecordHighCardProps {
   rank: number;
   apt: RecordHighApartment;
   isLast: boolean;
+  onNavigate: (lawdCd: string) => void;
 }
 
-function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
+function RecordHighCard({ rank, apt, isLast, onNavigate }: RecordHighCardProps) {
   const badgeStyle = RANK_COLORS[rank];
 
   return (
@@ -27,7 +29,9 @@ function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
       style={{
         padding: '14px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
+        cursor: 'pointer',
       }}
+      onClick={() => onNavigate(apt.lawdCd)}
     >
       {/* 순위 배지 */}
       <div
@@ -94,13 +98,15 @@ function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
         >
           {formatPrice(apt.recentPrice)}
         </Typography>
-        <Typography
-          variant="caption2"
-          weight="bold"
-          sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
-        >
-          +{apt.priceChangeRate.toFixed(1)}%
-        </Typography>
+        {apt.previousPrice > 0 && (
+          <Typography
+            variant="caption2"
+            weight="bold"
+            sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
+          >
+            +{((apt.recentPrice - apt.previousPrice) / 10000).toFixed(1)}억
+          </Typography>
+        )}
       </Box>
     </FlexBox>
   );
@@ -141,13 +147,13 @@ function RecordHighSkeleton() {
   );
 }
 
-// 데이터 시점 캡션 — 현재 월 기준
-function getDataCaption(): string {
+function getMonthTitle(): string {
   const now = new Date();
-  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 기준`;
+  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 신고가`;
 }
 
 export default function RecordHighSection() {
+  const navigate = useNavigate();
   const { data: recordHighs = [], isLoading } = useQuery({
     queryKey: ['apartments', 'recordHighs'],
     queryFn: () => getRecordHighs('수도권', 5),
@@ -158,21 +164,21 @@ export default function RecordHighSection() {
   return (
     <Box as="section" sx={{ padding: '0 16px' }}>
       {/* 섹션 헤더 */}
-      <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
+      <Box style={{ marginBottom: '12px' }}>
         <Typography
           variant="title3"
           weight="bold"
           sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
         >
-          이달의 신고가 🔥
+          {getMonthTitle()}
         </Typography>
         <Typography
           variant="caption2"
-          sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}
+          sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
         >
-          {getDataCaption()}
+          국토부 실거래가 기준 (2~3주 지연)
         </Typography>
-      </FlexBox>
+      </Box>
 
       {isLoading ? (
         <RecordHighSkeleton />
@@ -206,6 +212,7 @@ export default function RecordHighSection() {
               rank={i + 1}
               apt={apt}
               isLast={i === recordHighs.length - 1}
+              onNavigate={(lawdCd) => navigate(`/apartment/${lawdCd}`)}
             />
           ))}
         </Box>

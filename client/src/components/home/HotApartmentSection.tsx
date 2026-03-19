@@ -29,10 +29,10 @@ function RankChangeBadge({ change }: { change: number | null }) {
     );
   }
   if (change > 0) {
-    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#E53E3E' }}>▲{change}</span>;
+    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#FF4B4B' }}>▲{change}</span>;
   }
   if (change < 0) {
-    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#3B82F6' }}>▼{Math.abs(change)}</span>;
+    return <span style={{ fontSize: '11px', fontWeight: 700, color: '#00C896' }}>▼{Math.abs(change)}</span>;
   }
   return <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--semantic-label-assistive)' }}>-</span>;
 }
@@ -139,13 +139,13 @@ function CompactHotCard({ apartment, isLast }: CompactHotCardProps) {
         >
           {formatPriceShort(priceManwon)}
         </Typography>
-        {apartment.tradeSurgeRate > 0 && (
+        {apartment.tradeCount > 0 && (
           <Typography
             variant="caption2"
             weight="bold"
-            sx={{ color: '#E53E3E', display: 'block', marginTop: '2px' }}
+            sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
           >
-            거래 +{apartment.tradeSurgeRate}%
+            이번 달 {apartment.tradeCount}건
           </Typography>
         )}
       </Box>

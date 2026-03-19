@@ -14,8 +14,8 @@
   ──────────────────────────────────────── */
   --color-price-up:      #FF4B4B;
   --color-price-up-bg:   #FFF3F3;
-  --color-price-down:    #3B82F6;
-  --color-price-down-bg: #EFF6FF;
+  --color-price-down:    #00C896;
+  --color-price-down-bg: #E6FAF5;
   --color-price-neutral: #8B95A1;
 
   /* ────────────────────────────────────────
@@ -31,7 +31,7 @@
   /* ────────────────────────────────────────
      차트 전용
   ──────────────────────────────────────── */
-  --color-chart-line:    #0066FF;
+  --color-chart-line:    #1B64DA;
   --color-chart-grid:    #E5E8EB;
   --color-chart-axis:    #8B95A1;
   --color-chart-tooltip: #191F28;
