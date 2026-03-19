@@ -41,16 +41,20 @@ export const COMPLEX_FEATURE_OPTIONS: { value: ComplexFeature; label: string }[]
 
 // 카카오맵 줌 레벨 (낮을수록 더 확대됨, 1=건물, 14=전국)
 // getRegionOverlayLevel 기준: zoom >= 9 → sido, >= 7 → sigungu, >= 5 → gu, >= 4 → dong, < 4 → complex
+//
+// 레이어 계층 설계:
+//  zoom 1-7  : 개별 단지 가격 마커 (mapApartments - 이미 좌표 포함, Geocoding 불필요)
+//  zoom 1-4  : 실 MOLIT 단지 집계 마커 (complexes - Geocoding 필요, 더 정확한 대표가)
+//  zoom 8-14 : 시/구 단위 평균가 오버레이 (지역 평균 요약)
 export const MAP_ZOOM = {
-  // 개별 거래 마커 표시 임계값 (이 이하일 때 표시)
-  INDIVIDUAL_MARKERS: 3,
-  // 단지(complex) 마커 표시 임계값 (이 이하일 때 표시)
+  // 개별 가격 마커 표시 임계값: zoom 7 이하에서 표시 (기본 시티뷰에서도 마커 보임)
+  INDIVIDUAL_MARKERS: 7,
+  // 단지(complex) 집계 마커 표시 임계값: zoom 4 이하 (더 정확한 MOLIT 집계 단지)
   COMPLEX_MARKERS: 4,
-  // 구역별 오버레이(dong/gu/sigungu/sido) 표시 임계값 (이 이상일 때 표시)
-  // zoom 4는 dong 레벨이지만 complex 마커와 겹치므로 5부터 district overlay 활성화
-  DISTRICT_OVERLAYS: 5,
-  // 단지 데이터 API 호출 임계값 (이 이하일 때 서버 요청)
-  COMPLEX_DATA_FETCH: 4,
+  // 지역 평균가 오버레이 표시 임계값: zoom 8 이상 (광역 뷰에서만)
+  DISTRICT_OVERLAYS: 8,
+  // 단지 데이터 API 호출 임계값: zoom 5 이하
+  COMPLEX_DATA_FETCH: 5,
 } as const;
 
 // 가격 범례 아이템 (마커 색상과 동일한 4단계 기준)
