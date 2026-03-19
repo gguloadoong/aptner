@@ -170,8 +170,17 @@ function geocodeAddress(address: string): Promise<{ lat: number; lng: number } |
   });
 }
 
+// 청약 마커 캐시 (청약 목록은 하루 단위로 업데이트 → 5분 캐시로 반복 geocoding 방지)
+let _subMarkerCache: MapApartment[] | null = null;
+let _subMarkerCacheTime = 0;
+const SUB_MARKER_CACHE_TTL_MS = 5 * 60 * 1000;
+
 // 청약 데이터를 MapApartment 배열로 변환 (TASK 7)
 async function getSubscriptionMapApartments(): Promise<MapApartment[]> {
+  const now = Date.now();
+  if (_subMarkerCache && now - _subMarkerCacheTime < SUB_MARKER_CACHE_TTL_MS) {
+    return _subMarkerCache;
+  }
   try {
     const [ongoingRes, upcomingRes] = await Promise.all([
       getSubscriptions({ status: 'ongoing' }),
@@ -196,7 +205,7 @@ async function getSubscriptionMapApartments(): Promise<MapApartment[]> {
       })
     );
 
-    return allSubs
+    const result = allSubs
       .filter((sub) => sub.lat != null && sub.lng != null)
       .map((sub) => ({
         id: `sub-${sub.id}`,
@@ -212,6 +221,9 @@ async function getSubscriptionMapApartments(): Promise<MapApartment[]> {
         subStartDate: sub.startDate,
         subId: sub.id,
       }));
+    _subMarkerCache = result;
+    _subMarkerCacheTime = Date.now();
+    return result;
   } catch (err) {
     // 청약 데이터 실패해도 지도 마커는 정상 표시
     console.warn('[getSubscriptionMapApartments] 청약 데이터 로드 실패:', err);
