@@ -638,7 +638,7 @@ router.get('/map', apiRateLimiter, async (req: Request, res: Response, next: Nex
 
     // 단지 특성 필터 파싱
     const complexFilter: ComplexFilter = {
-      minUnit: req.query.minUnit ? parseInt(req.query.minUnit as string, 10) : undefined,
+      minUnit: req.query.minUnit ? (parseInt(req.query.minUnit as string, 10) || undefined) : undefined,
       isBrand: parseBool(req.query.isBrand as string),
       isWalkSubway: parseBool(req.query.isWalkSubway as string),
       isLargeComplex: parseBool(req.query.isLargeComplex as string),
