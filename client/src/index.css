@@ -86,5 +86,5 @@ body {
 
 /* 가격 상승/하락 색상 — 한국 부동산 컨벤션 */
 .price-up   { color: #FF4B4B; }
-.price-down { color: #3B82F6; }
+.price-down { color: #00C896; }
 .price-flat { color: var(--semantic-label-assistive); }

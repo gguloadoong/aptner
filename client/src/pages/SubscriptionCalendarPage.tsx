@@ -61,7 +61,7 @@ function filterByDate(subscriptions: Subscription[], date: Date): Subscription[]
 function getDotColor(subs: Subscription[]): string | null {
   if (subs.length === 0) return null;
   const hasOngoing = subs.some((s) => s.status === 'ongoing');
-  return hasOngoing ? '#0066FF' : '#F59E0B';
+  return hasOngoing ? '#1B64DA' : '#F59E0B';
 }
 
 export default function SubscriptionCalendarPage() {
@@ -267,7 +267,7 @@ export default function SubscriptionCalendarPage() {
                       idx === 0
                         ? '#FF4B4B'
                         : idx === 6
-                          ? '#3B82F6'
+                          ? '#1B64DA'
                           : 'var(--semantic-label-assistive)',
                   }}
                 >
@@ -333,7 +333,7 @@ export default function SubscriptionCalendarPage() {
                       borderBottom: row < totalRows - 1 ? '1px solid var(--semantic-line-normal)' : 'none',
                       cursor: 'pointer',
                       backgroundColor: isSelected
-                        ? 'rgba(0,102,255,0.06)'
+                        ? 'rgba(27,100,218,0.06)'
                         : 'transparent',
                       transition: 'background-color 120ms ease',
                     }}
@@ -347,7 +347,7 @@ export default function SubscriptionCalendarPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: isToday ? '#0066FF' : 'transparent',
+                        backgroundColor: isToday ? '#1B64DA' : 'transparent',
                         flexShrink: 0,
                       }}
                     >
@@ -360,9 +360,9 @@ export default function SubscriptionCalendarPage() {
                             : dayIdx === 0
                               ? '#FF4B4B'
                               : dayIdx === 6
-                                ? '#3B82F6'
+                                ? '#1B64DA'
                                 : isSelected
-                                  ? '#0066FF'
+                                  ? '#1B64DA'
                                   : 'var(--semantic-label-normal)',
                           lineHeight: 1,
                         }}
@@ -400,7 +400,7 @@ export default function SubscriptionCalendarPage() {
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                backgroundColor: '#0066FF',
+                backgroundColor: '#1B64DA',
               }}
             />
             <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)' }}>

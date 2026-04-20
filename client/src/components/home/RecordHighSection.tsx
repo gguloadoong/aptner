@@ -1,4 +1,6 @@
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
 import { getRecordHighs } from '../../services/apartment.service';
 import { formatPrice } from '../../utils/formatNumber';
@@ -19,14 +21,29 @@ interface RecordHighCardProps {
 
 function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
   const badgeStyle = RANK_COLORS[rank];
+  const navigate = useNavigate();
+
+  const priceDiffBillion =
+    apt.previousPrice && apt.previousPrice > 0
+      ? ((apt.recentPrice - apt.previousPrice) / 10000).toFixed(1)
+      : null;
 
   return (
     <FlexBox
       alignItems="center"
       gap="12px"
+      onClick={() => navigate(`/apartment/${apt.lawdCd}`)}
       style={{
         padding: '14px 16px',
         borderBottom: isLast ? 'none' : '1px solid var(--semantic-background-normal-alternative)',
+        cursor: 'pointer',
+        transition: 'background-color 120ms ease',
+      }}
+      onMouseEnter={(e: React.MouseEvent) => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--semantic-background-normal-alternative)';
+      }}
+      onMouseLeave={(e: React.MouseEvent) => {
+        (e.currentTarget as HTMLElement).style.backgroundColor = '';
       }}
     >
       {/* 순위 배지 */}
@@ -94,13 +111,15 @@ function RecordHighCard({ rank, apt, isLast }: RecordHighCardProps) {
         >
           {formatPrice(apt.recentPrice)}
         </Typography>
-        <Typography
-          variant="caption2"
-          weight="bold"
-          sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
-        >
-          +{apt.priceChangeRate.toFixed(1)}%
-        </Typography>
+        {priceDiffBillion !== null && (
+          <Typography
+            variant="caption2"
+            weight="bold"
+            sx={{ color: '#FF4B4B', display: 'block', marginTop: '2px' }}
+          >
+            +{priceDiffBillion}억
+          </Typography>
+        )}
       </Box>
     </FlexBox>
   );
@@ -141,10 +160,10 @@ function RecordHighSkeleton() {
   );
 }
 
-// 데이터 시점 캡션 — 현재 월 기준
+// 섹션 타이틀 — 현재 월 기준 동적 표시
 function getDataCaption(): string {
   const now = new Date();
-  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 기준`;
+  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 신고가`;
 }
 
 export default function RecordHighSection() {
@@ -159,19 +178,21 @@ export default function RecordHighSection() {
     <Box as="section" sx={{ padding: '0 16px' }}>
       {/* 섹션 헤더 */}
       <FlexBox alignItems="flex-end" justifyContent="space-between" style={{ marginBottom: '12px' }}>
-        <Typography
-          variant="title3"
-          weight="bold"
-          sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
-        >
-          이달의 신고가 🔥
-        </Typography>
-        <Typography
-          variant="caption2"
-          sx={{ color: 'var(--semantic-label-assistive)', display: 'block' }}
-        >
-          {getDataCaption()}
-        </Typography>
+        <div>
+          <Typography
+            variant="title3"
+            weight="bold"
+            sx={{ color: 'var(--semantic-label-normal)', letterSpacing: '-0.03em', display: 'block' }}
+          >
+            {getDataCaption()}
+          </Typography>
+          <Typography
+            variant="caption1"
+            sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginTop: '2px' }}
+          >
+            국토부 실거래가 기준 · 2~3주 지연
+          </Typography>
+        </div>
       </FlexBox>
 
       {isLoading ? (

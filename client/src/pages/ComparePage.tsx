@@ -191,7 +191,7 @@ function useJeonseRate(id: string | undefined, lawdCd: string | undefined) {
 }
 
 // 단지별 색상 팔레트 (파랑/오렌지/초록)
-const CHART_COLORS = ['#0066FF', '#FF6B2B', '#22C55E'] as const;
+const CHART_COLORS = ['#1B64DA', '#FF6B2B', '#22C55E'] as const;
 
 // 가격 추이 비교 차트 — recharts LineChart
 interface PriceHistoryChartProps {
@@ -401,7 +401,7 @@ function CompareTable({ ids }: { ids: string[] }) {
   const colCount = ids.length;
 
   const priceChangeColor = (type: 'up' | 'down' | 'flat') =>
-    type === 'up' ? '#FF4B4B' : type === 'down' ? '#3B82F6' : 'var(--semantic-label-assistive)';
+    type === 'up' ? '#FF4B4B' : type === 'down' ? '#00C896' : 'var(--semantic-label-assistive)';
   const priceArrow = (type: 'up' | 'down' | 'flat') =>
     type === 'up' ? '▲ ' : type === 'down' ? '▼ ' : '';
 

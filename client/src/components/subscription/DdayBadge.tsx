@@ -62,8 +62,8 @@ const DdayBadge = React.memo<DdayBadgeProps>(({ dDay }) => {
     // D-15~30: 파랑 + 파랑 border
     style = {
       background: '#EFF6FF',
-      color: '#0066FF',
-      border: '1px solid #0066FF',
+      color: '#1B64DA',
+      border: '1px solid #1B64DA',
     };
   } else {
     // D-31+: 회색 + 회색 border

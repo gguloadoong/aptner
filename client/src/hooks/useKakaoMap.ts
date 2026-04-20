@@ -810,7 +810,7 @@ function createSubOngoingMarker(apt: MapApartment): HTMLElement {
   wrapper.style.cssText = [
     'min-width: 68px',
     'border-radius: 10px',
-    'border: 2px solid #0066FF',
+    'border: 2px solid #1B64DA',
     'box-shadow: 0 3px 12px rgba(0,102,255,0.35)',
     'z-index: 30',
     'overflow: hidden',
@@ -820,7 +820,7 @@ function createSubOngoingMarker(apt: MapApartment): HTMLElement {
   // 상단: 청약중 + D-day
   const top = document.createElement('div');
   top.style.cssText = [
-    'background-color: #0066FF',
+    'background-color: #1B64DA',
     'padding: 3px 8px',
     'display: flex',
     'align-items: center',
@@ -846,7 +846,7 @@ function createSubOngoingMarker(apt: MapApartment): HTMLElement {
   ].join(';');
 
   const priceText = document.createElement('span');
-  priceText.style.cssText = 'font-size:11px; font-weight:700; color:#0066FF;';
+  priceText.style.cssText = 'font-size:11px; font-weight:700; color:#1B64DA;';
   priceText.textContent = formatPriceForMarker(apt.price);
   bottom.appendChild(priceText);
 

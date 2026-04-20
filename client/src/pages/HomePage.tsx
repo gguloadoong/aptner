@@ -12,11 +12,10 @@ import {
 } from '@wanteddev/wds';
 import { useIsPC } from '../hooks/useBreakpoint';
 import { IconSearch } from '@wanteddev/wds-icon';
-import QuickActionTabs from '../components/home/QuickActionTabs';
-import TodaySubscriptionBadge from '../components/home/TodaySubscriptionBadge';
 import HotApartmentSection from '../components/home/HotApartmentSection';
 import WeeklySubscriptionTimeline from '../components/home/WeeklySubscriptionTimeline';
 import RecordHighSection from '../components/home/RecordHighSection';
+import MarketSummaryBanner from '../components/home/MarketSummaryBanner';
 import { useSubscriptions } from '../hooks/useSubscription';
 import type { NewTradeItem } from '../stores/bookmarkStore';
 
@@ -155,20 +154,17 @@ export default function HomePage() {
               />
             )}
 
-            {/* 퀵 액션 탭 */}
-            <QuickActionTabs />
+            {/* 시장 요약 배너 */}
+            <MarketSummaryBanner />
 
-            {/* 오늘의 청약 배지 (D-7 이내) */}
-            <TodaySubscriptionBadge />
+            {/* 이달의 신고가 섹션 */}
+            <RecordHighSection />
 
-            {/* 주간 청약 타임라인 */}
+            {/* 주간 청약 타임라인 (오늘 청약 건수 Badge 통합) */}
             <WeeklySubscriptionTimeline
               subscriptions={allSubscriptions}
               isLoading={timelineLoading}
             />
-
-            {/* 이달의 신고가 섹션 */}
-            <RecordHighSection />
 
             {/* HOT 아파트 랭킹 */}
             <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
@@ -201,7 +197,7 @@ function BookmarkUpdateSection({
 }) {
   return (
     <Box sx={{ padding: isMobile ? '0 16px' : '0' }}>
-      <FlexBox alignItems="center" gap="6px" style={{ marginBottom: '10px' }}>
+      <FlexBox alignItems="center" gap="6px" style={{ marginBottom: '8px' }}>
         <span
           style={{
             width: 8,
@@ -220,11 +216,11 @@ function BookmarkUpdateSection({
         {trades.map((trade) => {
           const changeAmt = trade.newPrice - trade.oldPrice;
           const changeRate = trade.oldPrice > 0
-            ? ((changeAmt / trade.oldPrice) * 100).toFixed(1)
+            ? (Math.abs(changeAmt / trade.oldPrice) * 100).toFixed(1)
             : '0.0';
           const isUp = changeAmt > 0;
-          const changeColor = isUp ? '#FF4B4B' : '#3B82F6';
-          const changeSign = isUp ? '+' : '';
+          const changeColor = isUp ? '#FF4B4B' : '#00C896';
+          const changeSign = isUp ? '+' : '-';
 
           return (
             <button
@@ -271,7 +267,7 @@ function BookmarkUpdateSection({
                   weight="bold"
                   sx={{ color: changeColor, display: 'block' }}
                 >
-                  {changeSign}{(changeAmt / 10000).toFixed(1)}억
+                  {changeSign}{Math.abs(changeAmt / 10000).toFixed(1)}억
                 </Typography>
                 <Typography
                   variant="caption1"
@@ -297,7 +293,7 @@ function MapBanner() {
       onClick={() => navigate('/map')}
       style={{
         width: '100%',
-        background: 'linear-gradient(135deg, #0066FF 0%, #3B82F6 100%)',
+        background: 'linear-gradient(135deg, #1B64DA 0%, #2E7DE9 100%)',
         borderRadius: '16px',
         padding: '20px',
         textAlign: 'left',

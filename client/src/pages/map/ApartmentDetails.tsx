@@ -45,7 +45,7 @@ export function SubscriptionInfoSection({
 
   // D-Day 계산
   let dDayText = '';
-  let dDayColor = '#0066FF';
+  let dDayColor = '#1B64DA';
   if (isOngoing && apt.subDeadline) {
     const dl = new Date(apt.subDeadline);
     dl.setHours(0, 0, 0, 0);
@@ -55,7 +55,7 @@ export function SubscriptionInfoSection({
     } else if (diff > 0) {
       dDayText = `D-${diff}`;
     }
-    dDayColor = diff <= 7 ? '#D63031' : '#0066FF';
+    dDayColor = diff <= 7 ? '#D63031' : '#1B64DA';
   } else if (!isOngoing && apt.subStartDate) {
     const st = new Date(apt.subStartDate);
     st.setHours(0, 0, 0, 0);
@@ -83,7 +83,7 @@ export function SubscriptionInfoSection({
             display: 'inline-flex',
             alignItems: 'center',
             background: isOngoing ? '#E8F1FD' : '#FFF4E5',
-            color: isOngoing ? '#0066FF' : '#E67E22',
+            color: isOngoing ? '#1B64DA' : '#E67E22',
           }}
         >
           {isOngoing ? '청약 진행중' : '청약 예정'}
@@ -140,7 +140,7 @@ export function DesktopApartmentSummary({
     apartment.priceChangeType === 'up'
       ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? '#3B82F6'
+        ? '#00C896'
         : 'var(--semantic-label-assistive)';
 
   return (
@@ -234,7 +234,7 @@ export function ApartmentSummary({
     apartment.priceChangeType === 'up'
       ? '#FF4B4B'
       : apartment.priceChangeType === 'down'
-        ? '#3B82F6'
+        ? '#00C896'
         : 'var(--semantic-label-assistive)';
 
   return (

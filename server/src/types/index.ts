@@ -75,7 +75,7 @@ export interface HotApartment {
   area: number;
   tradeCount: number;
   priceChange: number;
-  priceChangeRate: number;
+  previousPrice: number;
   /** 위도 (지도 마커용) */
   lat?: number | null;
   /** 경도 (지도 마커용) */
@@ -422,4 +422,21 @@ export interface SubscriptionQueryParams {
 export interface TrendQueryParams {
   regionCode: string;
   type?: 'weekly' | 'monthly';
+}
+
+// ---- 전국 시장 요약 ----
+
+export interface MarketSummary {
+  /** 집계 범위 (수도권 또는 전국) */
+  scope: '수도권' | '전국';
+  /** 평균 거래가 (만원) */
+  avgPrice: number;
+  /** 전월 대비 변동률 (%) */
+  priceChange: number;
+  /** 이번 달 거래량 (건) */
+  tradeCount: number;
+  /** 기준 년월 (YYYY-MM) */
+  baseYearMonth: string;
+  /** 데이터 갱신 시각 (ISO 8601) */
+  updatedAt: string;
 }

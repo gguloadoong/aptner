@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
 import type { Subscription } from '../../types';
 import SubscriptionCard from '../subscription/SubscriptionCard';
@@ -33,15 +34,19 @@ function parseDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
-// Date → 'YYYY-MM-DD' 키 문자열
+// Date → 'YYYY-MM-DD' 키 문자열 (KST 로컬 기준, toISOString() UTC 변환 금지)
 function dateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export default function WeeklySubscriptionTimeline({
   subscriptions,
   isLoading = false,
 }: WeeklySubscriptionTimelineProps) {
+  const navigate = useNavigate();
   const weekDays = useMemo(() => getWeekDays(), []);
   const today = useMemo(() => {
     const d = new Date();
@@ -82,16 +87,40 @@ export default function WeeklySubscriptionTimeline({
     );
   }
 
+  // 오늘 날짜 키 기준 청약 건수 계산
+  const todayKey = dateKey(today);
+  const todaySubCount = subsByDate.get(todayKey)?.length ?? 0;
+
   return (
     <Box as="section" sx={{ padding: '0 16px' }}>
       {/* 섹션 헤더 */}
-      <Typography
-        variant="caption1"
-        weight="bold"
-        sx={{ color: 'var(--semantic-label-assistive)', display: 'block', marginBottom: '10px', letterSpacing: '0.02em' }}
-      >
-        이번 주 청약 일정
-      </Typography>
+      <FlexBox alignItems="center" justifyContent="space-between" style={{ marginBottom: '8px' }}>
+        <Typography
+          variant="caption1"
+          weight="bold"
+          sx={{ color: 'var(--semantic-label-assistive)', letterSpacing: '0.02em' }}
+        >
+          이번 주 청약 일정
+        </Typography>
+        {todaySubCount > 0 && (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              backgroundColor: 'var(--semantic-primary-normal)',
+              color: 'white',
+              fontSize: '11px',
+              fontWeight: 700,
+              lineHeight: 1.5,
+              flexShrink: 0,
+            }}
+          >
+            오늘 {todaySubCount}건
+          </span>
+        )}
+      </FlexBox>
 
       {/* 타임라인 가로 스크롤 */}
       <Box
@@ -136,7 +165,7 @@ export default function WeeklySubscriptionTimeline({
                   borderRadius: '10px',
                   cursor: 'pointer',
                   backgroundColor: isSelected
-                    ? 'rgba(0,102,255,0.08)'
+                    ? 'rgba(27,100,218,0.08)'
                     : 'transparent',
                   transition: 'background-color 120ms ease',
                 }}
@@ -152,7 +181,7 @@ export default function WeeklySubscriptionTimeline({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: isToday ? '#0066FF' : 'transparent',
+                    backgroundColor: isToday ? '#1B64DA' : 'transparent',
                     flexShrink: 0,
                   }}
                 >
@@ -165,9 +194,9 @@ export default function WeeklySubscriptionTimeline({
                         : dayIdx === 0
                           ? '#FF4B4B'
                           : dayIdx === 6
-                            ? '#3B82F6'
+                            ? '#1B64DA'
                             : isSelected
-                              ? '#0066FF'
+                              ? '#1B64DA'
                               : 'var(--semantic-label-normal)',
                       lineHeight: 1,
                     }}
@@ -181,11 +210,11 @@ export default function WeeklySubscriptionTimeline({
                   variant="caption2"
                   sx={{
                     color: isToday
-                      ? '#0066FF'
+                      ? '#1B64DA'
                       : dayIdx === 0
                         ? '#FF4B4B'
                         : dayIdx === 6
-                          ? '#3B82F6'
+                          ? '#1B64DA'
                           : 'var(--semantic-label-assistive)',
                     lineHeight: 1,
                   }}
@@ -200,7 +229,7 @@ export default function WeeklySubscriptionTimeline({
                       width: '6px',
                       height: '6px',
                       borderRadius: '50%',
-                      backgroundColor: hasOngoing ? '#0066FF' : '#F59E0B',
+                      backgroundColor: hasOngoing ? '#1B64DA' : '#F59E0B',
                       flexShrink: 0,
                     }}
                   />
@@ -229,6 +258,34 @@ export default function WeeklySubscriptionTimeline({
               외 {selectedSubs.length - 3}건 더 있음
             </Typography>
           )}
+          <button
+            onClick={() => navigate('/subscription')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              width: '100%',
+              marginTop: '8px',
+              padding: '4px 0',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              gap: '2px',
+            }}
+          >
+            <Typography
+              variant="caption1"
+              sx={{ color: 'var(--semantic-label-assistive)' }}
+            >
+              자세히 보기
+            </Typography>
+            <Typography
+              variant="caption1"
+              sx={{ color: 'var(--semantic-label-assistive)' }}
+            >
+              &gt;
+            </Typography>
+          </button>
         </Box>
       )}
 

@@ -133,7 +133,7 @@ export default function PriceAlertModal({
             className={[
               'flex-1 py-3 rounded-xl text-sm font-bold transition-colors',
               isValid
-                ? 'bg-[#0066FF] text-white hover:bg-[#0052CC]'
+                ? 'bg-[#1B64DA] text-white hover:bg-[#1558C0]'
                 : 'bg-[#E5E8EB] text-[#8B95A1] cursor-not-allowed',
             ].join(' ')}
           >
@@ -173,7 +173,7 @@ export function AlertButton({
         aria-label={active ? '알림 설정됨' : '가격 알림 설정'}
       >
         {active ? (
-          <IconBellFill style={{ color: '#0066FF' }} />
+          <IconBellFill style={{ color: '#1B64DA' }} />
         ) : (
           <IconBell />
         )}

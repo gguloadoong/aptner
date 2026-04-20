@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptions } from '../../hooks/useSubscription';
 import { Box, FlexBox, Typography, Skeleton } from '@wanteddev/wds';
-import { IconChevronRight } from '@wanteddev/wds-icon';
+import { IconChevronRight, IconBell } from '@wanteddev/wds-icon';
 
 const D7_MAX = 7;
 
@@ -22,7 +22,7 @@ export default function TodaySubscriptionBadge() {
   if (isLoading) {
     return (
       <Box sx={{ padding: '0 16px' }}>
-        <Skeleton variant="rectangle" width="100%" height="52px" style={{ borderRadius: '8px' }} />
+        <Skeleton variant="rectangle" width="100%" height="52px" style={{ borderRadius: '12px' }} />
       </Box>
     );
   }
@@ -42,7 +42,7 @@ export default function TodaySubscriptionBadge() {
           justifyContent: 'space-between',
           backgroundColor: '#EBF1FC',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: '12px',
           padding: '12px 16px',
           cursor: 'pointer',
           transition: 'opacity 120ms ease',
@@ -52,7 +52,7 @@ export default function TodaySubscriptionBadge() {
         aria-label={`${todaySub.name} D-${todaySub.dDay} 마감 임박`}
       >
         <FlexBox alignItems="center" gap="6px">
-          <Typography variant="body2" sx={{ fontSize: '15px', lineHeight: 1 }}>🔔</Typography>
+          <IconBell style={{ width: '16px', height: '16px', color: 'var(--semantic-primary-normal)' }} />
           <Typography
             variant="caption1"
             weight="bold"

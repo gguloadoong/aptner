@@ -151,8 +151,8 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
         <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#0066FF" stopOpacity={0.18} />
-              <stop offset="95%" stopColor="#0066FF" stopOpacity={0.01} />
+              <stop offset="5%" stopColor="#1B64DA" stopOpacity={0.18} />
+              <stop offset="95%" stopColor="#1B64DA" stopOpacity={0.01} />
             </linearGradient>
           </defs>
 
@@ -203,13 +203,13 @@ const PriceChart = React.memo<PriceChartProps>(({ data, isLoading = false }) => 
           <Area
             type="monotone"
             dataKey="price"
-            stroke="#0066FF"
+            stroke="#1B64DA"
             strokeWidth={2.5}
             fill={`url(#${gradientId})`}
             dot={false}
             activeDot={{
               r: 5,
-              fill: '#0066FF',
+              fill: '#1B64DA',
               stroke: 'white',
               strokeWidth: 2,
             }}

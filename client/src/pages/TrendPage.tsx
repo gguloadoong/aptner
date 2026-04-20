@@ -285,7 +285,7 @@ export default function TrendPage() {
                         {chartData.map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={entry.change > 0 ? '#FF4B4B' : entry.change < 0 ? '#3B82F6' : 'var(--color-chart-line, #0066FF)'}
+                            fill={entry.change > 0 ? '#FF4B4B' : entry.change < 0 ? '#00C896' : 'var(--color-chart-line, #1B64DA)'}
                           />
                         ))}
                       </Bar>
@@ -364,7 +364,7 @@ export default function TrendPage() {
                         const now = new Date();
                         const entryDate = new Date(entry.year, entry.monthNum - 1);
                         const diffMonths = (entryDate.getFullYear() - now.getFullYear()) * 12 + (entryDate.getMonth() - now.getMonth());
-                        return <Cell key={`cell-${index}`} fill={diffMonths <= 2 ? 'var(--color-chart-line, #0066FF)' : '#BFDBFE'} />;
+                        return <Cell key={`cell-${index}`} fill={diffMonths <= 2 ? 'var(--color-chart-line, #1B64DA)' : '#BFDBFE'} />;
                       })}
                     </Bar>
                   </BarChart>
@@ -374,7 +374,7 @@ export default function TrendPage() {
                 {/* 범례 */}
                 <FlexBox alignItems="center" gap="16px" style={{ marginTop: '8px' }}>
                   <FlexBox alignItems="center" gap="6px">
-                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: 'var(--color-chart-line, #0066FF)' }} />
+                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', backgroundColor: 'var(--color-chart-line, #1B64DA)' }} />
                     <Typography variant="caption2" sx={{ color: 'var(--semantic-label-assistive)' }}>3개월 내</Typography>
                   </FlexBox>
                   <FlexBox alignItems="center" gap="6px">
